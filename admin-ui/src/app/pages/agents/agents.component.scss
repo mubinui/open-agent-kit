@@ -1,0 +1,81 @@
+.agents-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+
+    h1 {
+      margin: 0;
+      color: #333;
+    }
+
+    button {
+      mat-icon {
+        margin-right: 8px;
+      }
+    }
+  }
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.agents-table {
+  width: 100%;
+
+  th {
+    font-weight: 600;
+    color: #666;
+  }
+
+  td {
+    padding: 12px 8px;
+  }
+
+  button {
+    margin: 0 4px;
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: #666;
+
+  p {
+    font-size: 16px;
+  }
+}
+
+.version-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #e3f2fd;
+  color: #1976d2;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.update-info {
+  font-size: 13px;
+  
+  .updated-by {
+    font-size: 11px;
+    color: #999;
+    margin-top: 2px;
+  }
+}
+
+.text-muted {
+  color: #999;
+}

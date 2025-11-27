@@ -1,0 +1,153 @@
+version: "3.8"
+
+services:
+  # Orchestration Service - Main application
+  orchestration-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: orchestration-service
+    ports:
+      - "8000:8000"  # API port
+      - "9090:9090"  # Metrics port
+    environment:
+      # LLM Providers
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      
+      # Database
+      - DATABASE_URL=postgresql://orchestrator:orchestrator_pass@postgres:5432/orchestration
+      
+      # Redis Cache
+      - REDIS_URL=redis://redis:6379/0
+      
+      # RabbitMQ
+      - RABBITMQ_URL=amqp://orchestrator:orchestrator_pass@rabbitmq:5672/
+      
+      # Vector Database (ChromaDB)
+      - CHROMADB_PATH=/app/data/chromadb
+      
+      # Application Settings
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MAX_CONCURRENT_SESSIONS=${MAX_CONCURRENT_SESSIONS:-100}
+      - AGENT_TIMEOUT_SECONDS=${AGENT_TIMEOUT_SECONDS:-300}
+      
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - OTEL_SERVICE_NAME=orchestration-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./configs:/app/configs
+      - chromadb_data:/app/data/chromadb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL - Conversation store and configuration
+  postgres:
+    image: postgres:16-alpine
+    container_name: orchestration-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=orchestrator
+      - POSTGRES_PASSWORD=orchestrator_pass
+      - POSTGRES_DB=orchestration
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestrator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Caching layer
+  redis:
+    image: redis:7-alpine
+    container_name: orchestration-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ - Message broker for async processing
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: orchestration-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI
+    environment:
+      - RABBITMQ_DEFAULT_USER=orchestrator
+      - RABBITMQ_DEFAULT_PASS=orchestrator_pass
+      - RABBITMQ_DEFAULT_VHOST=/
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ChromaDB - Optional standalone vector database
+  # Uncomment if you want to use ChromaDB as a separate service
+  # chromadb:
+  #   image: chromadb/chroma:latest
+  #   container_name: orchestration-chromadb
+  #   ports:
+  #     - "8001:8000"
+  #   environment:
+  #     - IS_PERSISTENT=TRUE
+  #     - ANONYMIZED_TELEMETRY=FALSE
+  #   volumes:
+  #     - chromadb_data:/chroma/chroma
+  #   restart: unless-stopped
+
+  # Admin UI - Angular frontend (optional, build separately)
+  # admin-ui:
+  #   build:
+  #     context: ./admin-ui
+  #     dockerfile: Dockerfile
+  #   container_name: orchestration-admin-ui
+  #   ports:
+  #     - "4200:80"
+  #   environment:
+  #     - API_URL=http://orchestration-service:8000
+  #   depends_on:
+  #     - orchestration-service
+  #   restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  chromadb_data:
+    driver: local
+
+networks:
+  default:
+    name: orchestration-network
+    driver: bridge

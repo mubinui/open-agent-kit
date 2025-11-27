@@ -1,0 +1,206 @@
+# Default values for orchestration-service
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 3
+
+image:
+  repository: orchestration-service
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+
+service:
+  type: ClusterIP
+  port: 8000
+  metricsPort: 9090
+  annotations: {}
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+  hosts:
+    - host: orchestration.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: orchestration-tls
+      hosts:
+        - orchestration.example.com
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app
+            operator: In
+            values:
+            - orchestration-service
+        topologyKey: kubernetes.io/hostname
+
+# Application configuration
+config:
+  logLevel: "INFO"
+  maxConcurrentSessions: 100
+  agentTimeoutSeconds: 300
+  apiWorkers: 4
+
+# Database configuration
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  auth:
+    username: orchestrator
+    password: orchestrator_pass
+    database: orchestration
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+
+# Redis configuration
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 500m
+
+# RabbitMQ configuration
+rabbitmq:
+  enabled: true
+  image:
+    repository: rabbitmq
+    tag: "3.12-management-alpine"
+  auth:
+    username: orchestrator
+    password: orchestrator_pass
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+
+# ChromaDB storage
+chromadb:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: standard
+
+# Secrets (use external secret management in production)
+secrets:
+  # LLM Provider API Keys
+  openrouterApiKey: "your-openrouter-api-key-here"
+  openaiApiKey: "your-openai-api-key-here"
+  
+  # JWT Secret
+  jwtSecretKey: "change-this-to-a-secure-random-string"
+  
+  # Encryption Key
+  encryptionKey: "change-this-to-a-secure-32-byte-key"
+
+# External secret management (optional)
+externalSecrets:
+  enabled: false
+  backend: aws-secrets-manager
+  region: us-east-1
+  secretName: orchestration/secrets
+
+# Network policies
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+
+# Init containers
+initContainers:
+  dbMigration:
+    enabled: true

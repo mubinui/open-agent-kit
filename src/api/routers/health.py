@@ -1,0 +1,188 @@
+"""Health check and metrics endpoints."""
+
+import time
+from typing import Any, Dict
+
+from fastapi import APIRouter, Request, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+from src.api.models import HealthResponse
+from src.audit_logging import get_logger
+from src.observability.metrics import get_metrics_registry
+
+logger = get_logger(__name__)
+router = APIRouter(prefix="/api/v1", tags=["health"])
+
+
+@router.get("/health", response_model=HealthResponse)
+async def health_check(request: Request) -> HealthResponse:
+    """
+    Health check endpoint for liveness probes.
+    
+    Args:
+        request: FastAPI request object
+        
+    Returns:
+        Health status information
+        
+    Requirements: 6.3, 14.1, 14.2
+    """
+    return HealthResponse(
+        status="healthy",
+        service="orchestration-service",
+        version="0.1.0",
+    )
+
+
+@router.get("/health/ready")
+async def readiness_check(request: Request) -> Dict[str, Any]:
+    """
+    Readiness check endpoint for readiness probes.
+    
+    This endpoint checks if the service is ready to accept traffic
+    by verifying that all dependencies are available.
+    
+    Args:
+        request: FastAPI request object
+        
+    Returns:
+        Readiness status information
+        
+    Requirements: 6.3, 14.1, 14.2, 16.3, 16.4
+    """
+    from src.config.settings import get_settings
+    from src.infrastructure.database.connection import get_db_manager
+    
+    settings = get_settings()
+    checks = {}
+    
+    # Check PostgreSQL database
+    if settings.memory.database_url:
+        try:
+            db_manager = get_db_manager()
+            checks["postgres"] = "ok" if db_manager.health_check() else "failed"
+        except Exception as e:
+            logger.error(f"PostgreSQL health check failed: {e}")
+            checks["postgres"] = "failed"
+    
+    # Check MongoDB (fail-fast if configured)
+    if settings.memory.mongodb_url:
+        try:
+            from src.infrastructure.database.mongo_store import MongoDBConversationStore
+            
+            mongo_store = MongoDBConversationStore(
+                connection_string=settings.memory.mongodb_url,
+                database_name=settings.memory.mongodb_database,
+            )
+            
+            if mongo_store.health_check():
+                checks["mongodb"] = "ok"
+            else:
+                checks["mongodb"] = "failed"
+                logger.error("MongoDB health check failed - service not ready")
+            
+            mongo_store.close()
+            
+        except Exception as e:
+            logger.error(f"MongoDB health check failed: {e}")
+            checks["mongodb"] = "failed"
+    
+    # Check Redis cache
+    if settings.memory.redis_url:
+        try:
+            from src.infrastructure.cache import get_cache_manager
+            
+            cache_manager = get_cache_manager()
+            checks["redis"] = "ok" if cache_manager.health_check() else "failed"
+        except Exception as e:
+            logger.error(f"Redis health check failed: {e}")
+            checks["redis"] = "failed"
+    
+    # Determine overall status
+    # Fail-fast: if MongoDB is configured and fails, service is not ready
+    all_ok = all(status == "ok" for status in checks.values())
+    
+    if not all_ok:
+        logger.warning(f"Readiness check failed: {checks}")
+    
+    return {
+        "status": "ready" if all_ok else "not_ready",
+        "service": "orchestration-service",
+        "version": "0.1.0",
+        "timestamp": time.time(),
+        "checks": checks,
+    }
+
+
+@router.get("/health/live")
+async def liveness_check(request: Request) -> Dict[str, Any]:
+    """
+    Liveness check endpoint for liveness probes.
+    
+    This endpoint checks if the service is alive and responding.
+    It should return quickly and not depend on external services.
+    
+    Args:
+        request: FastAPI request object
+        
+    Returns:
+        Liveness status information
+        
+    Requirements: 6.3, 14.1, 14.2
+    """
+    return {
+        "status": "alive",
+        "service": "orchestration-service",
+        "version": "0.1.0",
+        "timestamp": time.time(),
+    }
+
+
+@router.get("/metrics")
+async def metrics(request: Request) -> Response:
+    """
+    Prometheus metrics endpoint.
+    
+    This endpoint exposes metrics in Prometheus text format.
+    
+    Args:
+        request: FastAPI request object
+        
+    Returns:
+        Prometheus metrics in text format
+        
+    Requirements: 6.3, 14.1, 14.2
+    """
+    registry = get_metrics_registry()
+    metrics_output = generate_latest(registry)
+    
+    return Response(
+        content=metrics_output,
+        media_type=CONTENT_TYPE_LATEST,
+    )
+
+
+@router.get("/metrics/dashboard")
+async def dashboard_metrics(request: Request) -> Dict[str, Any]:
+    """
+    Dashboard metrics endpoint for frontend UI.
+    
+    This endpoint provides a JSON structure with key metrics
+    for the admin dashboard.
+    
+    Args:
+        request: FastAPI request object
+        
+    Returns:
+        Dashboard metrics as JSON
+    """
+    return {
+        "total_agents": 0,
+        "total_tools": 0,
+        "total_workflows": 0,
+        "active_sessions": 0,
+        "total_messages": 0,
+        "cache_hit_rate": 0.0,
+        "avg_response_time": 0.0,
+        "error_rate": 0.0,
+    }

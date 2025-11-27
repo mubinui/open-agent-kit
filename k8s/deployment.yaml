@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestration-service
+  namespace: orchestration
+  labels:
+    app: orchestration-service
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: orchestration-service
+  template:
+    metadata:
+      labels:
+        app: orchestration-service
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: orchestration-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      initContainers:
+      # Run database migrations before starting the app
+      - name: db-migration
+        image: orchestration-service:latest
+        command: ["alembic", "upgrade", "head"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: orchestration-secrets
+              key: DATABASE_URL
+        envFrom:
+        - configMapRef:
+            name: orchestration-config
+        - secretRef:
+            name: orchestration-secrets
+      
+      containers:
+      - name: orchestration-service
+        image: orchestration-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        env:
+        # Inject all config from ConfigMap and Secret
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: orchestration-secrets
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: orchestration-secrets
+              key: REDIS_URL
+        - name: RABBITMQ_URL
+          valueFrom:
+            secretKeyRef:
+              name: orchestration-secrets
+              key: RABBITMQ_URL
+        
+        envFrom:
+        - configMapRef:
+            name: orchestration-config
+        - secretRef:
+            name: orchestration-secrets
+        
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        volumeMounts:
+        - name: chromadb-storage
+          mountPath: /app/data/chromadb
+        - name: config-volume
+          mountPath: /app/configs
+          readOnly: true
+      
+      volumes:
+      - name: chromadb-storage
+        persistentVolumeClaim:
+          claimName: chromadb-pvc
+      - name: config-volume
+        configMap:
+          name: orchestration-config
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: orchestration-service
+  namespace: orchestration
+  labels:
+    app: orchestration-service
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chromadb-pvc
+  namespace: orchestration
+  labels:
+    app: orchestration-service
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard

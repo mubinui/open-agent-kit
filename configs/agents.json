@@ -1,0 +1,280 @@
+{
+  "version": "1.0",
+  "agents": [
+    {
+      "id": "reasoning_agent",
+      "type": "conversable",
+      "name": "ReasoningAgent",
+      "system_message": "You are a reasoning agent that analyzes user intent and creates execution plans.\n\nYour responsibilities:\n1. Detect the user's intent from their message\n2. Determine if knowledge retrieval is needed\n3. Create a clear plan for how to respond\n\nRespond in JSON format with:\n{\n    \"intent\": \"information_request|assistance_request|greeting|general_query\",\n    \"requires_knowledge\": true|false,\n    \"plan\": \"Brief description of how to handle this request\"\n}",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.7,
+        "max_tokens": 500,
+        "cache_seed": 42,
+        "timeout": 120
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 10,
+      "description": "Analyzes user intent and creates execution plans",
+      "version": 1,
+      "last_updated": "2024-11-16T00:00:00Z",
+      "retrieve_config": null
+    },
+    {
+      "id": "knowledge_agent",
+      "type": "retrieve_user_proxy",
+      "name": "KnowledgeAgent",
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "max_consecutive_auto_reply": 5,
+      "retrieve_config": {
+        "task": "qa",
+        "docs_path": [
+          "./docs"
+        ],
+        "chunk_token_size": 2000,
+        "vector_db": "chromadb",
+        "collection_name": "knowledge_base",
+        "embedding_model": "all-mpnet-base-v2",
+        "get_or_create": true
+      },
+      "description": "Retrieves relevant information from knowledge base",
+      "version": 1,
+      "last_updated": "2024-11-16T00:00:00Z"
+    },
+    {
+      "id": "response_agent",
+      "type": "conversable",
+      "name": "ResponseAgent",
+      "system_message": "You are a helpful AI assistant that generates clear, accurate, and friendly responses to user queries. Use the provided context and conversation history to craft appropriate responses.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.7,
+        "max_tokens": 1000,
+        "cache_seed": 42,
+        "timeout": 120
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 10,
+      "description": "Generates final user-facing responses",
+      "version": 1,
+      "last_updated": "2024-11-16T00:00:00Z"
+    },
+    {
+      "id": "code_assistant",
+      "type": "conversable",
+      "name": "CodeAssistant",
+      "system_message": "You are a code assistant that helps users write, debug, and understand code. You can execute Python code to demonstrate concepts.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.3,
+        "max_tokens": 2000,
+        "cache_seed": 42,
+        "timeout": 180
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": {
+        "work_dir": "coding",
+        "use_docker": false
+      },
+      "tools": [
+        "calculator"
+      ],
+      "max_consecutive_auto_reply": 15,
+      "description": "Assists with coding tasks and can execute code",
+      "version": 1,
+      "last_updated": "2024-11-16T00:00:00Z"
+    },
+    {
+      "id": "test_agent",
+      "type": "conversable",
+      "name": "TestAgent",
+      "system_message": "You are a test agent",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.7
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 10,
+      "retrieve_config": null,
+      "description": null,
+      "version": 1,
+      "last_updated": "2024-11-16T00:00:00Z"
+    },
+    {
+      "id": "search_assistant",
+      "type": "conversable",
+      "name": "SearchAssistant",
+      "system_message": "You are a helpful search assistant that can search the web for current information. When a user asks a question, use the web_search tool to find relevant information and provide a clear, concise answer based on the search results. Always cite your sources and be honest if you cannot find the information.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.7,
+        "max_tokens": 1500,
+        "cache_seed": 42,
+        "timeout": 120
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [
+        "web_search"
+      ],
+      "max_consecutive_auto_reply": 5,
+      "description": "An assistant that searches the web to answer questions",
+      "version": 1,
+      "last_updated": "2024-11-26T00:00:00Z",
+      "retrieve_config": null
+    },
+    {
+      "id": "user_proxy",
+      "type": "conversable",
+      "name": "UserProxy",
+      "system_message": "You are a user proxy that executes function calls and returns results. You do not generate your own responses, only execute tools when requested.",
+      "llm_config": false,
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 10,
+      "description": "Proxy agent representing the user that executes tool calls",
+      "version": 1,
+      "last_updated": "2024-11-26T00:00:00Z"
+    },
+    {
+      "id": "assistant",
+      "type": "conversable",
+      "name": "Assistant",
+      "system_message": "You are a helpful AI assistant. Answer questions clearly and concisely.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.7,
+        "max_tokens": 1000,
+        "cache_seed": 42,
+        "timeout": 120
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 5,
+      "description": "A general-purpose helpful assistant",
+      "version": 1,
+      "last_updated": "2024-11-26T00:00:00Z"
+    },
+    {
+      "id": "python_coder",
+      "type": "conversable",
+      "name": "DeveloperPyMax",
+      "system_message": "You Are A python Programmer . You will just return python snippet.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.7,
+        "max_tokens": 1000,
+        "timeout": 120,
+        "cache_seed": 42
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [
+        "web_search"
+      ],
+      "max_consecutive_auto_reply": 10,
+      "retrieve_config": null,
+      "description": null
+    },
+    {
+      "id": "facilitator",
+      "type": "conversable",
+      "name": "Facilitator",
+      "system_message": "You are a facilitator agent that guides brainstorming sessions. Your role is to introduce topics, keep discussions on track, summarize key points, and ensure all participants contribute. Be encouraging and help synthesize ideas from different perspectives.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.7,
+        "max_tokens": 1000,
+        "timeout": 120,
+        "cache_seed": 42
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 10,
+      "description": "Facilitates and guides brainstorming sessions",
+      "version": 1,
+      "last_updated": "2024-11-27T00:00:00Z"
+    },
+    {
+      "id": "creative_agent",
+      "type": "conversable",
+      "name": "CreativeAgent",
+      "system_message": "You are a creative agent that generates innovative and unconventional ideas. Think outside the box, propose novel solutions, and don't be afraid to suggest bold or unusual approaches. Your goal is to expand the solution space with creative possibilities.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.9,
+        "max_tokens": 1000,
+        "timeout": 120,
+        "cache_seed": 42
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 10,
+      "description": "Generates creative and innovative ideas",
+      "version": 1,
+      "last_updated": "2024-11-27T00:00:00Z"
+    },
+    {
+      "id": "analytical_agent",
+      "type": "conversable",
+      "name": "AnalyticalAgent",
+      "system_message": "You are an analytical agent that evaluates ideas based on logic, feasibility, and data. Assess proposals for their practical implementation, identify potential challenges, and provide structured analysis. Focus on facts, metrics, and evidence-based reasoning.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.5,
+        "max_tokens": 1000,
+        "timeout": 120,
+        "cache_seed": 42
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 10,
+      "description": "Provides analytical evaluation of ideas",
+      "version": 1,
+      "last_updated": "2024-11-27T00:00:00Z"
+    },
+    {
+      "id": "critic_agent",
+      "type": "conversable",
+      "name": "CriticAgent",
+      "system_message": "You are a critic agent that provides constructive criticism and identifies weaknesses in proposals. Point out potential flaws, risks, and areas for improvement. Be respectful but thorough in your critique to help strengthen ideas before implementation.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.6,
+        "max_tokens": 1000,
+        "timeout": 120,
+        "cache_seed": 42
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 10,
+      "description": "Provides constructive criticism to strengthen ideas",
+      "version": 1,
+      "last_updated": "2024-11-27T00:00:00Z"
+    }
+  ]
+}

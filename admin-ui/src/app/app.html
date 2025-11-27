@@ -1,0 +1,46 @@
+<mat-sidenav-container class="sidenav-container">
+  <mat-sidenav mode="side" opened class="sidenav">
+    <div class="brand-header">
+      <div class="logo-circle">
+        <mat-icon>auto_awesome</mat-icon>
+      </div>
+      <div class="brand-text">
+        <span class="brand-title">Autogen</span>
+        <span class="brand-subtitle">Orchestrator</span>
+      </div>
+    </div>
+
+    <mat-nav-list class="nav-list">
+      @for (item of menuItems; track item.path) {
+        <a mat-list-item [routerLink]="item.path" routerLinkActive="active-link" class="nav-item">
+          <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+          <span matListItemTitle>{{ item.label }}</span>
+        </a>
+      }
+    </mat-nav-list>
+    
+    <div class="sidenav-footer">
+      <span class="version">v1.0.0</span>
+    </div>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="main-content">
+    <mat-toolbar class="app-toolbar">
+      <span class="page-title">{{ title }}</span>
+      <span class="spacer"></span>
+      <button mat-icon-button class="toolbar-btn">
+        <mat-icon>notifications_none</mat-icon>
+      </button>
+      <button mat-icon-button class="toolbar-btn">
+        <mat-icon>settings</mat-icon>
+      </button>
+      <div class="user-profile">
+        <div class="avatar">A</div>
+      </div>
+    </mat-toolbar>
+    
+    <div class="content-wrapper">
+      <router-outlet />
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -1,0 +1,73 @@
+{
+  "version": "1.0",
+  "last_updated": "2025-11-04T00:00:00Z",
+  "providers": [
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "type": "llm",
+      "description": "Primary LLM provider routed through OpenRouter.",
+      "base_url": "https://openrouter.ai/api/v1",
+      "auth": {
+        "scheme": "bearer",
+        "env_var": "OPENROUTER_API_KEY"
+      },
+      "models": [
+        {
+          "name": "openai/gpt-oss-20b",
+          "default": true,
+          "capabilities": ["chat", "reasoning"],
+          "pricing": {
+            "input_per_million_tokens": 2.0,
+            "output_per_million_tokens": 2.0,
+            "currency": "USD"
+          }
+        }
+      ],
+      "request_defaults": {
+        "timeout_seconds": 120,
+        "max_retries": 2,
+        "headers": {
+          "HTTP-Referer": "https://github.com/mubinuiislam/MicrosoftAutogen",
+          "X-Title": "Autogen Sequential Chatbot"
+        }
+      }
+    },
+    {
+      "id": "duckduckgo",
+      "name": "DuckDuckGo Search",
+      "type": "tool",
+      "description": "DuckDuckGo Search API wrapper for real-time knowledge lookups.",
+      "library": "duckduckgo-search",
+      "entrypoint": "src.agents.connectors.duckduckgo:DuckDuckGoConnector",
+      "settings": {
+        "max_results": 3
+      }
+    },
+    {
+      "id": "mock_api",
+      "name": "Mock External API",
+      "type": "api",
+      "description": "Mock API provider that you can replace with your actual API integration.",
+      "base_url": "https://api.example.com/v1",
+      "auth": {
+        "scheme": "bearer",
+        "env_var": "MOCK_API_KEY"
+      },
+      "request_defaults": {
+        "timeout_seconds": 30,
+        "max_retries": 3,
+        "headers": {
+          "Content-Type": "application/json",
+          "User-Agent": "Autogen-Chatbot/1.0"
+        }
+      },
+      "enabled": false,
+      "settings": {
+        "rate_limit_per_minute": 60,
+        "max_payload_size_kb": 1024,
+        "supports_streaming": false
+      }
+    }
+  ]
+}

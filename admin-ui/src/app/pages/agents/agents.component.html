@@ -1,0 +1,104 @@
+<div class="agents-container">
+  <div class="header">
+    <h1>Agents Management</h1>
+    <button mat-raised-button color="primary" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon>
+      Create Agent
+    </button>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner></mat-spinner>
+    </div>
+  } @else {
+    <mat-card>
+      <mat-card-content>
+        <table mat-table [dataSource]="agents()" class="agents-table">
+          <!-- ID Column -->
+          <ng-container matColumnDef="id">
+            <th mat-header-cell *matHeaderCellDef>ID</th>
+            <td mat-cell *matCellDef="let agent">{{ agent.id }}</td>
+          </ng-container>
+
+          <!-- Name Column -->
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <td mat-cell *matCellDef="let agent">{{ agent.name }}</td>
+          </ng-container>
+
+          <!-- Type Column -->
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Type</th>
+            <td mat-cell *matCellDef="let agent">{{ agent.type }}</td>
+          </ng-container>
+
+          <!-- Version Column -->
+          <ng-container matColumnDef="version">
+            <th mat-header-cell *matHeaderCellDef>Version</th>
+            <td mat-cell *matCellDef="let agent">
+              @if (agent.version) {
+                <span class="version-badge">v{{ agent.version }}</span>
+              } @else {
+                <span class="version-badge">v1</span>
+              }
+            </td>
+          </ng-container>
+
+          <!-- Last Updated Column -->
+          <ng-container matColumnDef="last_updated">
+            <th mat-header-cell *matHeaderCellDef>Last Updated</th>
+            <td mat-cell *matCellDef="let agent">
+              @if (agent.last_updated) {
+                <div class="update-info">
+                  <div>{{ formatDate(agent.last_updated) }}</div>
+                  @if (agent.updated_by) {
+                    <div class="updated-by">by {{ agent.updated_by }}</div>
+                  }
+                </div>
+              } @else {
+                <span class="text-muted">N/A</span>
+              }
+            </td>
+          </ng-container>
+
+          <!-- Tools Column -->
+          <ng-container matColumnDef="tools">
+            <th mat-header-cell *matHeaderCellDef>Tools</th>
+            <td mat-cell *matCellDef="let agent">
+              {{ agent.tools.length > 0 ? agent.tools.join(', ') : 'None' }}
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Actions</th>
+            <td mat-cell *matCellDef="let agent">
+              <button mat-icon-button color="primary" (click)="testAgent(agent)" matTooltip="Test Agent">
+                <mat-icon>play_arrow</mat-icon>
+              </button>
+              <button mat-icon-button (click)="openHistoryDialog(agent)" matTooltip="View History">
+                <mat-icon>history</mat-icon>
+              </button>
+              <button mat-icon-button color="accent" (click)="openEditDialog(agent)" matTooltip="Edit">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" (click)="openDeleteDialog(agent)" matTooltip="Delete">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+
+        @if (agents().length === 0) {
+          <div class="empty-state">
+            <p>No agents configured. Create your first agent to get started.</p>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "tools": [
+    {
+      "id": "calculator",
+      "name": "calculate",
+      "description": "Perform arithmetic calculations on mathematical expressions. Supports basic operations like +, -, *, /, and functions like abs, round, min, max, sum, pow.",
+      "entrypoint": "src.tools.calculator:calculate",
+      "enabled": true,
+      "settings": {},
+      "version": 1,
+      "last_updated": "2024-11-16T00:00:00Z"
+    },
+    {
+      "id": "web_search",
+      "name": "search_web",
+      "description": "Search the web using DuckDuckGo and return formatted results with titles, descriptions, and URLs. Useful for finding current information, facts, and resources.",
+      "entrypoint": "src.tools.web_search:search_web",
+      "enabled": true,
+      "settings": {
+        "max_results": 5
+      },
+      "version": 1,
+      "last_updated": "2024-11-16T00:00:00Z"
+    }
+  ]
+}

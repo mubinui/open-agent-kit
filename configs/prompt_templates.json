@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "contexts": [
+    {
+      "id": "default_system",
+      "target": "response_agent",
+      "description": "Primary system directive for the response agent.",
+      "prompt": "You are a helpful AI assistant. Provide clear, accurate, and safe responses. Use the conversation history and context to give relevant answers."
+    },
+    {
+      "id": "knowledge_summary",
+      "target": "knowledge_agent",
+      "description": "Instructions for summarizing web search results into structured facts.",
+      "prompt": "Summarize the retrieved search results into concise bullet points that capture the most relevant facts. Mention each source briefly."
+    }
+  ],
+  "fallbacks": {
+    "missing_provider": "The requested provider is not available. Please configure it in configs/api_providers.json.",
+    "missing_prompt": "Unable to locate the prompt template. Verify the prompt identifier in configs/prompt_templates.json."
+  }
+}

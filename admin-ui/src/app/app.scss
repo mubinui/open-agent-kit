@@ -1,0 +1,196 @@
+.sidenav-container {
+  height: 100vh;
+  background-color: #f8fafc; // Slate 50
+}
+
+.sidenav {
+  width: 260px;
+  background-color: #0f172a; // Slate 900
+  color: #e2e8f0; // Slate 200
+  border-right: none;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+
+  .brand-header {
+    height: 80px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+    .logo-circle {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 16px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+
+      mat-icon {
+        color: white;
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+      }
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+
+      .brand-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: white;
+        letter-spacing: 0.5px;
+      }
+
+      .brand-subtitle {
+        font-size: 12px;
+        color: #94a3b8; // Slate 400
+      }
+    }
+  }
+
+  .nav-list {
+    padding: 0 12px;
+
+    .nav-item {
+      border-radius: 8px;
+      margin-bottom: 4px;
+      color: #94a3b8 !important;
+      transition: all 0.2s ease;
+      height: 48px;
+
+      // Force color on internal elements
+      ::ng-deep .mdc-list-item__primary-text {
+        color: #94a3b8 !important;
+      }
+      
+      ::ng-deep .mat-icon {
+        color: #94a3b8 !important;
+      }
+
+      mat-icon {
+        color: #94a3b8 !important;
+        margin-right: 12px;
+      }
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: #e2e8f0 !important;
+        
+        ::ng-deep .mdc-list-item__primary-text {
+          color: #e2e8f0 !important;
+        }
+
+        mat-icon, ::ng-deep .mat-icon {
+          color: #e2e8f0 !important;
+        }
+      }
+
+      &.active-link {
+        background-color: #3b82f6; // Blue 500
+        color: white !important;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+
+        ::ng-deep .mdc-list-item__primary-text {
+          color: white !important;
+        }
+
+        mat-icon, ::ng-deep .mat-icon {
+          color: white !important;
+        }
+      }
+    }
+  }
+
+  .sidenav-footer {
+    margin-top: auto;
+    padding: 24px;
+    text-align: center;
+    
+    .version {
+      font-size: 11px;
+      color: #94a3b8;
+      background: rgba(255,255,255,0.05);
+      padding: 4px 8px;
+      border-radius: 12px;
+    }
+  }
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-toolbar {
+  background: white;
+  color: #1e293b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  padding: 0 32px;
+  height: 70px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+
+  .page-title {
+    font-size: 20px;
+    font-weight: 500;
+    color: #1e293b;
+  }
+
+  .spacer {
+    flex: 1 1 auto;
+  }
+
+  .toolbar-btn {
+    color: #64748b;
+    margin-left: 8px;
+    
+    &:hover {
+      background-color: #f1f5f9;
+      color: #334155;
+    }
+  }
+
+  .user-profile {
+    margin-left: 16px;
+    padding-left: 16px;
+    border-left: 1px solid #e2e8f0;
+    
+    .avatar {
+      width: 36px;
+      height: 36px;
+      background: #e0e7ff;
+      color: #4f46e5;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.2s;
+
+      &:hover {
+        transform: scale(1.05);
+      }
+    }
+  }
+}
+
+.content-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+  background-color: #f8fafc;
+}
