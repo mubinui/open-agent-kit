@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from pymongo.collection import Collection
@@ -75,32 +75,33 @@ class MongoDBConversationStore(ConversationStore):
             ConversationState: Newly created session
         """
         try:
-            # Create session document
+            session_uuid = uuid4()
+            session_id_str = str(session_uuid)
+            current_time = datetime.utcnow()
+            
             session_doc = {
+                "_id": session_id_str,
                 "turn_count": 0,
                 "active": True,
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
+                "created_at": current_time,
+                "updated_at": current_time,
                 "metadata": {},
             }
             
-            # Insert into MongoDB
-            result = self.sessions_collection.insert_one(session_doc)
-            session_id = result.inserted_id
+            self.sessions_collection.insert_one(session_doc)
             
-            # Convert to ConversationState
             state = ConversationState(
-                session_id=UUID(str(session_id)),
+                session_id=session_uuid,
                 messages=[],
                 agent_notes=[],
                 turn_count=0,
                 active=True,
-                created_at=session_doc["created_at"],
-                updated_at=session_doc["updated_at"],
+                created_at=current_time,
+                updated_at=current_time,
                 metadata={},
             )
             
-            logger.info(f"Created MongoDB session: {session_id}")
+            logger.info(f"Created MongoDB session: {session_id_str}")
             
             return state
             

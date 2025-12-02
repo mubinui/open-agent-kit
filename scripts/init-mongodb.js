@@ -10,8 +10,8 @@ print('Initializing MongoDB for Orchestration Service...');
 // Note: Update username and password as needed for your environment
 try {
     db.createUser({
-        user: 'orchestration_user',
-        pwd: 'change_this_password_in_production',
+        user: 'orchestrator',
+        pwd: 'orchestrator_pass',
         roles: [
             {
                 role: 'readWrite',
@@ -19,10 +19,10 @@ try {
             }
         ]
     });
-    print('✓ Created orchestration_user');
+    print('✓ Created orchestrator user');
 } catch (e) {
     if (e.code === 51003) {
-        print('⚠ User orchestration_user already exists');
+        print('⚠ User orchestrator already exists');
     } else {
         print('✗ Failed to create user: ' + e.message);
         throw e;
@@ -179,5 +179,5 @@ db.transcripts.getIndexes().forEach(function(idx) {
 
 print('\n✓ MongoDB initialization complete!');
 print('\nConnection string format:');
-print('mongodb://orchestration_user:your_password@localhost:27017/orchestration');
+print('mongodb://orchestrator:orchestrator_pass@localhost:27017/orchestration');
 print('\nSet MONGODB_URL environment variable to use MongoDB persistence.');

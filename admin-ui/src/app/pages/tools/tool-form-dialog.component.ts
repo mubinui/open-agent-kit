@@ -124,6 +124,12 @@ import { ToolConfig } from '../../models/tool.model';
             <input matInput type="number" [(ngModel)]="tool.timeout" name="timeout" min="1" max="300">
             <mat-hint>Request timeout in seconds (default: 30)</mat-hint>
           </mat-form-field>
+
+          <div class="checkbox-field">
+            <mat-checkbox [(ngModel)]="tool.forward_user_context" name="forward_user_context">
+              Forward User Context (x-client-ref, x-client-username)
+            </mat-checkbox>
+          </div>
         }
 
         <div class="checkbox-field">
@@ -147,7 +153,7 @@ import { ToolConfig } from '../../models/tool.model';
       gap: 10px;
       font-size: 1.25rem;
       font-weight: 600;
-      color: #1e293b;
+      // Color handled by global styles
     }
 
     mat-dialog-content {
@@ -239,12 +245,14 @@ export class ToolFormDialogComponent {
       delete this.tool.body_template;
       delete this.tool.response_path;
       delete this.tool.timeout;
+      delete this.tool.forward_user_context;
       this.headersJson = '';
     } else if (this.tool.type === 'api') {
       delete this.tool.entrypoint;
       this.tool.http_method = 'POST';
       this.tool.auth_type = 'none';
       this.tool.timeout = 30;
+      this.tool.forward_user_context = true; // Default to true for convenience
     }
   }
 
@@ -280,7 +288,8 @@ export class ToolFormDialogComponent {
         headers: this.tool.headers,
         body_template: this.tool.body_template,
         response_path: this.tool.response_path,
-        timeout: this.tool.timeout
+        timeout: this.tool.timeout,
+        forward_user_context: this.tool.forward_user_context
       };
     }
     

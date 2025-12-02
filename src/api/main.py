@@ -169,7 +169,9 @@ async def request_logging_middleware(request: Request, call_next):
 
 @app.middleware("http")
 async def jwt_validation_middleware(request: Request, call_next):
-    """Middleware to validate JWT tokens and add user context to request."""
+    """Middleware to validate JWT tokens (Keycloak or internal) and add user context."""
+    settings = get_settings()
+    
     # Skip auth for public endpoints
     public_paths = ["/", "/docs", "/openapi.json", "/health", "/metrics", "/api/v1/auth/token"]
     
@@ -184,8 +186,30 @@ async def jwt_validation_middleware(request: Request, call_next):
         # Add token to request state for use in dependencies
         request.state.auth_token = token
         
-        # Log authentication attempt
-        logger.debug("jwt_validation_attempt", path=request.url.path)
+        # Extract custom headers for Service2-style calls (x-client-ref, x-client-username)
+        from src.api.keycloak_auth import extract_client_headers
+        roles, username = extract_client_headers(request)
+        request.state.client_roles = roles
+        request.state.client_username = username
+        
+        # Validate via Keycloak if enabled
+        if settings.keycloak.enabled:
+            from src.api.keycloak_auth import validate_keycloak_token
+            try:
+                token_data = await validate_keycloak_token(token)
+                request.state.keycloak_user = token_data
+                request.state.keycloak_authenticated = True
+                logger.debug(
+                    "keycloak_token_validated",
+                    username=token_data.preferred_username,
+                    roles=token_data.roles,
+                )
+            except Exception as e:
+                logger.warning("keycloak_validation_failed", error=str(e))
+                request.state.keycloak_authenticated = False
+        else:
+            # Log authentication attempt for internal JWT
+            logger.debug("jwt_validation_attempt", path=request.url.path)
     
     return await call_next(request)
 

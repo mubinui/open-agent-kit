@@ -81,6 +81,65 @@ class SecurityConfig(BaseSettings):
     api_key_requests_per_hour: int = Field(default=5000, alias="API_KEY_REQUESTS_PER_HOUR")
 
 
+class KeycloakConfig(BaseSettings):
+    """Keycloak OIDC configuration."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    enabled: bool = Field(default=False, alias="KEYCLOAK_ENABLED")
+    server_url: str = Field(default="http://localhost:8080", alias="KEYCLOAK_SERVER_URL")
+    realm: str = Field(default="demo-realm", alias="KEYCLOAK_REALM")
+    client_id: str = Field(default="frontend-client", alias="KEYCLOAK_CLIENT_ID")
+    client_secret: str | None = Field(default=None, alias="KEYCLOAK_CLIENT_SECRET")
+    admin_client_id: str = Field(default="admin-client", alias="KEYCLOAK_ADMIN_CLIENT_ID")
+    admin_client_secret: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_CLIENT_SECRET")
+    verify_audience: bool = Field(default=True, alias="KEYCLOAK_VERIFY_AUDIENCE")
+    jwks_cache_ttl: int = Field(default=3600, alias="KEYCLOAK_JWKS_CACHE_TTL")
+
+    @property
+    def jwks_uri(self) -> str:
+        """JWKS endpoint for token signature verification."""
+        return f"{self.server_url}/realms/{self.realm}/protocol/openid-connect/certs"
+
+    @property
+    def token_endpoint(self) -> str:
+        """Token endpoint for client_credentials grant."""
+        return f"{self.server_url}/realms/{self.realm}/protocol/openid-connect/token"
+
+    @property
+    def issuer(self) -> str:
+        """Expected token issuer."""
+        return f"{self.server_url}/realms/{self.realm}"
+
+
+class ExternalServicesConfig(BaseSettings):
+    """External service endpoints configuration (Service1, Service2)."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # Service1 configuration (user-authenticated calls)
+    service1_base_url: str = Field(default="http://localhost:8001", alias="SERVICE1_BASE_URL")
+    service1_api_path: str = Field(default="/api/v1", alias="SERVICE1_API_PATH")
+    service1_timeout: int = Field(default=30, alias="SERVICE1_TIMEOUT")
+    service1_enabled: bool = Field(default=False, alias="SERVICE1_ENABLED")
+
+    # Service2 configuration (admin-authenticated calls)
+    service2_base_url: str = Field(default="http://localhost:8002", alias="SERVICE2_BASE_URL")
+    service2_api_path: str = Field(default="/api/v1", alias="SERVICE2_API_PATH")
+    service2_timeout: int = Field(default=30, alias="SERVICE2_TIMEOUT")
+    service2_enabled: bool = Field(default=False, alias="SERVICE2_ENABLED")
+
+
 class Settings(BaseSettings):
     """Root settings container."""
 
@@ -98,6 +157,8 @@ class Settings(BaseSettings):
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     vector_db: VectorDBConfig = Field(default_factory=VectorDBConfig)
     message_broker: MessageBrokerConfig = Field(default_factory=MessageBrokerConfig)
+    keycloak: KeycloakConfig = Field(default_factory=KeycloakConfig)
+    external_services: ExternalServicesConfig = Field(default_factory=ExternalServicesConfig)
 
 
 # Global settings instance

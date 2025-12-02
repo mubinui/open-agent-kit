@@ -36,3 +36,17 @@ data:
   # API Configuration
   API_PORT: "8000"
   API_WORKERS: "4"
+  
+  # Keycloak Configuration (non-sensitive)
+  KEYCLOAK_ENABLED: "true"
+  KEYCLOAK_REALM: "demo-realm"
+  KEYCLOAK_VERIFY_AUDIENCE: "true"
+  KEYCLOAK_JWKS_CACHE_TTL: "3600"
+  
+  # External Services Configuration (non-sensitive)
+  SERVICE1_ENABLED: "true"
+  SERVICE1_API_PATH: "/api/v1"
+  SERVICE1_TIMEOUT: "30"
+  SERVICE2_ENABLED: "true"
+  SERVICE2_API_PATH: "/api/v1"
+  SERVICE2_TIMEOUT: "30"

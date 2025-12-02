@@ -177,6 +177,33 @@ secrets:
   
   # Encryption Key
   encryptionKey: "change-this-to-a-secure-32-byte-key"
+  
+  # Keycloak Credentials
+  keycloakClientSecret: "your-client-secret-here"
+  keycloakAdminClientSecret: "your-admin-client-secret-here"
+
+# Keycloak Configuration
+keycloak:
+  enabled: false
+  serverUrl: "http://keycloak-service:8080"
+  realm: "demo-realm"
+  clientId: "frontend-client"
+  adminClientId: "admin-client"
+  verifyAudience: true
+  jwksCacheTtl: 3600
+
+# External Services Configuration
+externalServices:
+  service1:
+    enabled: false
+    baseUrl: "http://service1-service:8001"
+    apiPath: "/api/v1"
+    timeout: 30
+  service2:
+    enabled: false
+    baseUrl: "http://service2-service:8002"
+    apiPath: "/api/v1"
+    timeout: 30
 
 # External secret management (optional)
 externalSecrets:

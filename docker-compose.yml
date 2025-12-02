@@ -17,6 +17,9 @@ services:
       
       # Database
       - DATABASE_URL=postgresql://orchestrator:orchestrator_pass@postgres:5432/orchestration
+      - MEMORY_BACKEND=${MEMORY_BACKEND:-mongodb}
+      - MONGODB_URL=mongodb://orchestrator:orchestrator_pass@mongodb:27017/${MONGODB_DATABASE:-orchestration}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-orchestration}
       
       # Redis Cache
       - REDIS_URL=redis://redis:6379/0
@@ -32,6 +35,27 @@ services:
       - MAX_CONCURRENT_SESSIONS=${MAX_CONCURRENT_SESSIONS:-100}
       - AGENT_TIMEOUT_SECONDS=${AGENT_TIMEOUT_SECONDS:-300}
       
+      # Keycloak Configuration
+      - KEYCLOAK_ENABLED=${KEYCLOAK_ENABLED:-false}
+      - KEYCLOAK_SERVER_URL=${KEYCLOAK_SERVER_URL:-http://keycloak:8080}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-demo-realm}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-frontend-client}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
+      - KEYCLOAK_ADMIN_CLIENT_ID=${KEYCLOAK_ADMIN_CLIENT_ID:-admin-client}
+      - KEYCLOAK_ADMIN_CLIENT_SECRET=${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
+      - KEYCLOAK_VERIFY_AUDIENCE=${KEYCLOAK_VERIFY_AUDIENCE:-true}
+      - KEYCLOAK_JWKS_CACHE_TTL=${KEYCLOAK_JWKS_CACHE_TTL:-3600}
+      
+      # External Services Configuration
+      - SERVICE1_ENABLED=${SERVICE1_ENABLED:-false}
+      - SERVICE1_BASE_URL=${SERVICE1_BASE_URL:-http://service1:8001}
+      - SERVICE1_API_PATH=${SERVICE1_API_PATH:-/api/v1}
+      - SERVICE1_TIMEOUT=${SERVICE1_TIMEOUT:-30}
+      - SERVICE2_ENABLED=${SERVICE2_ENABLED:-false}
+      - SERVICE2_BASE_URL=${SERVICE2_BASE_URL:-http://service2:8002}
+      - SERVICE2_API_PATH=${SERVICE2_API_PATH:-/api/v1}
+      - SERVICE2_TIMEOUT=${SERVICE2_TIMEOUT:-30}
+      
       # Observability
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       - OTEL_SERVICE_NAME=orchestration-service
@@ -41,6 +65,8 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     volumes:
       - ./configs:/app/configs
@@ -109,6 +135,26 @@ services:
       timeout: 10s
       retries: 5
 
+  # MongoDB - Primary session store
+  mongodb:
+    image: mongo:7.0
+    container_name: orchestration-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGODB_ROOT_USER:-mongo_root}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_ROOT_PASSWORD:-mongo_root_pass}
+      - MONGO_INITDB_DATABASE=${MONGODB_DATABASE:-orchestration}
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/init-mongodb.js:/docker-entrypoint-initdb.d/init-mongodb.js:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
   # ChromaDB - Optional standalone vector database
   # Uncomment if you want to use ChromaDB as a separate service
   # chromadb:
@@ -145,6 +191,8 @@ volumes:
   rabbitmq_data:
     driver: local
   chromadb_data:
+    driver: local
+  mongodb_data:
     driver: local
 
 networks:

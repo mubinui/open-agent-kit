@@ -9,7 +9,7 @@
 html {
   @include mat.theme((
     color: (
-      primary: mat.$azure-palette,
+      primary: mat.$magenta-palette,
       tertiary: mat.$blue-palette,
     ),
     typography: Roboto,
@@ -45,6 +45,26 @@ body {
   margin: 0; 
   font-family: 'Inter', Roboto, "Helvetica Neue", sans-serif; 
   background-color: #f8fafc;
+  color: #334155; // Slate 700 - Uniform body text color
+}
+
+// Global Typography
+h1, h2, h3, h4, h5, h6 {
+  color: #1e293b; // Slate 800 - Uniform heading color
+  margin-top: 0;
+  font-weight: 600;
+}
+
+.text-muted {
+  color: #64748b !important; // Slate 500
+}
+
+a {
+  color: #D91B5C; // BRAC Pink
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 // Global Card Styling Override for "Sleek" look
@@ -63,7 +83,7 @@ body {
 // Button Styling Override
 .mat-mdc-raised-button.mat-primary {
   border-radius: 8px !important;
-  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3), 0 2px 4px -1px rgba(59, 130, 246, 0.15) !important;
+  box-shadow: 0 4px 6px -1px rgba(217, 27, 92, 0.3), 0 2px 4px -1px rgba(217, 27, 92, 0.15) !important;
 }
 
 // Form Field Styling
@@ -117,7 +137,7 @@ body {
   margin: 0 !important;
   font-size: 1.25rem !important;
   font-weight: 600 !important;
-  color: #1e293b;
+  color: #1e293b !important; // Enforce Slate 800
   border-bottom: 1px solid #e2e8f0;
   flex-shrink: 0;
 }
@@ -155,26 +175,77 @@ body {
   }
   
   .mat-mdc-button {
-    color: #64748b;
+    color: #64748b !important; // Enforce Slate 500
     border: 1px solid #e2e8f0;
     
     &:hover {
       background-color: #f1f5f9;
       border-color: #cbd5e1;
+      color: #334155 !important; // Darker on hover
     }
   }
   
   .mat-mdc-raised-button.mat-primary {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35) !important;
+    background: linear-gradient(135deg, #D91B5C 0%, #C2185B 100%);
+    color: white !important; // Ensure text is white
+    box-shadow: 0 2px 8px rgba(217, 27, 92, 0.35) !important;
     
     &:hover {
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.45) !important;
+      box-shadow: 0 4px 12px rgba(217, 27, 92, 0.45) !important;
     }
   }
   
   .mat-mdc-raised-button.mat-warn {
     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white !important; // Ensure text is white
     box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35) !important;
   }
 }
+
+// --- Global Material Component Overrides for BRAC Theme ---
+
+// Checkbox
+.mdc-checkbox .mdc-checkbox__native-control:enabled:checked~.mdc-checkbox__background,
+.mdc-checkbox .mdc-checkbox__native-control:enabled:indeterminate~.mdc-checkbox__background {
+  background-color: #D91B5C !important;
+  border-color: #D91B5C !important;
+}
+
+// Form Field Focus Color
+.mdc-text-field--focused:not(.mdc-text-field--disabled) .mdc-floating-label {
+  color: #D91B5C !important;
+}
+
+.mdc-text-field--focused:not(.mdc-text-field--disabled) .mdc-notched-outline__leading,
+.mdc-text-field--focused:not(.mdc-text-field--disabled) .mdc-notched-outline__notch,
+.mdc-text-field--focused:not(.mdc-text-field--disabled) .mdc-notched-outline__trailing {
+  border-color: #D91B5C !important;
+  border-width: 2px !important;
+}
+
+// Select Option Selected
+.mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) .mdc-list-item__primary-text {
+  color: #D91B5C !important;
+}
+
+.mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) .mat-pseudo-checkbox-checked.mat-pseudo-checkbox-minimal::after {
+  color: #D91B5C !important;
+}
+
+// Slide Toggle
+.mdc-switch:enabled .mdc-switch__track::after {
+  background: #fce7f3 !important; // Pink 100
+}
+
+.mdc-switch:enabled .mdc-switch__handle::after {
+  background: #D91B5C !important;
+}
+
+.mdc-switch.mdc-switch--selected:enabled .mdc-switch__handle::after {
+  background: #D91B5C !important;
+}
+
+.mdc-switch.mdc-switch--selected:enabled .mdc-switch__track::after {
+  background: #D91B5C !important;
+}
+

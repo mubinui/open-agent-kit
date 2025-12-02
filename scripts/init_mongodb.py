@@ -45,14 +45,14 @@ def create_user(client: MongoClient, database_name: str, username: str, password
             pwd=password,
             roles=[{"role": "readWrite", "db": database_name}]
         )
-        logger.info(f"✓ Created user: {username}")
+        logger.info(f"Created user: {username}")
         return True
     except OperationFailure as e:
         if "already exists" in str(e):
-            logger.warning(f"⚠ User {username} already exists")
+            logger.warning(f"User {username} already exists")
             return False
         else:
-            logger.error(f"✗ Failed to create user: {e}")
+            logger.error(f"Failed to create user: {e}")
             raise
 
 
@@ -73,9 +73,9 @@ def create_collections(client: MongoClient, database_name: str) -> None:
     for collection_name in collections:
         try:
             db.create_collection(collection_name)
-            logger.info(f"✓ Created {collection_name} collection")
+            logger.info(f"Created {collection_name} collection")
         except CollectionInvalid:
-            logger.warning(f"⚠ {collection_name} collection already exists")
+            logger.warning(f"{collection_name} collection already exists")
 
 
 def create_indexes(client: MongoClient, database_name: str) -> None:
@@ -102,9 +102,9 @@ def create_indexes(client: MongoClient, database_name: str) -> None:
             name="ttl_updated_at",
             expireAfterSeconds=86400
         )
-        logger.info("✓ Created TTL index on sessions.updated_at (24 hour expiration)")
+        logger.info("Created TTL index on sessions.updated_at (24 hour expiration)")
     except Exception as e:
-        logger.warning(f"⚠ TTL index on sessions.updated_at: {e}")
+        logger.warning(f"TTL index on sessions.updated_at: {e}")
     
     # Compound index for active sessions query
     try:
@@ -112,9 +112,9 @@ def create_indexes(client: MongoClient, database_name: str) -> None:
             [("active", ASCENDING), ("updated_at", DESCENDING)],
             name="active_updated_idx"
         )
-        logger.info("✓ Created compound index on sessions (active, updated_at)")
+        logger.info("Created compound index on sessions (active, updated_at)")
     except Exception as e:
-        logger.warning(f"⚠ Compound index on sessions: {e}")
+        logger.warning(f"Compound index on sessions: {e}")
     
     # Messages collection indexes
     logger.info("\nCreating indexes for messages collection...")
@@ -128,9 +128,9 @@ def create_indexes(client: MongoClient, database_name: str) -> None:
             name="ttl_created_at",
             expireAfterSeconds=604800
         )
-        logger.info("✓ Created TTL index on messages.created_at (7 day expiration)")
+        logger.info("Created TTL index on messages.created_at (7 day expiration)")
     except Exception as e:
-        logger.warning(f"⚠ TTL index on messages.created_at: {e}")
+        logger.warning(f"TTL index on messages.created_at: {e}")
     
     # Compound index for session queries
     try:
@@ -138,9 +138,9 @@ def create_indexes(client: MongoClient, database_name: str) -> None:
             [("session_id", ASCENDING), ("timestamp", ASCENDING)],
             name="session_timestamp_idx"
         )
-        logger.info("✓ Created compound index on messages (session_id, timestamp)")
+        logger.info("Created compound index on messages (session_id, timestamp)")
     except Exception as e:
-        logger.warning(f"⚠ Compound index on messages: {e}")
+        logger.warning(f"Compound index on messages: {e}")
     
     # Index for agent notes queries
     try:
@@ -148,9 +148,9 @@ def create_indexes(client: MongoClient, database_name: str) -> None:
             [("session_id", ASCENDING), ("is_agent_note", ASCENDING)],
             name="session_agent_note_idx"
         )
-        logger.info("✓ Created compound index on messages (session_id, is_agent_note)")
+        logger.info("Created compound index on messages (session_id, is_agent_note)")
     except Exception as e:
-        logger.warning(f"⚠ Compound index on messages (agent notes): {e}")
+        logger.warning(f"Compound index on messages (agent notes): {e}")
     
     # Transcripts collection indexes
     logger.info("\nCreating indexes for transcripts collection...")
@@ -164,9 +164,9 @@ def create_indexes(client: MongoClient, database_name: str) -> None:
             name="ttl_created_at",
             expireAfterSeconds=2592000
         )
-        logger.info("✓ Created TTL index on transcripts.created_at (30 day expiration)")
+        logger.info("Created TTL index on transcripts.created_at (30 day expiration)")
     except Exception as e:
-        logger.warning(f"⚠ TTL index on transcripts.created_at: {e}")
+        logger.warning(f"TTL index on transcripts.created_at: {e}")
     
     # Index for session lookup
     try:
@@ -174,9 +174,9 @@ def create_indexes(client: MongoClient, database_name: str) -> None:
             [("session_id", ASCENDING)],
             name="session_id_idx"
         )
-        logger.info("✓ Created index on transcripts.session_id")
+        logger.info("Created index on transcripts.session_id")
     except Exception as e:
-        logger.warning(f"⚠ Index on transcripts.session_id: {e}")
+        logger.warning(f"Index on transcripts.session_id: {e}")
 
 
 def display_statistics(client: MongoClient, database_name: str) -> None:
@@ -236,7 +236,7 @@ def initialize_mongodb(
         
         # Test connection
         client.admin.command('ping')
-        logger.info("✓ Connected to MongoDB")
+        logger.info("Connected to MongoDB")
         
         # Create user if requested
         if create_user_account:
@@ -254,7 +254,7 @@ def initialize_mongodb(
         # Display statistics
         display_statistics(client, database_name)
         
-        logger.info("\n✓ MongoDB initialization complete!")
+        logger.info("\nMongoDB initialization complete!")
         logger.info("\nConnection string format:")
         logger.info(f"mongodb://username:password@host:port/{database_name}")
         logger.info("\nSet MONGODB_URL environment variable to use MongoDB persistence.")
@@ -263,7 +263,7 @@ def initialize_mongodb(
         return True
         
     except Exception as e:
-        logger.error(f"✗ MongoDB initialization failed: {e}")
+        logger.error(f"MongoDB initialization failed: {e}")
         return False
 
 
@@ -289,8 +289,8 @@ def main():
     )
     parser.add_argument(
         "--username",
-        default="orchestration_user",
-        help="Username for the user account (default: orchestration_user)"
+        default="orchestrator",
+        help="Username for the user account (default: orchestrator)"
     )
     parser.add_argument(
         "--password",

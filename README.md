@@ -42,7 +42,7 @@
 - **REST API** — FastAPI with OpenAPI documentation
 - **Async Processing** — RabbitMQ for scalable task distribution
 - **Caching** — Redis multi-layer caching
-- **Storage** — PostgreSQL with Alembic migrations
+- **Storage** — MongoDB session store plus PostgreSQL with Alembic migrations
 - **Observability** — Prometheus, OpenTelemetry, structured logging
 - **Security** — API keys, JWT, RBAC, rate limiting
 
@@ -115,8 +115,11 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 source .venv/bin/activate
 
-# 4. Start infrastructure services
-docker-compose up -d postgres redis rabbitmq
+# 4. Start infrastructure services (includes MongoDB session store)
+docker-compose up -d postgres redis rabbitmq mongodb
+
+# or run the helper script for Mongo only
+./scripts/start_mongodb_docker.sh
 
 # 5. Configure environment
 cp .env.example .env
@@ -149,6 +152,23 @@ npm install
 npm start
 # Open http://localhost:4200
 ```
+
+### MongoDB Setup (Local)
+
+```bash
+# Start just MongoDB (if you are not using docker-compose for everything)
+./scripts/start_mongodb_docker.sh
+
+# Initialize collections, indexes, and service user credentials
+python scripts/init_mongodb.py \
+  --connection-string "mongodb://localhost:27017" \
+  --database orchestration \
+  --create-user \
+  --username orchestrator \
+  --password orchestrator_pass
+```
+
+The helper script provisions a Docker container with the same credentials referenced in `.env`. The initialization script can be re-run safely; it merely ensures indexes and the `orchestrator` user exist.
 
 ---
 
@@ -215,6 +235,9 @@ orchestration-service/
 # Required
 OPENROUTER_API_KEY=sk-or-v1-...
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/orchestration
+MEMORY_BACKEND=mongodb
+MONGODB_URL=mongodb://orchestrator:orchestrator_pass@localhost:27017/orchestration
+MONGODB_DATABASE=orchestration
 REDIS_URL=redis://localhost:6379/0
 
 # Optional

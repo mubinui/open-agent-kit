@@ -17,6 +17,7 @@ export interface ToolConfig {
   body_template?: string;    // Request body template with {variable} placeholders
   response_path?: string;    // JSON path to extract response (e.g., 'data.result')
   timeout?: number;          // Request timeout in seconds
+  forward_user_context?: boolean; // Whether to forward user context headers
   
   // Versioning fields
   version?: number;

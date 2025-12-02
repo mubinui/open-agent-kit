@@ -20,22 +20,18 @@
     margin-bottom: 16px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 
-    .logo-circle {
+    .logo-container {
       width: 40px;
       height: 40px;
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       margin-right: 16px;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 
-      mat-icon {
-        color: white;
-        font-size: 24px;
-        width: 24px;
-        height: 24px;
+      .brand-logo {
+        width: 100%;
+        height: auto;
+        object-fit: contain;
       }
     }
 
@@ -95,9 +91,9 @@
       }
 
       &.active-link {
-        background-color: #3b82f6; // Blue 500
+        background-color: #D91B5C; // BRAC Pink
         color: white !important;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+        box-shadow: 0 4px 12px rgba(217, 27, 92, 0.25);
 
         ::ng-deep .mdc-list-item__primary-text {
           color: white !important;
@@ -170,8 +166,8 @@
     .avatar {
       width: 36px;
       height: 36px;
-      background: #e0e7ff;
-      color: #4f46e5;
+      background: #fce7f3; // Pink 100
+      color: #be185d; // Pink 700
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -183,6 +179,7 @@
 
       &:hover {
         transform: scale(1.05);
+        background: #fbcfe8; // Pink 200
       }
     }
   }

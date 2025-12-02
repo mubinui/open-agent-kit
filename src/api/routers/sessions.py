@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from src.api.auth import CurrentUser, get_current_user, require_user
+from src.api.context import set_request_user
 from src.api.models import (
     ChatHistoryResponse,
     MessageRequest,
@@ -38,6 +39,9 @@ async def create_session(
     Requirements: 1.1, 1.3
     """
     request_id = getattr(request.state, "request_id", None)
+    
+    # Set request context
+    set_request_user(current_user)
     
     logger.info(
         "Creating session",
@@ -262,6 +266,9 @@ async def send_message(
     Requirements: 1.1, 1.3
     """
     request_id = getattr(request.state, "request_id", None)
+    
+    # Set request context
+    set_request_user(current_user)
     
     logger.info(
         "Sending message",

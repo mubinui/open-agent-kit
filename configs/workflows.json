@@ -16,7 +16,7 @@
         "complexity": "simple"
       },
       "workflow_type": "sequential",
-      "persistence": "postgres",
+      "persistence": "mongo_only",
       "version": 1,
       "last_updated": "2024-11-16T00:00:00Z"
     },
@@ -35,7 +35,7 @@
         "complexity": "simple"
       },
       "workflow_type": "sequential",
-      "persistence": "postgres",
+      "persistence": "mongo_only",
       "version": 1,
       "last_updated": "2024-11-16T00:00:00Z",
       "steps": null,
@@ -83,7 +83,7 @@
         "complexity": "medium"
       },
       "workflow_type": "sequential",
-      "persistence": "postgres",
+      "persistence": "mongo_only",
       "version": 1,
       "last_updated": "2024-11-16T00:00:00Z"
     },
@@ -115,7 +115,7 @@
         "complexity": "high"
       },
       "workflow_type": "tree",
-      "persistence": "postgres",
+      "persistence": "mongo_only",
       "version": 1,
       "last_updated": "2024-11-16T00:00:00Z"
     },
@@ -164,7 +164,7 @@
         "complexity": "high"
       },
       "workflow_type": "tree",
-      "persistence": "postgres",
+      "persistence": "mongo_only",
       "version": 1,
       "last_updated": "2024-11-16T00:00:00Z"
     },
@@ -196,7 +196,7 @@
         "complexity": "medium"
       },
       "workflow_type": "sequential",
-      "persistence": "postgres",
+      "persistence": "mongo_only",
       "version": 1,
       "last_updated": "2024-11-16T00:00:00Z"
     },
@@ -234,7 +234,7 @@
         "note": "Disabled by default - requires proper nested chat setup"
       },
       "workflow_type": "custom",
-      "persistence": "postgres",
+      "persistence": "mongo_only",
       "version": 1,
       "last_updated": "2024-11-16T00:00:00Z"
     },
@@ -277,7 +277,7 @@
         "complexity": "simple"
       },
       "workflow_type": "sequential",
-      "persistence": "postgres",
+      "persistence": "mongo_only",
       "version": 1,
       "last_updated": "2024-11-26T00:00:00Z",
       "steps": null,

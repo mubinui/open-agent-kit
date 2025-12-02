@@ -211,7 +211,8 @@
       "max_consecutive_auto_reply": 10,
       "description": "Facilitates and guides brainstorming sessions",
       "version": 1,
-      "last_updated": "2024-11-27T00:00:00Z"
+      "last_updated": "2024-11-27T00:00:00Z",
+      "retrieve_config": null
     },
     {
       "id": "creative_agent",

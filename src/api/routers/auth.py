@@ -7,6 +7,7 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.api.auth import (
@@ -32,6 +33,26 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/token")
+
+
+class AuthConfig(BaseModel):
+    """Public authentication configuration for frontend."""
+    enabled: bool
+    server_url: str
+    realm: str
+    client_id: str
+
+
+@router.get("/config", response_model=AuthConfig)
+async def get_auth_config():
+    """Get public authentication configuration."""
+    settings = get_settings()
+    return AuthConfig(
+        enabled=settings.keycloak.enabled,
+        server_url=settings.keycloak.server_url,
+        realm=settings.keycloak.realm,
+        client_id=settings.keycloak.client_id
+    )
 
 
 @router.post("/token", response_model=Token)

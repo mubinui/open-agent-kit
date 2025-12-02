@@ -8,6 +8,7 @@ from autogen.agentchat import ConversableAgent
 from src.audit_logging import get_logger
 from src.config.agent_models import AgentConfig, AgentsConfig
 from src.config.registries import get_prompt_registry, get_provider_registry
+from src.config.settings import get_settings
 from src.config.tool_registry import get_tool_registry
 from src.config.workflow_models import ConversationPattern, WorkflowConfig
 from src.config.workflow_registry import get_workflow_registry, WorkflowRegistry
@@ -46,6 +47,8 @@ class SessionManager:
             workflow_registry: Registry for workflow configurations
         """
         self.default_conversation_store = conversation_store or InMemoryConversationStore()
+        self._custom_store_provided = conversation_store is not None
+        self._settings = get_settings()
         
         # Initialize agent factory if not provided
         if agent_factory is None:
@@ -74,9 +77,7 @@ class SessionManager:
 
     def _init_persistence_stores(self) -> None:
         """Initialize persistence stores based on configuration."""
-        from src.config.settings import get_settings
-        
-        settings = get_settings()
+        settings = self._settings
         
         # Initialize PostgreSQL store if configured
         if settings.memory.database_url:
@@ -107,6 +108,29 @@ class SessionManager:
             except Exception as e:
                 logger.error(f"Failed to initialize MongoDB store: {e}")
 
+        self._configure_default_store()
+
+    def _configure_default_store(self) -> None:
+        """Select the default conversation store based on settings."""
+        if self._custom_store_provided:
+            return
+
+        preferred_backend = (self._settings.memory.backend or "").lower()
+
+        if preferred_backend in {"mongodb", "mongo"} and self._mongo_store is not None:
+            self.default_conversation_store = self._mongo_store
+            return
+
+        if preferred_backend in {"postgres", "postgresql"} and self._postgres_store is not None:
+            self.default_conversation_store = self._postgres_store
+            return
+
+        if self._mongo_store is not None:
+            # Fall back to MongoDB when available to persist sessions by default
+            self.default_conversation_store = self._mongo_store
+        elif self._postgres_store is not None:
+            self.default_conversation_store = self._postgres_store
+
     def _get_conversation_store(self, workflow: WorkflowConfig) -> ConversationStore:
         """
         Get the appropriate conversation store for a workflow based on persistence configuration.
@@ -122,9 +146,9 @@ class SessionManager:
             
         Requirements: 16.1, 16.4, 16.5
         """
-        persistence = workflow.persistence
+        persistence = (workflow.persistence or "").lower()
         
-        if persistence == "mongo_only":
+        if persistence in {"mongo_only", "mongodb", "mongo"}:
             if self._mongo_store is None:
                 raise ValueError(
                     f"Workflow {workflow.id} requires MongoDB but MONGODB_URL is not configured"
@@ -132,7 +156,7 @@ class SessionManager:
             logger.debug(f"Using MongoDB store for workflow {workflow.id}")
             return self._mongo_store
         
-        elif persistence == "postgres":
+        elif persistence in {"postgres", "postgresql"}:
             if self._postgres_store is not None:
                 logger.debug(f"Using PostgreSQL store for workflow {workflow.id}")
                 return self._postgres_store
@@ -143,9 +167,8 @@ class SessionManager:
                 )
                 return self.default_conversation_store
         
-        else:
-            logger.debug(f"Using default store for workflow {workflow.id}")
-            return self.default_conversation_store
+        logger.debug(f"Using default store for workflow {workflow.id}")
+        return self.default_conversation_store
 
     async def create_session(
         self,

@@ -22,6 +22,36 @@
       },
       "version": 1,
       "last_updated": "2024-11-16T00:00:00Z"
+    },
+    {
+      "id": "call_service1",
+      "name": "call_service1",
+      "description": "Call Service1 API with user authentication token. Used for making authenticated requests where the user's Keycloak token is forwarded directly. Parameters: endpoint (string), method (string, default POST), payload (object), auth_token (string).",
+      "entrypoint": "src.tools.external_service:call_service1",
+      "enabled": true,
+      "settings": {},
+      "version": 1,
+      "last_updated": "2024-12-01T00:00:00Z"
+    },
+    {
+      "id": "call_service2",
+      "name": "call_service2",
+      "description": "Call Service2 API with admin authentication and client context headers (x-client-ref, x-client-username). Used for admin-authenticated requests with user context. Parameters: endpoint (string), method (string, default POST), payload (object), roles (array), username (string).",
+      "entrypoint": "src.tools.external_service:call_service2",
+      "enabled": true,
+      "settings": {},
+      "version": 1,
+      "last_updated": "2024-12-01T00:00:00Z"
+    },
+    {
+      "id": "call_external_service",
+      "name": "call_external_service",
+      "description": "Generic external service caller that routes to Service1 or Service2 based on service_name parameter. Parameters: service_name ('service1' or 'service2'), endpoint (string), method (string), payload (object), auth_token (string), roles (array), username (string).",
+      "entrypoint": "src.tools.external_service:call_external_service",
+      "enabled": true,
+      "settings": {},
+      "version": 1,
+      "last_updated": "2024-12-01T00:00:00Z"
     }
   ]
 }

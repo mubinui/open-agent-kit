@@ -54,6 +54,7 @@ Thumbs.db
 
 # Data directories
 data/
+mongo-data/
 *.db
 *.sqlite
 
