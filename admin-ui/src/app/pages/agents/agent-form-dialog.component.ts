@@ -53,7 +53,7 @@ import { ToolConfig } from '../../models/tool.model';
           <mat-label>Name</mat-label>
           <input matInput [(ngModel)]="agent.name" name="name" required
                  (ngModelChange)="sanitizeName($event)">
-          <mat-hint>No spaces allowed (Autogen requirement)</mat-hint>
+          <mat-hint>No spaces allowed (System requirement)</mat-hint>
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">

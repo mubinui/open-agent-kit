@@ -272,7 +272,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 
 # Include routers
-from src.api.routers import agents, api_providers, auth, configs, health, prompts, sessions, tools, workflows
+from src.api.routers import agents, api_providers, auth, configs, health, prompts, sessions, tools, workflows, vector_dbs
 
 app.include_router(auth.router)
 app.include_router(sessions.router)
@@ -282,6 +282,7 @@ app.include_router(workflows.router)
 app.include_router(prompts.router)
 app.include_router(api_providers.router)
 app.include_router(configs.router)
+app.include_router(vector_dbs.router)
 app.include_router(health.router)
 
 

@@ -28,6 +28,14 @@ data:
   
   # Vector Database Configuration
   CHROMADB_PATH: "/app/data/chromadb"
+  QDRANT_URL: "http://qdrant-service:6333"
+  QDRANT_COLLECTION: "knowledge_base"
+  
+  # RAG Pipeline Configuration
+  RAG_PIPELINE_BASE_URL: "http://rag-pipeline-service:8003"
+  RAG_PIPELINE_TIMEOUT: "60"
+  RAG_PIPELINE_ENABLED: "true"
+  RAG_PIPELINE_DEFAULT_COLLECTION: "knowledge_base"
   
   # Observability
   OTEL_SERVICE_NAME: "orchestration-service"

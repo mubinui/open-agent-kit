@@ -276,6 +276,54 @@
       "description": "Provides constructive criticism to strengthen ideas",
       "version": 1,
       "last_updated": "2024-11-27T00:00:00Z"
+    },
+    {
+      "_comment": "RAG Assistant - Requires: 1) QDRANT_URL (vector DB), 2) RAG_PIPELINE_BASE_URL (http://10.42.65.199:8000 - remote service), 3) RAG_PIPELINE_ENABLED=true. See docs/RAG_SETUP.md",
+      "id": "rag_assistant",
+      "type": "conversable",
+      "name": "RAGAssistant",
+      "system_message": "You are a helpful AI assistant with access to a knowledge base through RAG (Retrieval-Augmented Generation). When users ask questions, you can search the knowledge base to find relevant information and provide accurate, contextual answers. Use the rag_query tool to retrieve relevant documents before answering questions.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "temperature": 0.7,
+        "max_tokens": 1500,
+        "timeout": 120,
+        "cache_seed": 42
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [
+        "rag_query",
+        "rag_list_files",
+        "rag_get_stats"
+      ],
+      "max_consecutive_auto_reply": 10,
+      "description": "RAG-enabled assistant with knowledge base access via Qdrant",
+      "version": 1,
+      "last_updated": "2024-12-03T00:00:00Z",
+      "retrieve_config": null
+    },
+    {
+      "_comment": "RAG Knowledge Agent - Uses Qdrant directly for retrieval. Requires QDRANT_URL env var. Collection 'knowledge_base' must exist and be populated via RAG Pipeline ingestion.",
+      "id": "rag_knowledge_agent",
+      "type": "retrieve_user_proxy",
+      "name": "RAGKnowledgeAgent",
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "max_consecutive_auto_reply": 5,
+      "retrieve_config": {
+        "task": "qa",
+        "docs_path": [],
+        "chunk_token_size": 2000,
+        "vector_db": "qdrant",
+        "collection_name": "knowledge_base",
+        "embedding_model": "all-mpnet-base-v2",
+        "get_or_create": true
+      },
+      "description": "Retrieves information from Qdrant vector database for RAG",
+      "version": 1,
+      "last_updated": "2024-12-03T00:00:00Z"
     }
   ]
 }

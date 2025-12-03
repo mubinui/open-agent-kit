@@ -91,6 +91,23 @@ export interface ConfigHistoryEntry {
   config: any;
 }
 
+export interface VectorDbConfig {
+  id: string;
+  type: string;
+  enabled: boolean;
+  base_url: string;
+  default_collection: string;
+  timeout: number;
+  description: string;
+  health_status?: string;
+  health_details?: Record<string, any>;
+}
+
+export interface RagCollections {
+  collections: string[];
+  total: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -238,5 +255,14 @@ export class ApiService {
 
   getApiProvider(providerId: string): Observable<ApiProvider> {
     return this.http.get<ApiProvider>(`${this.baseUrl}/api-providers/${providerId}`);
+  }
+
+  // RAG Service endpoints
+  getRagService(): Observable<VectorDbConfig> {
+    return this.http.get<VectorDbConfig>(`${this.baseUrl}/rag-service`);
+  }
+
+  getRagCollections(): Observable<RagCollections> {
+    return this.http.get<RagCollections>(`${this.baseUrl}/rag-service/collections`);
   }
 }

@@ -26,5 +26,9 @@ export const routes: Routes = [
     path: 'monitoring', 
     loadComponent: () => import('./pages/monitoring/monitoring.component').then(m => m.MonitoringComponent)
   },
+  { 
+    path: 'vector-db', 
+    loadComponent: () => import('./pages/vector-db/vector-db.component').then(m => m.VectorDbComponent)
+  },
   { path: '**', redirectTo: '/dashboard' }
 ];

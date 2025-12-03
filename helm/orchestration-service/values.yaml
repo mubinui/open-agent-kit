@@ -149,15 +149,40 @@ rabbitmq:
     username: orchestrator
     password: orchestrator_pass
   persistence:
+
+# Qdrant configuration (local vector database for development/staging)
+qdrant:
+  enabled: true
+  image:
+    repository: qdrant/qdrant
+    tag: "v1.7.4"
+  service:
+    type: ClusterIP
+    httpPort: 6333
+    grpcPort: 6334
+  persistence:
     enabled: true
-    size: 10Gi
+    size: 20Gi
   resources:
     requests:
-      memory: 256Mi
+      memory: 512Mi
       cpu: 250m
     limits:
-      memory: 1Gi
+      memory: 2Gi
       cpu: 1000m
+  config:
+    collection: "rag_documents"
+
+# RAG Pipeline configuration (External Remote Service)
+# The RAG Pipeline is hosted externally at http://10.42.65.199:8000
+# See: http://10.42.65.199:8000/docs for API documentation
+# This is not deployed as part of the Helm chart
+ragPipeline:
+  enabled: true
+  baseUrl: "http://10.42.65.199:8000"
+  timeout: 60
+  defaultCollection: "knowledge_base"
+  apiKey: ""  # Set via secrets if required
 
 # ChromaDB storage
 chromadb:

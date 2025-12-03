@@ -52,6 +52,57 @@
       "settings": {},
       "version": 1,
       "last_updated": "2024-12-01T00:00:00Z"
+    },
+    {
+      "_comment": "RAG Tools - All tools require RAG_PIPELINE_BASE_URL (http://10.42.65.199:8000) and RAG_PIPELINE_ENABLED=true. Optional: RAG_PIPELINE_API_KEY for authenticated access. See docs/RAG_SETUP.md",
+      "id": "rag_ingest_file",
+      "name": "rag_ingest_file",
+      "description": "Ingest a file (PDF or text) into the RAG pipeline for a specific collection. Parameters: collection (string), file_path (string).",
+      "entrypoint": "src.tools.rag_pipeline:ingest_file",
+      "enabled": true,
+      "settings": {},
+      "version": 1,
+      "last_updated": "2024-12-03T00:00:00Z"
+    },
+    {
+      "id": "rag_query",
+      "name": "rag_query",
+      "description": "Query the RAG pipeline to retrieve relevant documents and generate answers. Parameters: collection (string), query (string), top_k (integer, default 5), rerank (boolean, default true).",
+      "entrypoint": "src.tools.rag_pipeline:query_rag",
+      "enabled": true,
+      "settings": {},
+      "version": 1,
+      "last_updated": "2024-12-03T00:00:00Z"
+    },
+    {
+      "id": "rag_list_files",
+      "name": "rag_list_files",
+      "description": "List all files in a RAG collection. Parameters: collection (string).",
+      "entrypoint": "src.tools.rag_pipeline:list_files",
+      "enabled": true,
+      "settings": {},
+      "version": 1,
+      "last_updated": "2024-12-03T00:00:00Z"
+    },
+    {
+      "id": "rag_delete_file",
+      "name": "rag_delete_file",
+      "description": "Delete a file and all its chunks from a RAG collection. Parameters: collection (string), filename (string).",
+      "entrypoint": "src.tools.rag_pipeline:delete_file",
+      "enabled": true,
+      "settings": {},
+      "version": 1,
+      "last_updated": "2024-12-03T00:00:00Z"
+    },
+    {
+      "id": "rag_get_stats",
+      "name": "rag_get_stats",
+      "description": "Get detailed statistics about a RAG collection. Parameters: collection (string).",
+      "entrypoint": "src.tools.rag_pipeline:get_stats",
+      "enabled": true,
+      "settings": {},
+      "version": 1,
+      "last_updated": "2024-12-03T00:00:00Z"
     }
   ]
 }

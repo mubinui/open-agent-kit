@@ -47,6 +47,7 @@ class VectorDBConfig(BaseSettings):
     chromadb_path: str = Field(default="./data/chromadb", alias="CHROMADB_PATH")
     qdrant_url: str | None = Field(default=None, alias="QDRANT_URL")
     qdrant_api_key: str | None = Field(default=None, alias="QDRANT_API_KEY")
+    qdrant_collection: str = Field(default="knowledge_base", alias="QDRANT_COLLECTION")
     pgvector_url: str | None = Field(default=None, alias="PGVECTOR_URL")
 
 
@@ -138,6 +139,13 @@ class ExternalServicesConfig(BaseSettings):
     service2_api_path: str = Field(default="/api/v1", alias="SERVICE2_API_PATH")
     service2_timeout: int = Field(default=30, alias="SERVICE2_TIMEOUT")
     service2_enabled: bool = Field(default=False, alias="SERVICE2_ENABLED")
+
+    # RAG Pipeline configuration
+    rag_pipeline_base_url: str = Field(default="http://localhost:8003", alias="RAG_PIPELINE_BASE_URL")
+    rag_pipeline_timeout: int = Field(default=60, alias="RAG_PIPELINE_TIMEOUT")
+    rag_pipeline_enabled: bool = Field(default=True, alias="RAG_PIPELINE_ENABLED")
+    rag_pipeline_api_key: str | None = Field(default=None, alias="RAG_PIPELINE_API_KEY")
+    rag_pipeline_default_collection: str = Field(default="knowledge_base", alias="RAG_PIPELINE_DEFAULT_COLLECTION")
 
 
 class Settings(BaseSettings):

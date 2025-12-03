@@ -1,64 +1,12 @@
 {
-  "version": "1.0",
-  "databases": [
-    {
-      "type": "chromadb",
-      "collection_name": "knowledge_base",
-      "embedding_model": "all-mpnet-base-v2",
-      "embedding_dimensions": 768,
-      "distance_metric": "cosine",
-      "chromadb_config": {
-        "persist_directory": "./data/chromadb",
-        "client_settings": {}
-      },
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "type": "pgvector",
-      "collection_name": "documents",
-      "embedding_model": "all-mpnet-base-v2",
-      "embedding_dimensions": 768,
-      "distance_metric": "cosine",
-      "pgvector_config": {
-        "connection_string": "postgresql://user:password@localhost:5432/vectordb",
-        "table_name": "embeddings",
-        "vector_dimensions": 768
-      },
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "type": "qdrant",
-      "collection_name": "semantic_search",
-      "embedding_model": "all-mpnet-base-v2",
-      "embedding_dimensions": 768,
-      "distance_metric": "cosine",
-      "qdrant_config": {
-        "url": "http://localhost:6333",
-        "api_key": null,
-        "prefer_grpc": false,
-        "timeout": 60,
-        "path": null
-      },
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "type": "qdrant",
-      "collection_name": "local_storage",
-      "embedding_model": "all-mpnet-base-v2",
-      "embedding_dimensions": 768,
-      "distance_metric": "cosine",
-      "qdrant_config": {
-        "url": null,
-        "api_key": null,
-        "prefer_grpc": false,
-        "timeout": 60,
-        "path": "./data/qdrant"
-      },
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    }
-  ]
+  "_comment": "Simplified RAG Service configuration - remote service handles all vector DB operations",
+  "rag_service": {
+    "type": "rag_pipeline",
+    "enabled": true,
+    "base_url": "http://10.42.65.199:8000",
+    "default_collection": "knowledge_base",
+    "timeout": 60,
+    "description": "Remote RAG Pipeline service with Qdrant vector database, embeddings, and reranking"
+  }
 }
+

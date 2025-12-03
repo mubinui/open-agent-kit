@@ -246,6 +246,161 @@ LOG_LEVEL=INFO
 ENABLE_METRICS=true
 ```
 
+### Vector Database & RAG Setup
+
+This service integrates **Qdrant** vector database for RAG (Retrieval-Augmented Generation) workflows. The RAG Pipeline API is a **remote service** that provides document ingestion, semantic search, and knowledge retrieval capabilities.
+
+> **📌 Remote RAG Pipeline Service**  
+> The RAG Pipeline is hosted at **http://10.42.65.199:8000**  
+> Access the Swagger API documentation: http://10.42.65.199:8000/docs
+
+#### 🚀 Quick Setup (Docker)
+
+```bash
+# Start Qdrant vector database (local for development)
+./scripts/start_qdrant_docker.sh
+
+# Verify Qdrant is running
+curl http://localhost:6333/readyz
+
+# Access Qdrant dashboard
+open http://localhost:6333/dashboard
+```
+
+#### 📦 Docker Compose (Recommended)
+
+```bash
+# Start all services including Qdrant
+# Note: RAG Pipeline is hosted remotely, not in docker-compose
+docker-compose up -d
+
+# Qdrant will be available at:
+# - HTTP API: http://localhost:6333
+# - gRPC API: http://localhost:6334
+```
+
+#### 📄 Document Ingestion
+
+Use the ingestion script to upload documents to the remote RAG pipeline:
+
+```bash
+# Ingest a single file
+python scripts/ingest_rag_documents.py \
+  --file /path/to/document.pdf \
+  --collection knowledge_base
+
+# Ingest all files in a directory
+python scripts/ingest_rag_documents.py \
+  --directory ./docs \
+  --collection knowledge_base \
+  --recursive
+
+# Batch ingestion (faster for multiple files)
+python scripts/ingest_rag_documents.py \
+  --files doc1.pdf doc2.txt doc3.md \
+  --collection knowledge_base \
+  --batch
+
+# Show collection statistics
+python scripts/ingest_rag_documents.py \
+  --file document.pdf \
+  --collection knowledge_base \
+  --stats
+```
+
+#### 🔧 Configuration
+
+Add these environment variables to `.env`:
+
+```bash
+# Qdrant Configuration (local dev or remote cluster)
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=                          # Optional, for production
+QDRANT_COLLECTION=rag_documents
+
+# RAG Pipeline API (Remote Service - Required for RAG features)
+# The pipeline service is hosted externally and handles document processing
+RAG_PIPELINE_BASE_URL=http://10.42.65.199:8000
+RAG_PIPELINE_TIMEOUT=60
+RAG_PIPELINE_ENABLED=true
+RAG_PIPELINE_API_KEY=                    # Optional, set if service requires auth
+RAG_PIPELINE_DEFAULT_COLLECTION=knowledge_base
+
+# Note: Local services connect to the remote RAG pipeline via HTTP
+# Ensure network connectivity to 10.42.65.199:8000
+```
+
+#### 🤖 RAG-Enabled Workflows
+
+Two RAG workflows are pre-configured:
+
+1. **`rag_qa_assistant`** — Simple Q&A using RAG tools
+2. **`rag_research_workflow`** — Multi-step research with reasoning
+
+```bash
+# Create a session with RAG workflow
+curl -X POST http://localhost:8000/api/v1/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"workflow_id": "rag_qa_assistant"}'
+
+# Query the knowledge base
+curl -X POST http://localhost:8000/api/v1/sessions/{session_id}/messages \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What are the key features of our product?"}'
+```
+
+#### 🛠️ Available RAG Tools
+
+The following tools are available for agents (powered by the remote RAG Pipeline service):
+
+| Tool | Description |
+|------|-------------|
+| `rag_query` | Search knowledge base and retrieve relevant documents |
+| `rag_ingest_file` | Upload a document to the knowledge base |
+| `rag_list_files` | List all files in a collection |
+| `rag_delete_file` | Remove a document from the collection |
+| `rag_get_stats` | Get collection statistics |
+
+#### 📊 Vector Database Admin UI
+
+Access the Vector DB management page in the Admin UI:
+
+1. Start the Admin UI: `cd admin-ui && npm start`
+2. Navigate to **Vector DB** in the sidebar
+3. View configured databases (Qdrant, ChromaDB, PGVector)
+4. Check connection status and collection details
+
+The Admin UI connects to `/api/v1/vector-dbs` endpoints to display:
+- Database type and configuration
+- Connection details (host, port, collection name)
+- Embedding model settings
+
+#### 📊 Vector Database Options
+
+The service supports multiple vector databases:
+
+| Database | Use Case | Setup |
+|----------|----------|-------|
+| **Qdrant** | Production RAG with high performance | Docker / Cloud |
+| ChromaDB | Development, embedded use | Built-in, no setup |
+| PGVector | PostgreSQL-integrated vectors | Requires pgvector extension |
+
+Configure in `configs/vector_databases.json` (format: dict with db_id as keys):
+
+```json
+{
+  "qdrant": {
+    "type": "qdrant",
+  "collection_name": "knowledge_base",
+  "embedding_model": "all-mpnet-base-v2",
+  "embedding_dimensions": 768,
+  "qdrant_config": {
+    "url": "http://localhost:6333",
+    "api_key": null
+  }
+}
+```
+
 ---
 
 ## 📚 API Reference

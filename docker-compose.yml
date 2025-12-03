@@ -30,6 +30,21 @@ services:
       # Vector Database (ChromaDB)
       - CHROMADB_PATH=/app/data/chromadb
       
+      # Vector Database (Qdrant - local instance for development)
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-rag_documents}
+      
+      # RAG Pipeline Configuration (External Remote Service)
+      # The RAG Pipeline is hosted externally at http://10.42.65.199:8000
+      # and is not included in this docker-compose stack
+      # See: http://10.42.65.199:8000/docs for API documentation
+      - RAG_PIPELINE_BASE_URL=${RAG_PIPELINE_BASE_URL:-http://10.42.65.199:8000}
+      - RAG_PIPELINE_TIMEOUT=${RAG_PIPELINE_TIMEOUT:-60}
+      - RAG_PIPELINE_ENABLED=${RAG_PIPELINE_ENABLED:-true}
+      - RAG_PIPELINE_API_KEY=${RAG_PIPELINE_API_KEY:-}
+      - RAG_PIPELINE_DEFAULT_COLLECTION=${RAG_PIPELINE_DEFAULT_COLLECTION:-knowledge_base}
+      
       # Application Settings
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - MAX_CONCURRENT_SESSIONS=${MAX_CONCURRENT_SESSIONS:-100}
@@ -67,6 +82,8 @@ services:
       rabbitmq:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      qdrant:
         condition: service_healthy
     volumes:
       - ./configs:/app/configs
@@ -155,6 +172,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # Qdrant - Vector database for RAG
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: orchestration-qdrant
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC API
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HTTP_PORT=6333
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/readyz"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   # ChromaDB - Optional standalone vector database
   # Uncomment if you want to use ChromaDB as a separate service
   # chromadb:
@@ -193,6 +230,8 @@ volumes:
   chromadb_data:
     driver: local
   mongodb_data:
+    driver: local
+  qdrant_data:
     driver: local
 
 networks:

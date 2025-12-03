@@ -22,13 +22,14 @@ import { MatButtonModule } from '@angular/material/button';
   styleUrl: './app.scss'
 })
 export class App {
-  title = 'Admin Console';
+  title = 'Agent Builder';
   
   menuItems = [
     { path: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
     { path: '/agents', icon: 'support_agent', label: 'Agents' },
     { path: '/tools', icon: 'build', label: 'Tools' },
     { path: '/workflows', icon: 'account_tree', label: 'Workflows' },
+    { path: '/vector-db', icon: 'cloud', label: 'RAG Service' },
     { path: '/testing', icon: 'chat', label: 'Testing' },
     { path: '/monitoring', icon: 'monitoring', label: 'Monitoring' }
   ];
