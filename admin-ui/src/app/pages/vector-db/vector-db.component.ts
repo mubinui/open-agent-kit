@@ -85,21 +85,21 @@ import { ApiService, VectorDbConfig, RagCollections } from '../../services/api.s
                     <mat-icon>storage</mat-icon>
                     <div>
                       <strong>Vector DB</strong>
-                      <span>{{ ragService.health_details.vector_db?.type || 'N/A' }}</span>
+                      <span>{{ ragService.health_details['vector_db']?.type || 'N/A' }}</span>
                     </div>
                   </div>
                   <div class="health-item">
                     <mat-icon>blur_on</mat-icon>
                     <div>
                       <strong>Embedding Service</strong>
-                      <span>{{ ragService.health_details.embedding_service?.model || 'N/A' }}</span>
+                      <span>{{ ragService.health_details['embedding_service']?.model || 'N/A' }}</span>
                     </div>
                   </div>
                   <div class="health-item">
                     <mat-icon>sort</mat-icon>
                     <div>
                       <strong>Reranker Service</strong>
-                      <span>{{ ragService.health_details.reranker_service?.model || 'N/A' }}</span>
+                      <span>{{ ragService.health_details['reranker_service']?.model || 'N/A' }}</span>
                     </div>
                   </div>
                 </div>

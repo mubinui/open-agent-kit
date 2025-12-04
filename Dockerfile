@@ -1,18 +1,15 @@
 # Multi-stage Dockerfile for Orchestration Service
 # Stage 1: Builder - Install dependencies using uv
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install system dependencies and uv
+# Install system build tools and uv (via pip so it's on PATH)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Add uv to PATH
-ENV PATH="/root/.cargo/bin:$PATH"
+    && pip install --no-cache-dir uv
 
 # Copy dependency files
 COPY pyproject.toml uv.lock* ./
