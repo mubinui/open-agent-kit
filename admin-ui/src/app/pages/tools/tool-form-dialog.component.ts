@@ -214,6 +214,24 @@ export class ToolFormDialogComponent {
     if (this.data.tool) {
       this.tool = { ...this.data.tool };
       this.isEdit.set(true);
+      
+      // Map settings to top-level properties for API tools
+      if (this.tool.settings && this.tool.settings['type'] === 'api') {
+        this.tool.type = 'api';
+        this.tool.api_url = this.tool.settings['api_url'];
+        this.tool.http_method = this.tool.settings['http_method'];
+        this.tool.auth_type = this.tool.settings['auth_type'];
+        this.tool.auth_header = this.tool.settings['auth_header'];
+        this.tool.auth_env_var = this.tool.settings['auth_env_var'];
+        this.tool.headers = this.tool.settings['headers'];
+        this.tool.body_template = this.tool.settings['body_template'];
+        this.tool.response_path = this.tool.settings['response_path'];
+        this.tool.timeout = this.tool.settings['timeout'];
+        this.tool.forward_user_context = this.tool.settings['forward_user_context'];
+      } else {
+        this.tool.type = 'function';
+      }
+
       // Convert headers object to JSON string for editing
       if (this.tool.headers) {
         this.headersJson = JSON.stringify(this.tool.headers, null, 2);

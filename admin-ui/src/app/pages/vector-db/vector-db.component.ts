@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,11 +7,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { ApiService, VectorDbConfig, RagCollections } from '../../services/api.service';
+import { ToolConfig } from '../../models/tool.model';
 
 @Component({
   selector: 'app-vector-db',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     MatCardModule,
@@ -20,7 +23,8 @@ import { ApiService, VectorDbConfig, RagCollections } from '../../services/api.s
     MatProgressSpinnerModule,
     MatChipsModule,
     MatDividerModule,
-    MatListModule
+    MatListModule,
+    MatExpansionModule
   ],
   template: `
     <div class="container">
@@ -182,24 +186,53 @@ import { ApiService, VectorDbConfig, RagCollections } from '../../services/api.s
           <mat-card class="guide-card">
             <mat-card-header>
               <mat-icon mat-card-avatar>integration_instructions</mat-icon>
-              <mat-card-title>Integration Guide</mat-card-title>
-              <mat-card-subtitle>How to use RAG service in workflows</mat-card-subtitle>
+              <mat-card-title>Available RAG Tools</mat-card-title>
+              <mat-card-subtitle>Tools available for agents to interact with RAG service</mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
-              <h3>Available RAG Tools</h3>
-              <ul class="tool-list">
-                <li><code>rag_query</code> - Query documents with semantic search</li>
-                <li><code>rag_ingest_file</code> - Upload documents for indexing</li>
-                <li><code>rag_list_files</code> - List ingested documents</li>
-                <li><code>rag_delete_file</code> - Remove documents from collection</li>
-                <li><code>rag_get_stats</code> - Get collection statistics</li>
-              </ul>
+              @if (loadingTools) {
+                <div class="loading-small">
+                  <mat-spinner diameter="30"></mat-spinner>
+                </div>
+              } @else if (ragTools.length > 0) {
+                <mat-accordion>
+                  @for (tool of ragTools; track tool.id) {
+                    <mat-expansion-panel>
+                      <mat-expansion-panel-header>
+                        <mat-panel-title>
+                          <code>{{ tool.name }}</code>
+                        </mat-panel-title>
+                        <mat-panel-description>
+                          {{ tool.description | slice:0:60 }}{{ tool.description.length > 60 ? '...' : '' }}
+                        </mat-panel-description>
+                      </mat-expansion-panel-header>
+                      
+                      <div class="tool-details">
+                        <p><strong>Description:</strong> {{ tool.description }}</p>
+                        <p><strong>ID:</strong> <code>{{ tool.id }}</code></p>
+                        <p><strong>Entrypoint:</strong> <code>{{ tool.entrypoint }}</code></p>
+                        
+                        @if (tool.settings && Object.keys(tool.settings).length > 0) {
+                          <div class="settings-section">
+                            <strong>Settings:</strong>
+                            <pre>{{ tool.settings | json }}</pre>
+                          </div>
+                        }
+                      </div>
+                    </mat-expansion-panel>
+                  }
+                </mat-accordion>
+              } @else {
+                <p class="no-data">No RAG tools found. Check tools configuration.</p>
+              }
               
-              <h3>Example Workflows</h3>
-              <ul class="tool-list">
-                <li><strong>rag_qa_assistant</strong> - Simple Q&A using RAG</li>
-                <li><strong>rag_research_workflow</strong> - Multi-step research with reasoning</li>
-              </ul>
+              <div class="example-workflows">
+                <h3>Example Workflows</h3>
+                <ul class="tool-list">
+                  <li><strong>rag_qa_assistant</strong> - Simple Q&A using RAG</li>
+                  <li><strong>rag_research_workflow</strong> - Multi-step research with reasoning</li>
+                </ul>
+              </div>
             </mat-card-content>
           </mat-card>
         </div>
@@ -370,6 +403,28 @@ import { ApiService, VectorDbConfig, RagCollections } from '../../services/api.s
       margin: 8px 0;
       line-height: 1.6;
     }
+    .tool-details {
+      padding: 16px 0;
+    }
+    .tool-details p {
+      margin: 8px 0;
+    }
+    .settings-section {
+      margin-top: 12px;
+    }
+    .settings-section pre {
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-top: 4px;
+      overflow-x: auto;
+    }
+    .example-workflows {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+    }
     code {
       background: #f1f5f9;
       padding: 2px 6px;
@@ -381,15 +436,22 @@ import { ApiService, VectorDbConfig, RagCollections } from '../../services/api.s
 })
 export class VectorDbComponent implements OnInit {
   private apiService = inject(ApiService);
+  private cdr = inject(ChangeDetectorRef);
   
   ragService: VectorDbConfig | null = null;
   collections: RagCollections | null = null;
+  ragTools: ToolConfig[] = [];
   loading = true;
   loadingCollections = false;
+  loadingTools = false;
   error: string | null = null;
+  
+  // Helper for template
+  Object = Object;
 
   ngOnInit() {
     this.loadRagService();
+    this.loadRagTools();
   }
 
   loadRagService() {
@@ -401,11 +463,13 @@ export class VectorDbComponent implements OnInit {
         this.ragService = service;
         this.loading = false;
         this.loadCollections();
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Failed to load RAG service', err);
         this.error = 'Failed to load RAG service configuration. Please check if the backend service is running.';
         this.loading = false;
+        this.cdr.markForCheck();
       }
     });
   }
@@ -416,10 +480,28 @@ export class VectorDbComponent implements OnInit {
       next: (collections) => {
         this.collections = collections;
         this.loadingCollections = false;
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('Failed to load collections', err);
         this.loadingCollections = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  loadRagTools() {
+    this.loadingTools = true;
+    this.apiService.getTools().subscribe({
+      next: (tools) => {
+        this.ragTools = tools.filter(t => t.id.startsWith('rag_'));
+        this.loadingTools = false;
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.error('Failed to load tools', err);
+        this.loadingTools = false;
+        this.cdr.markForCheck();
       }
     });
   }
