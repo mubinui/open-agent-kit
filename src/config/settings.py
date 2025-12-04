@@ -34,6 +34,13 @@ class ApplicationConfig(BaseSettings):
 class MemoryConfig(BaseSettings):
     """Memory and persistence configuration."""
 
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
     backend: str = Field(default="inmemory", alias="MEMORY_BACKEND")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
     database_url: str | None = Field(default=None, alias="DATABASE_URL")

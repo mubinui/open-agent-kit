@@ -82,24 +82,57 @@ import { ApiService, VectorDbConfig, RagCollections } from '../../services/api.s
                 <h3>Health Details</h3>
                 <div class="health-details">
                   <div class="health-item">
-                    <mat-icon>storage</mat-icon>
+                    <mat-icon [class.healthy]="ragService.health_details['vector_db']?.status === 'healthy'"
+                              [class.unhealthy]="ragService.health_details['vector_db']?.status !== 'healthy'">
+                      storage
+                    </mat-icon>
                     <div>
                       <strong>Vector DB</strong>
                       <span>{{ ragService.health_details['vector_db']?.type || 'N/A' }}</span>
+                      <mat-chip size="small"
+                                [class.chip-healthy]="ragService.health_details['vector_db']?.status === 'healthy'"
+                                [class.chip-unhealthy]="ragService.health_details['vector_db']?.status !== 'healthy'">
+                        {{ ragService.health_details['vector_db']?.status || 'unknown' }}
+                      </mat-chip>
+                      @if (ragService.health_details['vector_db']?.error) {
+                        <span class="error-text">{{ ragService.health_details['vector_db']?.error }}</span>
+                      }
                     </div>
                   </div>
                   <div class="health-item">
-                    <mat-icon>blur_on</mat-icon>
+                    <mat-icon [class.healthy]="ragService.health_details['embedding_service']?.status === 'healthy'"
+                              [class.unhealthy]="ragService.health_details['embedding_service']?.status !== 'healthy'">
+                      blur_on
+                    </mat-icon>
                     <div>
                       <strong>Embedding Service</strong>
                       <span>{{ ragService.health_details['embedding_service']?.model || 'N/A' }}</span>
+                      <mat-chip size="small"
+                                [class.chip-healthy]="ragService.health_details['embedding_service']?.status === 'healthy'"
+                                [class.chip-unhealthy]="ragService.health_details['embedding_service']?.status !== 'healthy'">
+                        {{ ragService.health_details['embedding_service']?.status || 'unknown' }}
+                      </mat-chip>
+                      @if (ragService.health_details['embedding_service']?.error) {
+                        <span class="error-text">{{ ragService.health_details['embedding_service']?.error }}</span>
+                      }
                     </div>
                   </div>
                   <div class="health-item">
-                    <mat-icon>sort</mat-icon>
+                    <mat-icon [class.healthy]="ragService.health_details['reranker_service']?.status === 'healthy'"
+                              [class.unhealthy]="ragService.health_details['reranker_service']?.status !== 'healthy'">
+                      sort
+                    </mat-icon>
                     <div>
                       <strong>Reranker Service</strong>
                       <span>{{ ragService.health_details['reranker_service']?.model || 'N/A' }}</span>
+                      <mat-chip size="small"
+                                [class.chip-healthy]="ragService.health_details['reranker_service']?.status === 'healthy'"
+                                [class.chip-unhealthy]="ragService.health_details['reranker_service']?.status !== 'healthy'">
+                        {{ ragService.health_details['reranker_service']?.status || 'unknown' }}
+                      </mat-chip>
+                      @if (ragService.health_details['reranker_service']?.error) {
+                        <span class="error-text">{{ ragService.health_details['reranker_service']?.error }}</span>
+                      }
                     </div>
                   </div>
                 </div>
@@ -280,19 +313,43 @@ import { ApiService, VectorDbConfig, RagCollections } from '../../services/api.s
     }
     .health-item {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 12px;
     }
     .health-item mat-icon {
       color: #64748b;
+      margin-top: 2px;
+    }
+    .health-item mat-icon.healthy {
+      color: #10b981;
+    }
+    .health-item mat-icon.unhealthy {
+      color: #ef4444;
     }
     .health-item div {
       display: flex;
       flex-direction: column;
+      gap: 4px;
     }
     .health-item span {
       font-size: 14px;
       color: #64748b;
+    }
+    .health-item .error-text {
+      font-size: 12px;
+      color: #ef4444;
+      background: #fef2f2;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+    .chip-healthy {
+      background-color: #d1fae5 !important;
+      color: #065f46 !important;
+    }
+    .chip-unhealthy {
+      background-color: #fee2e2 !important;
+      color: #991b1b !important;
     }
     .collection-count {
       margin-top: 16px;

@@ -9,7 +9,6 @@ and directory scanning.
 **Remote RAG Pipeline Service**
 The RAG Pipeline is hosted at http://10.42.65.199:8000
 API Documentation: http://10.42.65.199:8000/docs
-
 **Required Environment Variables**
 - RAG_PIPELINE_BASE_URL: URL of the RAG Pipeline service (default: http://10.42.65.199:8000)
 - RAG_PIPELINE_API_KEY: API key for authentication (optional, if service requires auth)

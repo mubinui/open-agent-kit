@@ -60,6 +60,7 @@ def create_collections(client: MongoClient, database_name: str) -> None:
     """
     Create MongoDB collections.
     
+    
     Args:
         client: MongoDB client
         database_name: Name of the database
