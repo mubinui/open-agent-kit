@@ -1,2 +1,64 @@
+# Build context optimization - exclude unnecessary files
 admin-ui/
 tmp/
+
+# Version control
+.git/
+.gitignore
+
+# Python artifacts
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Testing and coverage
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Caches
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Data and logs
+data/
+*.log
+logs/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Development files
+examples/
+scripts/
+dashboards/
+helm/
+k8s/
+
+# Misc
+.env.local
+.env.*.local
+*.bak
+*.tmp

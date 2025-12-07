@@ -8,7 +8,6 @@ from src.audit_logging import get_logger
 from src.config.agent_models import AgentConfig, AgentType, RetrieveConfig
 from src.config.registries import PromptRegistry, ProviderRegistry
 from src.config.tool_registry import ToolRegistry
-from src.config.vector_db_models import VectorDBConfig, VectorDBType
 from src.infrastructure.providers import ProviderAdapter
 
 logger = get_logger(__name__)
@@ -75,14 +74,15 @@ class AgentFactory:
     def create_retrieve_agent(
         self,
         agent_config: AgentConfig,
-        vector_db_config: Optional[VectorDBConfig] = None,
     ) -> "RetrieveUserProxyAgent":
         """
         Create a RetrieveUserProxyAgent for RAG.
 
+        Note: Local vector DB clients have been removed. Use the external
+        RAG pipeline service (src.tools.rag_pipeline) for document retrieval.
+
         Args:
             agent_config: Agent configuration with retrieve_config
-            vector_db_config: Optional VectorDBConfig for database configuration
 
         Returns:
             Configured RetrieveUserProxyAgent instance
@@ -100,7 +100,7 @@ class AgentFactory:
                 f"Agent {agent_config.id} requires retrieve_config"
             )
 
-        return self._create_retrieve_user_proxy_agent(agent_config, vector_db_config)
+        return self._create_retrieve_user_proxy_agent(agent_config)
 
     def register_tools_for_agent(
         self,
@@ -218,14 +218,16 @@ class AgentFactory:
     def _create_retrieve_user_proxy_agent(
         self,
         agent_config: AgentConfig,
-        vector_db_config: Optional[VectorDBConfig] = None,
     ) -> "RetrieveUserProxyAgent":
         """
         Create a RetrieveUserProxyAgent for RAG.
 
+        Note: Local vector DB clients (chromadb, pgvector, qdrant) have been removed.
+        Use the external RAG pipeline service (src.tools.rag_pipeline) for document
+        retrieval instead of this agent type.
+
         Args:
             agent_config: Agent configuration
-            vector_db_config: Optional VectorDBConfig for database configuration
 
         Returns:
             RetrieveUserProxyAgent instance
@@ -258,94 +260,9 @@ class AgentFactory:
             "get_or_create": retrieve_config.get_or_create,
         }
 
-        # If VectorDBConfig is provided, use provider adapter if available
-        if vector_db_config:
-            logger.info(
-                "Using VectorDBConfig for RetrieveUserProxyAgent",
-                agent_id=agent_config.id,
-                db_type=vector_db_config.type,
-                collection=vector_db_config.collection_name,
-            )
-            
-            # Use provider adapter if available
-            if self.provider_adapter:
-                try:
-                    vector_db_client = self.provider_adapter.get_vector_db_client(
-                        vector_db_config.collection_name
-                    )
-                    # Get Autogen-compatible configuration
-                    autogen_retrieve_config["client"] = vector_db_client.get_client()
-                    autogen_retrieve_config["db_type"] = vector_db_config.type.value
-                    
-                    logger.info(
-                        "Using ProviderAdapter for vector DB client",
-                        agent_id=agent_config.id,
-                        db_type=vector_db_config.type,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "Failed to use ProviderAdapter for vector DB, falling back to factory",
-                        agent_id=agent_config.id,
-                        error=str(e),
-                    )
-                    # Fallback to factory
-                    from src.infrastructure.vector_db import VectorDBFactory
-                    db_config = VectorDBFactory.create_client_for_autogen(vector_db_config)
-                    autogen_retrieve_config.update(db_config)
-            else:
-                # Use legacy factory
-                from src.infrastructure.vector_db import VectorDBFactory
-                db_config = VectorDBFactory.create_client_for_autogen(vector_db_config)
-                autogen_retrieve_config.update(db_config)
-        
-        # Otherwise, use legacy configuration from retrieve_config
-        elif retrieve_config.db_config:
+        # Use legacy configuration from retrieve_config if provided
+        if retrieve_config.db_config:
             autogen_retrieve_config.update(retrieve_config.db_config)
-        
-        # Fallback: Use provider adapter for credentials if available
-        else:
-            if retrieve_config.vector_db == "chromadb":
-                # ChromaDB is the default, no special config needed
-                pass
-            elif retrieve_config.vector_db == "pgvector":
-                # PGVector requires connection string
-                if self.provider_adapter:
-                    connection_string = self.provider_adapter.get_credentials(
-                        agent_config.id, "PGVECTOR_CONNECTION_STRING"
-                    )
-                else:
-                    import os
-                    connection_string = os.getenv("PGVECTOR_CONNECTION_STRING")
-                
-                if connection_string:
-                    autogen_retrieve_config["connection_string"] = connection_string
-                    logger.info(
-                        "Using PGVector connection string",
-                        agent_id=agent_config.id,
-                    )
-            elif retrieve_config.vector_db == "qdrant":
-                # Qdrant requires URL and optional API key
-                if self.provider_adapter:
-                    qdrant_url = self.provider_adapter.get_credentials(
-                        agent_config.id, "QDRANT_URL"
-                    ) or "http://localhost:6333"
-                    qdrant_api_key = self.provider_adapter.get_credentials(
-                        agent_config.id, "QDRANT_API_KEY"
-                    )
-                else:
-                    import os
-                    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
-                    qdrant_api_key = os.getenv("QDRANT_API_KEY")
-                
-                autogen_retrieve_config["url"] = qdrant_url
-                if qdrant_api_key:
-                    autogen_retrieve_config["api_key"] = qdrant_api_key
-                
-                logger.info(
-                    "Using Qdrant configuration",
-                    agent_id=agent_config.id,
-                    url=qdrant_url,
-                )
 
         # Create the agent
         agent = RetrieveUserProxyAgent(
@@ -361,7 +278,6 @@ class AgentFactory:
             "Created RetrieveUserProxyAgent",
             agent_id=agent_config.id,
             agent_name=agent_config.name,
-            vector_db=retrieve_config.vector_db,
             collection=retrieve_config.collection_name,
         )
 

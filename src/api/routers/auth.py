@@ -8,7 +8,6 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from src.api.auth import (
     APIKeyCreate,
@@ -26,7 +25,6 @@ from src.api.auth import (
     require_user,
 )
 from src.config.settings import get_settings
-from src.infrastructure.database.connection import get_db
 
 logger = structlog.get_logger(__name__)
 
@@ -58,10 +56,16 @@ async def get_auth_config():
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
 ):
     """Authenticate user and return JWT token."""
-    user_manager = UserManager(db)
+    try:
+        user_manager = UserManager()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service not available (MongoDB not configured)"
+        )
+    
     user = user_manager.authenticate_user(form_data.username, form_data.password)
     
     if not user:
@@ -95,11 +99,16 @@ async def login_for_access_token(
 @router.post("/users", response_model=UserResponse)
 async def create_user(
     user_data: UserCreate,
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin)
 ):
     """Create a new user (admin only)."""
-    user_manager = UserManager(db)
+    try:
+        user_manager = UserManager()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service not available (MongoDB not configured)"
+        )
     return user_manager.create_user(user_data)
 
 
@@ -118,22 +127,32 @@ async def read_users_me(current_user: CurrentUser = Depends(get_current_user)):
 @router.post("/api-keys", response_model=APIKeyResponse)
 async def create_api_key(
     api_key_data: APIKeyCreate,
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin)
 ):
     """Create a new API key (admin only)."""
-    api_key_manager = APIKeyManager(db)
+    try:
+        api_key_manager = APIKeyManager()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service not available (MongoDB not configured)"
+        )
     return api_key_manager.create_api_key(api_key_data)
 
 
 @router.get("/api-keys", response_model=List[APIKeyInfo])
 async def list_api_keys(
     user_id: str = None,
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_user)
 ):
     """List API keys. Non-admin users can only see their own keys."""
-    api_key_manager = APIKeyManager(db)
+    try:
+        api_key_manager = APIKeyManager()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service not available (MongoDB not configured)"
+        )
     
     # Non-admin users can only see their own keys
     if current_user.role != "admin" and current_user.user_id:
@@ -145,11 +164,17 @@ async def list_api_keys(
 @router.delete("/api-keys/{api_key_id}")
 async def revoke_api_key(
     api_key_id: UUID,
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin)
 ):
     """Revoke an API key (admin only)."""
-    api_key_manager = APIKeyManager(db)
+    try:
+        api_key_manager = APIKeyManager()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service not available (MongoDB not configured)"
+        )
+    
     success = api_key_manager.revoke_api_key(api_key_id)
     
     if not success:
@@ -164,11 +189,17 @@ async def revoke_api_key(
 @router.post("/api-keys/{api_key_id}/rotate", response_model=APIKeyResponse)
 async def rotate_api_key(
     api_key_id: UUID,
-    db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_admin)
 ):
     """Rotate an API key (admin only)."""
-    api_key_manager = APIKeyManager(db)
+    try:
+        api_key_manager = APIKeyManager()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service not available (MongoDB not configured)"
+        )
+    
     rotated_key = api_key_manager.rotate_api_key(api_key_id)
     
     if not rotated_key:

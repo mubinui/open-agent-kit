@@ -51,38 +51,35 @@ async def readiness_check(request: Request) -> Dict[str, Any]:
     Requirements: 6.3, 14.1, 14.2, 16.3, 16.4
     """
     from src.config.settings import get_settings
-    from src.infrastructure.database.connection import get_db_manager
     
     settings = get_settings()
     checks = {}
     
-    # Check PostgreSQL database
-    if settings.memory.database_url:
-        try:
-            db_manager = get_db_manager()
-            checks["postgres"] = "ok" if db_manager.health_check() else "failed"
-        except Exception as e:
-            logger.error(f"PostgreSQL health check failed: {e}")
-            checks["postgres"] = "failed"
-    
-    # Check MongoDB (fail-fast if configured)
+    # Check MongoDB (for both auth and conversation store)
     if settings.memory.mongodb_url:
         try:
-            from src.infrastructure.database.mongo_store import MongoDBConversationStore
+            from src.infrastructure.database.mongo_auth_store import get_mongo_auth_store
             
-            mongo_store = MongoDBConversationStore(
-                connection_string=settings.memory.mongodb_url,
-                database_name=settings.memory.mongodb_database,
-            )
-            
-            if mongo_store.health_check():
+            auth_store = get_mongo_auth_store()
+            if auth_store and auth_store.health_check():
                 checks["mongodb"] = "ok"
             else:
-                checks["mongodb"] = "failed"
-                logger.error("MongoDB health check failed - service not ready")
-            
-            mongo_store.close()
-            
+                # Try to initialize and check
+                from src.infrastructure.database.mongo_store import MongoDBConversationStore
+                
+                mongo_store = MongoDBConversationStore(
+                    connection_string=settings.memory.mongodb_url,
+                    database_name=settings.memory.mongodb_database,
+                )
+                
+                if mongo_store.health_check():
+                    checks["mongodb"] = "ok"
+                else:
+                    checks["mongodb"] = "failed"
+                    logger.error("MongoDB health check failed - service not ready")
+                
+                mongo_store.close()
+                
         except Exception as e:
             logger.error(f"MongoDB health check failed: {e}")
             checks["mongodb"] = "failed"

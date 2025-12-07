@@ -25,25 +25,24 @@
     },
     {
       "id": "knowledge_agent",
-      "type": "retrieve_user_proxy",
+      "type": "conversable",
       "name": "KnowledgeAgent",
+      "system_message": "You are a knowledge retrieval agent. Use the rag_query tool to search the knowledge base and retrieve relevant information to answer questions. Always cite the sources you find.",
       "human_input_mode": "NEVER",
       "code_execution_config": false,
       "max_consecutive_auto_reply": 5,
-      "retrieve_config": {
-        "task": "qa",
-        "docs_path": [
-          "./docs"
-        ],
-        "chunk_token_size": 2000,
-        "vector_db": "chromadb",
-        "collection_name": "knowledge_base",
-        "embedding_model": "all-mpnet-base-v2",
-        "get_or_create": true
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b",
+        "temperature": 0.3,
+        "max_tokens": 2000,
+        "timeout": 120
       },
-      "description": "Retrieves relevant information from knowledge base",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
+      "tools": ["rag_query", "rag_list_files"],
+      "description": "Retrieves relevant information from knowledge base using RAG pipeline",
+      "version": 2,
+      "last_updated": "2024-12-07T00:00:00Z",
+      "retrieve_config": null
     },
     {
       "id": "response_agent",
@@ -177,7 +176,7 @@
       "system_message": "You Are A python Programmer . You will just return python snippet.",
       "llm_config": {
         "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "model": "openai/gpt-oss-20b",
         "temperature": 0.7,
         "max_tokens": 1000,
         "timeout": 120,
@@ -305,25 +304,26 @@
       "retrieve_config": null
     },
     {
-      "_comment": "RAG Knowledge Agent - Uses Qdrant directly for retrieval. Requires QDRANT_URL env var. Collection 'knowledge_base' must exist and be populated via RAG Pipeline ingestion.",
+      "_comment": "RAG Knowledge Agent - Uses remote RAG Pipeline service for retrieval. Set RAG_PIPELINE_BASE_URL env var.",
       "id": "rag_knowledge_agent",
-      "type": "retrieve_user_proxy",
+      "type": "conversable",
       "name": "RAGKnowledgeAgent",
+      "system_message": "You are a RAG-powered knowledge agent. Use the rag_query tool to search the knowledge base collection and retrieve relevant documents. Summarize and cite the information you find.",
       "human_input_mode": "NEVER",
       "code_execution_config": false,
       "max_consecutive_auto_reply": 5,
-      "retrieve_config": {
-        "task": "qa",
-        "docs_path": [],
-        "chunk_token_size": 2000,
-        "vector_db": "qdrant",
-        "collection_name": "knowledge_base",
-        "embedding_model": "all-mpnet-base-v2",
-        "get_or_create": true
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b",
+        "temperature": 0.3,
+        "max_tokens": 2000,
+        "timeout": 120
       },
-      "description": "Retrieves information from Qdrant vector database for RAG",
-      "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z"
+      "tools": ["rag_query", "rag_list_files", "rag_get_stats"],
+      "description": "Retrieves information from RAG pipeline service",
+      "version": 2,
+      "last_updated": "2024-12-07T00:00:00Z",
+      "retrieve_config": null
     }
   ]
 }

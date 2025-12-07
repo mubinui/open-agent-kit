@@ -249,3 +249,18 @@ a {
   background: #D91B5C !important;
 }
 
+// Fix for extra lines/borders in form fields
+.mat-mdc-form-field {
+  .mat-mdc-form-field-infix {
+    border: none !important;
+  }
+
+  input.mat-mdc-input-element, 
+  textarea.mat-mdc-input-element {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background-image: none !important;
+  }
+}
+

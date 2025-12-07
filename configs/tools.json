@@ -29,7 +29,13 @@
       "description": "Call Service1 API with user authentication token. Used for making authenticated requests where the user's Keycloak token is forwarded directly. Parameters: endpoint (string), method (string, default POST), payload (object), auth_token (string).",
       "entrypoint": "src.tools.external_service:call_service1",
       "enabled": true,
-      "settings": {},
+      "settings": {
+        "type": "api",
+        "http_method": "POST",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true
+      },
       "version": 1,
       "last_updated": "2024-12-01T00:00:00Z"
     },
@@ -54,7 +60,7 @@
       "last_updated": "2024-12-01T00:00:00Z"
     },
     {
-      "_comment": "RAG Tools - All tools require RAG_PIPELINE_BASE_URL (http://10.42.65.199:8000) and RAG_PIPELINE_ENABLED=true. Optional: RAG_PIPELINE_API_KEY for authenticated access. See docs/RAG_SETUP.md",
+      "_comment": "RAG Tools - Remote RAG Pipeline service. Requires RAG_PIPELINE_BASE_URL and RAG_PIPELINE_ENABLED=true. Optional: RAG_PIPELINE_API_KEY for authenticated access.",
       "id": "rag_ingest_file",
       "name": "rag_ingest_file",
       "description": "Ingest a file (PDF or text) into the RAG pipeline for a specific collection. Parameters: collection (string), file_path (string).",
@@ -62,7 +68,7 @@
       "enabled": true,
       "settings": {},
       "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z"
+      "last_updated": "2024-12-07T00:00:00Z"
     },
     {
       "id": "rag_query",
@@ -72,7 +78,7 @@
       "enabled": true,
       "settings": {},
       "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z"
+      "last_updated": "2024-12-07T00:00:00Z"
     },
     {
       "id": "rag_list_files",
@@ -82,7 +88,7 @@
       "enabled": true,
       "settings": {},
       "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z"
+      "last_updated": "2024-12-07T00:00:00Z"
     },
     {
       "id": "rag_delete_file",
@@ -92,7 +98,7 @@
       "enabled": true,
       "settings": {},
       "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z"
+      "last_updated": "2024-12-07T00:00:00Z"
     },
     {
       "id": "rag_get_stats",
@@ -102,7 +108,7 @@
       "enabled": true,
       "settings": {},
       "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z"
+      "last_updated": "2024-12-07T00:00:00Z"
     }
   ]
 }

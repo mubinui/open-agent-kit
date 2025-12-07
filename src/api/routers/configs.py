@@ -9,8 +9,15 @@ from pydantic import BaseModel, Field
 from src.api.auth import CurrentUser, require_admin, require_user
 from src.audit_logging import AuditLogger
 from src.config.settings import get_settings
-from src.config.versioned_service import VersionedConfigService
 from src.config.config_loader import get_config_loader
+
+# Versioned config service is optional and requires PostgreSQL
+try:
+    from src.config.versioned_service import VersionedConfigService
+    VERSIONED_SERVICE_AVAILABLE = True
+except ImportError:
+    VersionedConfigService = None
+    VERSIONED_SERVICE_AVAILABLE = False
 
 logger = structlog.get_logger(__name__)
 
@@ -77,8 +84,13 @@ class ConflictResponse(BaseModel):
 
 
 # Dependency to get versioned config service
-def get_versioned_config_service() -> VersionedConfigService:
+def get_versioned_config_service() -> "VersionedConfigService":
     """Get VersionedConfigService instance."""
+    if not VERSIONED_SERVICE_AVAILABLE:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Configuration versioning requires PostgreSQL which is not available"
+        )
     settings = get_settings()
     audit_logger = AuditLogger()
     return VersionedConfigService(

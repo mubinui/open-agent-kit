@@ -17,7 +17,14 @@ from src.api.models import (
 )
 from src.audit_logging import get_logger
 from src.config.prompt_models import extract_variables
-from src.config.versioned_service import VersionedConfigService
+
+# Versioned config service is optional and requires PostgreSQL
+try:
+    from src.config.versioned_service import VersionedConfigService
+    VERSIONED_SERVICE_AVAILABLE = True
+except ImportError:
+    VersionedConfigService = None
+    VERSIONED_SERVICE_AVAILABLE = False
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/prompts", tags=["prompts"])
@@ -48,8 +55,10 @@ def _save_prompts_config(config: dict) -> None:
         json.dump(config, f, indent=2)
 
 
-def _get_versioned_service() -> Optional[VersionedConfigService]:
+def _get_versioned_service() -> Optional["VersionedConfigService"]:
     """Get versioned config service if database is configured."""
+    if not VERSIONED_SERVICE_AVAILABLE:
+        return None
     database_url = os.getenv("DATABASE_URL")
     if database_url:
         return VersionedConfigService(database_url=database_url)

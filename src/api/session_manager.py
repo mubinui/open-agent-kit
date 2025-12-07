@@ -72,24 +72,11 @@ class SessionManager:
         
         # Initialize MongoDB store if configured
         self._mongo_store: Optional[ConversationStore] = None
-        self._postgres_store: Optional[ConversationStore] = None
         self._init_persistence_stores()
 
     def _init_persistence_stores(self) -> None:
         """Initialize persistence stores based on configuration."""
         settings = self._settings
-        
-        # Initialize PostgreSQL store if configured
-        if settings.memory.database_url:
-            try:
-                from src.infrastructure.database.postgres_store import PostgreSQLConversationStore
-                
-                self._postgres_store = PostgreSQLConversationStore(
-                    database_url=settings.memory.database_url
-                )
-                logger.info("PostgreSQL conversation store initialized")
-            except Exception as e:
-                logger.error(f"Failed to initialize PostgreSQL store: {e}")
         
         # Initialize MongoDB store if configured
         if settings.memory.mongodb_url:
@@ -121,15 +108,9 @@ class SessionManager:
             self.default_conversation_store = self._mongo_store
             return
 
-        if preferred_backend in {"postgres", "postgresql"} and self._postgres_store is not None:
-            self.default_conversation_store = self._postgres_store
-            return
-
         if self._mongo_store is not None:
-            # Fall back to MongoDB when available to persist sessions by default
+            # Use MongoDB when available to persist sessions by default
             self.default_conversation_store = self._mongo_store
-        elif self._postgres_store is not None:
-            self.default_conversation_store = self._postgres_store
 
     def _get_conversation_store(self, workflow: WorkflowConfig) -> ConversationStore:
         """
@@ -155,17 +136,6 @@ class SessionManager:
                 )
             logger.debug(f"Using MongoDB store for workflow {workflow.id}")
             return self._mongo_store
-        
-        elif persistence in {"postgres", "postgresql"}:
-            if self._postgres_store is not None:
-                logger.debug(f"Using PostgreSQL store for workflow {workflow.id}")
-                return self._postgres_store
-            else:
-                logger.warning(
-                    f"PostgreSQL not configured for workflow {workflow.id}, "
-                    f"falling back to default store"
-                )
-                return self.default_conversation_store
         
         logger.debug(f"Using default store for workflow {workflow.id}")
         return self.default_conversation_store

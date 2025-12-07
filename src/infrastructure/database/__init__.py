@@ -1,14 +1,27 @@
 """Database infrastructure components."""
 
-from src.infrastructure.database.connection import DatabaseConnectionManager
-from src.infrastructure.database.postgres_store import PostgreSQLConversationStore
-from src.infrastructure.database.schema import Base, Session, Message, AgentNote
+from src.infrastructure.database.mongo_store import MongoDBConversationStore
+from src.infrastructure.database.mongo_auth_store import (
+    MongoAuthStore,
+    UserRole,
+    UserCreate,
+    UserResponse,
+    APIKeyCreate,
+    APIKeyResponse,
+    APIKeyInfo,
+    get_mongo_auth_store,
+    init_mongo_auth_store,
+)
 
 __all__ = [
-    "DatabaseConnectionManager",
-    "PostgreSQLConversationStore",
-    "Base",
-    "Session",
-    "Message",
-    "AgentNote",
+    "MongoDBConversationStore",
+    "MongoAuthStore",
+    "UserRole",
+    "UserCreate",
+    "UserResponse",
+    "APIKeyCreate",
+    "APIKeyResponse",
+    "APIKeyInfo",
+    "get_mongo_auth_store",
+    "init_mongo_auth_store",
 ]

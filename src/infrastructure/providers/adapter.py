@@ -13,12 +13,7 @@ import httpx
 import structlog
 
 from src.config.dynamic_models import AuthScheme, ProviderConfig, ProviderType
-from src.config.vector_db_models import VectorDBConfig, VectorDBType
 from src.infrastructure.secrets import get_global_credential_manager
-from src.infrastructure.vector_db.base import VectorDBClient
-from src.infrastructure.vector_db.chromadb_client import ChromaDBClient
-from src.infrastructure.vector_db.pgvector_client import PGVectorClient
-from src.infrastructure.vector_db.qdrant_client import QdrantClient
 from src.observability.metrics import (
     config_reload_total,
     provider_client_created_total,
@@ -70,13 +65,12 @@ class ProviderAdapter:
 
         # Client caches with TTL
         self._llm_clients: Dict[str, tuple[Any, datetime]] = {}
-        self._vector_db_clients: Dict[str, tuple[VectorDBClient, datetime]] = {}
+        self._vector_db_clients: Dict[str, tuple[Any, datetime]] = {}
         self._search_clients: Dict[str, tuple[Any, datetime]] = {}
         self._api_clients: Dict[str, tuple[Any, datetime]] = {}
 
         # Configuration caches
         self._providers: Dict[str, ProviderConfig] = {}
-        self._vector_db_configs: Dict[str, VectorDBConfig] = {}
 
         # Credential manager
         self._credential_manager = get_global_credential_manager()
@@ -148,44 +142,23 @@ class ProviderAdapter:
         logger.info("llm_client_created", provider_id=provider_id)
         return client
 
-    def get_vector_db_client(self, db_id: str) -> VectorDBClient:
+    def get_vector_db_client(self, db_id: str) -> Any:
         """
         Get or create a vector database client instance.
+
+        Note: Vector DB support (chromadb, pgvector, qdrant) has been removed.
+        Use the external RAG pipeline service instead.
 
         Args:
             db_id: Database identifier (collection name)
 
-        Returns:
-            Vector database client
-
         Raises:
-            ValueError: If database configuration not found
+            NotImplementedError: Always, as vector DB clients are no longer supported
         """
-        # Check cache
-        if db_id in self._vector_db_clients:
-            client, cached_at = self._vector_db_clients[db_id]
-            if datetime.utcnow() - cached_at < timedelta(seconds=self.cache_ttl_seconds):
-                logger.debug("vector_db_client_cache_hit", db_id=db_id)
-                return client
-
-        # Get database configuration
-        config = self._vector_db_configs.get(db_id)
-        if config is None:
-            raise ValueError(f"Vector database configuration not found: {db_id}")
-
-        # Create new client
-        client = self._create_vector_db_client(config)
-
-        # Cache the client
-        self._vector_db_clients[db_id] = (client, datetime.utcnow())
-
-        # Emit metrics
-        provider_client_created_total.labels(
-            provider_id=db_id, client_type="vector_db"
-        ).inc()
-
-        logger.info("vector_db_client_created", db_id=db_id, db_type=config.type)
-        return client
+        raise NotImplementedError(
+            "Local vector DB clients have been removed. "
+            "Use the external RAG pipeline service via src.tools.rag_pipeline instead."
+        )
 
     def get_search_client(self, provider_id: str) -> Any:
         """
@@ -363,7 +336,6 @@ class ProviderAdapter:
             logger.info(
                 "provider_configurations_reloaded",
                 providers_count=len(self._providers),
-                vector_dbs_count=len(self._vector_db_configs),
             )
 
         except Exception as e:
@@ -389,27 +361,6 @@ class ProviderAdapter:
         else:
             logger.warning(
                 "provider_config_file_not_found", path=str(self.config_path)
-            )
-
-        # Load vector database configurations
-        if self.vector_db_config_path.exists():
-            with open(self.vector_db_config_path, "r") as f:
-                data = json.load(f)
-                for db_data in data.get("databases", []):
-                    try:
-                        config = VectorDBConfig(**db_data)
-                        # Use collection_name as the key
-                        self._vector_db_configs[config.collection_name] = config
-                    except Exception as e:
-                        logger.error(
-                            "failed_to_load_vector_db_config",
-                            collection_name=db_data.get("collection_name"),
-                            error=str(e),
-                        )
-        else:
-            logger.warning(
-                "vector_db_config_file_not_found",
-                path=str(self.vector_db_config_path),
             )
 
     def _create_llm_client(self, provider: ProviderConfig) -> httpx.AsyncClient:
@@ -459,50 +410,6 @@ class ProviderAdapter:
             headers=headers,
             timeout=timeout,
         )
-
-    def _create_vector_db_client(self, config: VectorDBConfig) -> VectorDBClient:
-        """
-        Create a vector database client.
-
-        Args:
-            config: Vector database configuration
-
-        Returns:
-            Vector database client
-
-        Raises:
-            ValueError: If database type is not supported
-        """
-        # Inject credentials from secret management
-        if config.type == VectorDBType.PGVECTOR and config.pgvector_config:
-            # Check if connection string needs credential injection
-            if "{{" in config.pgvector_config.connection_string:
-                # Extract credential keys and inject
-                # This is a simple implementation; could be enhanced
-                pass
-
-        elif config.type == VectorDBType.QDRANT and config.qdrant_config:
-            # Inject Qdrant API key if needed
-            if config.qdrant_config.api_key and config.qdrant_config.api_key.startswith("{{"):
-                # Extract credential key
-                key = config.qdrant_config.api_key.strip("{}").strip()
-                credential = self.get_credentials(config.collection_name, key)
-                if credential:
-                    config.qdrant_config.api_key = credential
-
-        # Create client based on type
-        if config.type == VectorDBType.CHROMADB:
-            return ChromaDBClient(config)
-        elif config.type == VectorDBType.PGVECTOR:
-            return PGVectorClient(config)
-        elif config.type == VectorDBType.QDRANT:
-            return QdrantClient(config)
-        elif config.type == VectorDBType.MONGODB:
-            raise NotImplementedError(
-                "MongoDB vector database support is not yet implemented"
-            )
-        else:
-            raise ValueError(f"Unsupported vector database type: {config.type}")
 
     def _create_search_client(self, provider: ProviderConfig) -> Any:
         """

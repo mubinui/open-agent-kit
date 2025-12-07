@@ -1,12 +1,5 @@
 {
-  "_comment": "Simplified RAG Service configuration - remote service handles all vector DB operations",
-  "rag_service": {
-    "type": "rag_pipeline",
-    "enabled": true,
-    "base_url": "http://10.42.65.199:8000",
-    "default_collection": "knowledge_base",
-    "timeout": 60,
-    "description": "Remote RAG Pipeline service with Qdrant vector database, embeddings, and reranking"
-  }
+  "_comment": "Vector DB support removed. Use external RAG pipeline service instead.",
+  "databases": []
 }
 
