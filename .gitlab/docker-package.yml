@@ -1,0 +1,26 @@
+package-docker:
+  stage: package
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  before_script:
+    - export APP_VERSION=$(echo $CI_COMMIT_REF_NAME | sed -E 's/(all-|dev-)?([^ ]*)$/\2/')-$CI_COMMIT_SHORT_SHA
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"docker.bracits.com\":{\"auth\":\"$(printf "%s:%s" "${DOCKER_USERNAME}" "${DOCKER_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - echo "Building backend image"
+    - >-
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "docker.bracits.com/v3devops/orchestration-service-api:latest"
+    - echo "Building frontend image"
+    - >-
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}/admin-ui"
+      --dockerfile "${CI_PROJECT_DIR}/admin-ui/Dockerfile"
+      --destination "docker.bracits.com/v3devops/orchestration-service-client:latest"
+  only:
+    - /^dev-.*$/
+
+      # --destination "docker.bracits.com/v3devops/orchestration-service-client:$APP_VERSION"

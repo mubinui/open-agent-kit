@@ -1,0 +1,14 @@
+deploy:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - 'command -v ssh-agent >/dev/null || ( apk add --update openssh )' 
+    - eval $(ssh-agent -s)
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+  script:
+    - echo "Deploying to server..."
+    - ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 root@10.42.65.199 -p 5522 'bash /bits/orchestration-service/run.sh >> /bits/orchestration-service/run.log 2>&1'
+  only:
+    - /^dev-.*$/
