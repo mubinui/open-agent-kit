@@ -30,7 +30,6 @@
       "entrypoint": "src.tools.external_service:call_service1",
       "enabled": true,
       "settings": {
-        "type": "api",
         "http_method": "POST",
         "auth_type": "none",
         "timeout": 30,
@@ -118,12 +117,17 @@
       "entrypoint": "src.tools.requisition_api:get_requisition",
       "enabled": true,
       "settings": {
-        "type": "api",
-        "base_url": "http://10.42.65.155:8012",
-        "api_path": "/api/v1",
+        "api_url": "http://10.42.65.155:8012/api/v1/requisition",
         "http_method": "GET",
+        "auth_type": "none",
+        "auth_header": "",
+        "auth_env_var": "",
+        "body_template": "",
+        "response_path": "",
+        "timeout": 30,
         "forward_user_context": true,
-        "timeout": 30
+        "client_username": "",
+        "client_roles": ""
       },
       "version": 1,
       "last_updated": "2024-12-08T00:00:00Z"
@@ -135,15 +139,490 @@
       "entrypoint": "src.tools.requisition_api:search_requisitions",
       "enabled": true,
       "settings": {
-        "type": "api",
-        "base_url": "http://10.42.65.155:8012",
-        "api_path": "/api/v1",
+        "api_url": "http://10.42.65.155:8012/api/v1/requisition/search",
         "http_method": "GET",
-        "forward_user_context": true,
-        "timeout": 30
+        "timeout": 30,
+        "forward_user_context": true
       },
       "version": 1,
       "last_updated": "2024-12-08T00:00:00Z"
+    },
+    {
+      "id": "getrequisitioninfo",
+      "name": "Find requisition by requisition no",
+      "description": "Find requisition by requisition no\n\nParameters:\n  - reqNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "api_url": "http://10.42.65.155:8012/api/v1/requisition",
+        "http_method": "GET",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true,
+        "_swagger_metadata": {
+          "operation_id": "getRequisitionInfo",
+          "path": "/api/v1/requisition",
+          "tags": [
+            "requisition-controller"
+          ],
+          "parameters": [
+            {
+              "name": "reqNo",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "example": "REQ20250010638"
+            },
+            {
+              "name": "x-client-username",
+              "in": "header",
+              "description": "Username",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "x-client-ref",
+              "in": "header",
+              "description": "Comma-separated roles",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "source_spec": "API Documentation"
+        }
+      }
+    },
+    {
+      "id": "gettenderinfo",
+      "name": "Find tender info by requisition no",
+      "description": "Find tender info by requisition no\n\nParameters:\n  - reqNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "api_url": "http://10.42.65.155:8012/api/v1/requisition/tender-info",
+        "http_method": "GET",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true,
+        "_swagger_metadata": {
+          "operation_id": "getTenderInfo",
+          "path": "/api/v1/requisition/tender-info",
+          "tags": [
+            "requisition-controller"
+          ],
+          "parameters": [
+            {
+              "name": "reqNo",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "example": "REQ20250010638"
+            },
+            {
+              "name": "x-client-username",
+              "in": "header",
+              "description": "Username",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "x-client-ref",
+              "in": "header",
+              "description": "Comma-separated roles",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "source_spec": "API Documentation"
+        }
+      }
+    },
+    {
+      "id": "getselfrequisitioninfo",
+      "name": "Find latest(max 10) requisitions of myself",
+      "description": "Find latest(max 10) requisitions of myself\n\nParameters:\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "api_url": "http://10.42.65.155:8012/api/v1/requisition/self",
+        "http_method": "GET",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true,
+        "_swagger_metadata": {
+          "operation_id": "getSelfRequisitionInfo",
+          "path": "/api/v1/requisition/self",
+          "tags": [
+            "requisition-controller"
+          ],
+          "parameters": [
+            {
+              "name": "x-client-username",
+              "in": "header",
+              "description": "Username",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "x-client-ref",
+              "in": "header",
+              "description": "Comma-separated roles",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "source_spec": "API Documentation"
+        }
+      }
+    },
+    {
+      "id": "getrequisitioninfowithinitiator",
+      "name": "Find requisition initiator name and contact info by requisition no",
+      "description": "Find requisition initiator name and contact info by requisition no\n\nParameters:\n  - reqNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "api_url": "http://10.42.65.155:8012/api/v1/requisition/initiator-info",
+        "http_method": "GET",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true,
+        "_swagger_metadata": {
+          "operation_id": "getRequisitionInfoWithInitiator",
+          "path": "/api/v1/requisition/initiator-info",
+          "tags": [
+            "requisition-controller"
+          ],
+          "parameters": [
+            {
+              "name": "reqNo",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "example": "REQ20250010638"
+            },
+            {
+              "name": "x-client-username",
+              "in": "header",
+              "description": "Username",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "x-client-ref",
+              "in": "header",
+              "description": "Comma-separated roles",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "source_spec": "API Documentation"
+        }
+      }
+    },
+    {
+      "id": "getpurchaseorderinfo",
+      "name": "Find purchase order by purchase order no",
+      "description": "Find purchase order by purchase order no\n\nParameters:\n  - purchaseOrderNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "api_url": "http://10.42.65.155:8012/api/v1/purchase-order",
+        "http_method": "GET",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true,
+        "_swagger_metadata": {
+          "operation_id": "getPurchaseOrderInfo",
+          "path": "/api/v1/purchase-order",
+          "tags": [
+            "purchase-order-controller"
+          ],
+          "parameters": [
+            {
+              "name": "purchaseOrderNo",
+              "in": "query",
+              "required": true,
+              "schema": {
+                "type": "string"
+              },
+              "example": "BPD/2025/FO-5109"
+            },
+            {
+              "name": "x-client-username",
+              "in": "header",
+              "description": "Username",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "x-client-ref",
+              "in": "header",
+              "description": "Comma-separated roles",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "source_spec": "API Documentation"
+        }
+      }
+    },
+    {
+      "id": "getselfpurchaseorderinfo",
+      "name": "Find lastest(max 10) Purchase Order of self",
+      "description": "Find lastest(max 10) Purchase Order of self\n\nParameters:\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "api_url": "http://10.42.65.155:8012/api/v1/purchase-order/self",
+        "http_method": "GET",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true,
+        "_swagger_metadata": {
+          "operation_id": "getSelfPurchaseOrderInfo",
+          "path": "/api/v1/purchase-order/self",
+          "tags": [
+            "purchase-order-controller"
+          ],
+          "parameters": [
+            {
+              "name": "x-client-username",
+              "in": "header",
+              "description": "Username",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "x-client-ref",
+              "in": "header",
+              "description": "Comma-separated roles",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "source_spec": "API Documentation"
+        }
+      }
+    },
+    {
+      "id": "getallframeworkagreementnobyitem",
+      "name": "Find lastest(max 10) Framework Agreement by item code or item name",
+      "description": "Find lastest(max 10) Framework Agreement by item code or item name\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "api_url": "http://10.42.65.155:8012/api/v1/framework-agreement/item-wise",
+        "http_method": "GET",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true,
+        "_swagger_metadata": {
+          "operation_id": "getAllFrameworkAgreementNoByItem",
+          "path": "/api/v1/framework-agreement/item-wise",
+          "tags": [
+            "framework-agreement-controller"
+          ],
+          "parameters": [
+            {
+              "name": "itemCode",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "itemName",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "default": ""
+              },
+              "example": "Controller"
+            },
+            {
+              "name": "x-client-username",
+              "in": "header",
+              "description": "Username",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "x-client-ref",
+              "in": "header",
+              "description": "Comma-separated roles",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "source_spec": "API Documentation"
+        }
+      }
+    },
+    {
+      "id": "gettotalframeworkagreement",
+      "name": "Total active framework agreement",
+      "description": "Get the total COUNT of active framework agreements. Use this tool when the user asks:\n- How many framework agreements are there?\n- What is the total framework agreement count?\n- Count of framework agreements\n- Total framework agreements\n\nOptional filters:\n- itemCode: Filter by item code\n- itemName: Filter by item name\n\nReturns a count/number, not a list of agreements.",
+      "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "api_url": "http://10.42.65.155:8012/api/v1/framework-agreement/count",
+        "http_method": "GET",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true,
+        "_swagger_metadata": {
+          "operation_id": "getTotalFrameworkAgreement",
+          "path": "/api/v1/framework-agreement/count",
+          "tags": [
+            "framework-agreement-controller"
+          ],
+          "parameters": [
+            {
+              "name": "itemCode",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "itemName",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "default": ""
+              },
+              "example": "Controller"
+            },
+            {
+              "name": "x-client-username",
+              "in": "header",
+              "description": "Username",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "x-client-ref",
+              "in": "header",
+              "description": "Comma-separated roles",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "source_spec": "API Documentation"
+        }
+      }
+    },
+    {
+      "id": "getframeworkagreementwithbrandbyitem",
+      "name": "Find lastest(max 10) Framework Agreement with brands by item code or item name",
+      "description": "Find lastest(max 10) Framework Agreement with brands by item code or item name\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "api_url": "http://10.42.65.155:8012/api/v1/framework-agreement/brand-info",
+        "http_method": "GET",
+        "auth_type": "none",
+        "timeout": 30,
+        "forward_user_context": true,
+        "_swagger_metadata": {
+          "operation_id": "getFrameworkAgreementWithBrandByItem",
+          "path": "/api/v1/framework-agreement/brand-info",
+          "tags": [
+            "framework-agreement-controller"
+          ],
+          "parameters": [
+            {
+              "name": "itemCode",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "itemName",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "default": ""
+              },
+              "example": "Controller"
+            },
+            {
+              "name": "x-client-username",
+              "in": "header",
+              "description": "Username",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "x-client-ref",
+              "in": "header",
+              "description": "Comma-separated roles",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "source_spec": "API Documentation"
+        }
+      }
     }
   ]
 }

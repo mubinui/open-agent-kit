@@ -14,9 +14,26 @@
       color: #1e293b; // Slate 800
     }
 
-    button {
-      mat-icon {
-        margin-right: 8px;
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      
+      button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 16px;
+        height: 36px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 4px;
+        
+        mat-icon {
+          font-size: 20px;
+          height: 20px;
+          width: 20px;
+          margin-right: 0;
+        }
       }
     }
   }

@@ -115,14 +115,46 @@ class AgentConfigUpdateRequest(BaseModel):
 
 # Tool Models
 class ToolRegisterRequest(BaseModel):
-    """Request to register a tool."""
+    """Request to register a tool.
+    
+    For function tools: entrypoint is required (e.g., src.tools.calculator:calculate)
+    For API tools: settings.type='api' and settings.api_url are required
+    """
 
-    id: str = Field(pattern=r"^[a-z0-9_]+$", description="Unique tool identifier")
+    id: str = Field(pattern=r"^[a-z0-9_]+$", description="Unique tool identifier (lowercase alphanumeric and underscores only)")
     name: str = Field(description="Tool name")
     description: str = Field(description="Tool description")
-    entrypoint: str = Field(description="Python entrypoint (module.path:function)")
+    entrypoint: Optional[str] = Field(default=None, description="Python entrypoint (module.path:function). Required for function tools, optional for API tools.")
     enabled: bool = Field(default=True)
-    settings: dict[str, Any] = Field(default_factory=dict)
+    settings: dict[str, Any] = Field(default_factory=dict, description="Tool settings. For API tools, must include 'type': 'api' and 'api_url'.")
+    
+    def model_post_init(self, __context: Any) -> None:
+        """Validate tool configuration based on type."""
+        tool_type = self.settings.get('type', 'function')
+        
+        if tool_type == 'api':
+            # API tool validation
+            api_url = self.settings.get('api_url')
+            if not api_url:
+                raise ValueError(
+                    "API tools require 'api_url' in settings. "
+                    "Example: settings={'type': 'api', 'api_url': 'https://api.example.com/endpoint', 'http_method': 'GET'}"
+                )
+            # Set default entrypoint for API tools
+            if not self.entrypoint:
+                self.entrypoint = "src.tools.api_tool_executor:execute_api_tool"
+        else:
+            # Function tool validation
+            if not self.entrypoint:
+                raise ValueError(
+                    "Function tools require 'entrypoint' field. "
+                    "Example: entrypoint='src.tools.calculator:calculate'"
+                )
+            if ':' not in self.entrypoint:
+                raise ValueError(
+                    f"Invalid entrypoint format: '{self.entrypoint}'. "
+                    "Expected format: 'module.path:function_name' (e.g., 'src.tools.calculator:calculate')"
+                )
 
 
 class ToolResponse(BaseModel):
@@ -131,7 +163,7 @@ class ToolResponse(BaseModel):
     id: str
     name: str
     description: str
-    entrypoint: str
+    entrypoint: Optional[str] = None
     enabled: bool
     settings: dict[str, Any]
 
@@ -144,6 +176,76 @@ class ToolUpdateRequest(BaseModel):
     entrypoint: Optional[str] = None
     enabled: Optional[bool] = None
     settings: Optional[dict[str, Any]] = None
+
+
+# Swagger Import Models
+class SwaggerImportRequest(BaseModel):
+    """Request to import tools from a Swagger/OpenAPI specification."""
+    
+    swagger_url: str = Field(description="URL to the Swagger/OpenAPI specification (JSON or YAML)")
+    endpoint_filter: Optional[List[str]] = Field(
+        default=None, 
+        description="List of operation_ids to import. If None, imports all endpoints."
+    )
+    auth_type: str = Field(
+        default="none",
+        description="Default authentication type for imported tools: 'none', 'bearer', 'api_key', 'basic'"
+    )
+    auth_env_var: Optional[str] = Field(
+        default=None,
+        description="Environment variable name containing authentication credentials"
+    )
+    forward_user_context: bool = Field(
+        default=False,
+        description="Whether to forward user context headers (x-client-username, x-client-ref)"
+    )
+    timeout: int = Field(
+        default=30,
+        ge=1,
+        le=300,
+        description="Request timeout in seconds (1-300)"
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Whether imported tools should be enabled by default"
+    )
+
+
+class SwaggerPreviewEndpoint(BaseModel):
+    """Preview of an endpoint from Swagger spec."""
+    
+    operation_id: str
+    path: str
+    method: str
+    summary: str
+    description: str
+    tags: List[str]
+    generated_tool_id: str
+    is_duplicate: bool = False
+
+
+class SwaggerPreviewResponse(BaseModel):
+    """Response from previewing a Swagger specification."""
+    
+    title: str
+    version: str
+    description: str
+    base_url: str
+    openapi_version: str
+    endpoints: List[SwaggerPreviewEndpoint]
+    total_endpoints: int
+    duplicate_count: int
+    errors: List[str] = Field(default_factory=list)
+
+
+class SwaggerImportResult(BaseModel):
+    """Result of importing tools from Swagger."""
+    
+    success: bool
+    imported_count: int
+    skipped_duplicates: List[str]
+    imported_tools: List[str]
+    errors: List[str] = Field(default_factory=list)
 
 
 # Workflow Models

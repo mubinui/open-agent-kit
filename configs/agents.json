@@ -38,7 +38,10 @@
         "max_tokens": 2000,
         "timeout": 120
       },
-      "tools": ["rag_query", "rag_list_files"],
+      "tools": [
+        "rag_query",
+        "rag_list_files"
+      ],
       "description": "Retrieves relevant information from knowledge base using RAG pipeline",
       "version": 2,
       "last_updated": "2024-12-07T00:00:00Z",
@@ -319,7 +322,11 @@
         "max_tokens": 2000,
         "timeout": 120
       },
-      "tools": ["rag_query", "rag_list_files", "rag_get_stats"],
+      "tools": [
+        "rag_query",
+        "rag_list_files",
+        "rag_get_stats"
+      ],
       "description": "Retrieves information from RAG pipeline service",
       "version": 2,
       "last_updated": "2024-12-07T00:00:00Z",
@@ -330,7 +337,7 @@
       "id": "requisition_agent",
       "type": "conversable",
       "name": "RequisitionAgent",
-      "system_message": "You are a requisition assistant that helps users query and understand procurement requisitions. Use the get_requisition tool to fetch requisition details by requisition number. When users ask about a specific requisition, extract the requisition number (format: REQ followed by numbers, e.g., REQ20250010638) and use the tool to fetch details. Present the information clearly and answer any follow-up questions about the requisition data.",
+      "system_message": "You are a requisition assistant that helps users query and understand procurement requisitions. Use the get_requisition tool to fetch requisition details by requisition number. When users ask about a specific requisition, extract the requisition number (format: REQ followed by numbers, e.g., REQ20250010638) and use the tool to fetch details. Present the information clearly and answer any follow-up questions about the requisition data. It can also find the Total framework agreement count by calling Total Active framework Aggrement tool ",
       "human_input_mode": "NEVER",
       "code_execution_config": false,
       "max_consecutive_auto_reply": 5,
@@ -341,7 +348,11 @@
         "max_tokens": 2000,
         "timeout": 120
       },
-      "tools": ["get_requisition", "search_requisitions"],
+      "tools": [
+        "get_requisition",
+        "search_requisitions",
+        "gettotalframeworkagreement"
+      ],
       "description": "Queries requisition data from the Requisition API",
       "version": 1,
       "last_updated": "2024-12-08T00:00:00Z",

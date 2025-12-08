@@ -3,15 +3,20 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ToolConfig(BaseModel):
-    """Configuration for a tool."""
+    """Configuration for a tool.
+    
+    Supports two tool types:
+    - function: Python function tools (requires entrypoint)
+    - api: HTTP API tools (requires settings.api_url)
+    """
 
     id: str = Field(
         pattern=r"^[a-z0-9_]+$",
-        description="Unique tool identifier"
+        description="Unique tool identifier (lowercase alphanumeric and underscores only)"
     )
     name: str = Field(
         description="Function name for the tool"
@@ -19,8 +24,9 @@ class ToolConfig(BaseModel):
     description: str = Field(
         description="Description of what the tool does"
     )
-    entrypoint: str = Field(
-        description="Python entrypoint in format 'module.path:function_name'"
+    entrypoint: Optional[str] = Field(
+        default=None,
+        description="Python entrypoint in format 'module.path:function_name'. Required for function tools."
     )
     enabled: bool = Field(
         default=True,
@@ -28,7 +34,7 @@ class ToolConfig(BaseModel):
     )
     settings: dict[str, Any] = Field(
         default_factory=dict,
-        description="Tool-specific settings"
+        description="Tool-specific settings. For API tools, must include 'type': 'api' and 'api_url'."
     )
     
     # Versioning and metadata fields
@@ -42,13 +48,43 @@ class ToolConfig(BaseModel):
         description="Timestamp of last configuration update"
     )
 
+    @model_validator(mode='after')
+    def validate_tool_type(self) -> 'ToolConfig':
+        """Validate tool configuration based on type."""
+        tool_type = self.settings.get('type', 'function')
+        
+        if tool_type == 'api':
+            # API tool validation
+            api_url = self.settings.get('api_url')
+            if not api_url:
+                raise ValueError(
+                    f"Tool '{self.id}': API tools require 'api_url' in settings. "
+                    "Example: settings={'type': 'api', 'api_url': 'https://api.example.com/endpoint'}"
+                )
+            # Set default entrypoint for API tools if not provided
+            if not self.entrypoint:
+                self.entrypoint = "src.tools.api_tool_executor:execute_api_tool"
+        else:
+            # Function tool validation
+            if not self.entrypoint:
+                raise ValueError(
+                    f"Tool '{self.id}': Function tools require 'entrypoint' field. "
+                    "Example: entrypoint='src.tools.calculator:calculate'"
+                )
+        
+        return self
+
     def validate_entrypoint(self) -> None:
         """Validate entrypoint format."""
-        if ":" not in self.entrypoint:
+        if self.entrypoint and ":" not in self.entrypoint:
             raise ValueError(
-                f"Tool {self.id}: Invalid entrypoint format. "
-                "Expected 'module.path:function_name'"
+                f"Tool '{self.id}': Invalid entrypoint format '{self.entrypoint}'. "
+                "Expected 'module.path:function_name' (e.g., 'src.tools.calculator:calculate')"
             )
+    
+    def is_api_tool(self) -> bool:
+        """Check if this is an API tool."""
+        return self.settings.get('type') == 'api'
 
 
 class ToolsConfig(BaseModel):

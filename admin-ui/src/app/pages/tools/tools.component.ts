@@ -14,6 +14,7 @@ import { ApiService } from '../../services/api.service';
 import { ToolConfig } from '../../models/tool.model';
 import { ToolFormDialogComponent } from './tool-form-dialog.component';
 import { ToolTestDialogComponent } from './tool-test-dialog.component';
+import { SwaggerImportDialogComponent } from './swagger-import-dialog.component';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog.component';
 import { ConflictDialogComponent } from '../../components/conflict-dialog.component';
 import { ConfigHistoryComponent } from '../../components/config-history.component';
@@ -65,6 +66,22 @@ export class ToolsComponent implements OnInit, OnDestroy {
         this.snackBar.open('Failed to load tools', 'Close', { duration: 3000 });
         this.loading.set(false);
         console.error('Error loading tools:', err);
+      }
+    });
+  }
+
+  openSwaggerImportDialog(): void {
+    const dialogRef = this.dialog.open(SwaggerImportDialogComponent, {
+      width: '950px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result === 'imported') {
+        this.snackBar.open('Tools imported successfully', 'Close', { duration: 3000 });
+        this.loadTools();
       }
     });
   }

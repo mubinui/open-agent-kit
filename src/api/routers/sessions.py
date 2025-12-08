@@ -287,6 +287,8 @@ async def send_message(
         pattern=body.pattern,
         username=current_user.username,
         has_roles=bool(current_user.roles),
+        has_raw_token=bool(current_user.raw_token),
+        roles=current_user.roles,
     )
     
     try:

@@ -91,6 +91,48 @@ export interface ConfigHistoryEntry {
   config: any;
 }
 
+// Swagger/OpenAPI Import Types
+export interface SwaggerPreviewEndpoint {
+  operation_id: string;
+  path: string;
+  method: string;
+  summary: string;
+  description: string;
+  tags: string[];
+  generated_tool_id: string;
+  is_duplicate: boolean;
+}
+
+export interface SwaggerPreviewResponse {
+  title: string;
+  version: string;
+  description: string;
+  base_url: string;
+  openapi_version: string;
+  endpoints: SwaggerPreviewEndpoint[];
+  total_endpoints: number;
+  duplicate_count: number;
+  errors: string[];
+}
+
+export interface SwaggerImportRequest {
+  swagger_url: string;
+  endpoint_filter?: string[];
+  auth_type?: string;
+  auth_env_var?: string;
+  forward_user_context?: boolean;
+  timeout?: number;
+  enabled?: boolean;
+}
+
+export interface SwaggerImportResult {
+  success: boolean;
+  imported_count: number;
+  skipped_duplicates: string[];
+  imported_tools: string[];
+  errors: string[];
+}
+
 export interface VectorDbConfig {
   id: string;
   type: string;
@@ -215,6 +257,17 @@ export class ApiService {
   executeTool(toolId: string, args: Record<string, any>, headers?: Record<string, string>): Observable<ToolExecutionResponse> {
     const options = headers ? { headers } : {};
     return this.http.post<ToolExecutionResponse>(`${this.baseUrl}/tools/${toolId}/execute`, { args }, options);
+  }
+
+  // Swagger/OpenAPI Import endpoints
+  previewSwaggerImport(swaggerUrl: string): Observable<SwaggerPreviewResponse> {
+    return this.http.post<SwaggerPreviewResponse>(`${this.baseUrl}/tools/import-swagger/preview`, null, {
+      params: { swagger_url: swaggerUrl }
+    });
+  }
+
+  importSwaggerTools(request: SwaggerImportRequest): Observable<SwaggerImportResult> {
+    return this.http.post<SwaggerImportResult>(`${this.baseUrl}/tools/import-swagger`, request);
   }
 
   // Workflow endpoints

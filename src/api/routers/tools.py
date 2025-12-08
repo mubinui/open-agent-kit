@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Request, status
+from pydantic import ValidationError
 
 from src.api.models import (
     ToolRegisterRequest,
@@ -13,11 +14,16 @@ from src.api.models import (
     ToolUpdateRequest,
     ToolExecutionRequest,
     ToolExecutionResponse,
+    SwaggerImportRequest,
+    SwaggerPreviewResponse,
+    SwaggerPreviewEndpoint,
+    SwaggerImportResult,
 )
 from src.audit_logging import get_logger
 from src.config.dependency_validation import DependencyError, get_validator
 from src.config.tool_registry import get_tool_registry
 from src.config.config_loader import get_config_loader
+from src.tools.swagger_parser import SwaggerParser, sanitize_tool_id
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/tools", tags=["tools"])
@@ -61,6 +67,14 @@ async def register_tool(
     """
     Register a new tool.
     
+    For function tools:
+        - entrypoint is required (e.g., src.tools.calculator:calculate)
+        
+    For API tools:
+        - settings.type must be 'api'
+        - settings.api_url is required
+        - entrypoint is auto-set to the API tool executor
+    
     Args:
         request: FastAPI request object
         body: Tool registration request
@@ -86,7 +100,11 @@ async def register_tool(
         if any(t["id"] == body.id for t in config["tools"]):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Tool already exists: {body.id}",
+                detail={
+                    "error": "duplicate_tool_id",
+                    "message": f"Tool already exists with ID: {body.id}",
+                    "suggestion": "Use a different tool ID or update the existing tool"
+                },
             )
         
         # Add new tool
@@ -96,8 +114,9 @@ async def register_tool(
         # Save config
         _save_tools_config(config)
         
-        # Register with tool registry if enabled
-        if body.enabled:
+        # Register with tool registry if enabled (only for function tools)
+        tool_type = body.settings.get('type', 'function')
+        if body.enabled and tool_type == 'function':
             try:
                 tool_registry = get_tool_registry()
                 tool_registry.register_tool_from_entrypoint(
@@ -117,6 +136,7 @@ async def register_tool(
             "Registered tool",
             request_id=request_id,
             tool_id=body.id,
+            tool_type=tool_type,
         )
         
         return ToolResponse(**tool_dict)
@@ -460,4 +480,216 @@ async def execute_tool(
             status="error",
             result=None,
             error=str(e),
+        )
+
+
+@router.post("/import-swagger/preview", response_model=SwaggerPreviewResponse)
+async def preview_swagger_import(
+    request: Request,
+    swagger_url: str,
+) -> SwaggerPreviewResponse:
+    """
+    Preview endpoints from a Swagger/OpenAPI specification before importing.
+    
+    This endpoint fetches and parses the Swagger spec, then returns a preview
+    of all available endpoints with duplicate detection against existing tools.
+    
+    Args:
+        request: FastAPI request object
+        swagger_url: URL to the Swagger/OpenAPI specification
+        
+    Returns:
+        Preview of available endpoints and their generated tool IDs
+    """
+    request_id = getattr(request.state, "request_id", None)
+    
+    logger.info(
+        "Previewing Swagger import",
+        request_id=request_id,
+        swagger_url=swagger_url,
+    )
+    
+    try:
+        # Load existing tools to check for duplicates
+        config = _load_tools_config()
+        existing_ids = {t["id"] for t in config["tools"]}
+        
+        # Parse the Swagger spec
+        parser = SwaggerParser()
+        parse_result = await parser.parse(swagger_url)
+        
+        # Build preview endpoints
+        preview_endpoints = []
+        duplicate_count = 0
+        
+        for endpoint in parse_result.endpoints:
+            tool_id = sanitize_tool_id(endpoint.operation_id, endpoint.path, endpoint.method)
+            is_duplicate = tool_id in existing_ids
+            
+            if is_duplicate:
+                duplicate_count += 1
+            
+            preview_endpoints.append(SwaggerPreviewEndpoint(
+                operation_id=endpoint.operation_id,
+                path=endpoint.path,
+                method=endpoint.method,
+                summary=endpoint.summary,
+                description=endpoint.description[:200] + "..." if len(endpoint.description) > 200 else endpoint.description,
+                tags=endpoint.tags,
+                generated_tool_id=tool_id,
+                is_duplicate=is_duplicate,
+            ))
+        
+        return SwaggerPreviewResponse(
+            title=parse_result.title,
+            version=parse_result.version,
+            description=parse_result.description,
+            base_url=parse_result.base_url,
+            openapi_version=parse_result.openapi_version,
+            endpoints=preview_endpoints,
+            total_endpoints=len(preview_endpoints),
+            duplicate_count=duplicate_count,
+            errors=parse_result.errors,
+        )
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to preview Swagger import",
+            request_id=request_id,
+            swagger_url=swagger_url,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to parse Swagger spec: {str(e)}",
+        )
+
+
+@router.post("/import-swagger", response_model=SwaggerImportResult)
+async def import_swagger_tools(
+    request: Request,
+    body: SwaggerImportRequest,
+) -> SwaggerImportResult:
+    """
+    Import tools from a Swagger/OpenAPI specification.
+    
+    Parses the Swagger/OpenAPI spec and creates tool configurations for each endpoint.
+    Supports both OpenAPI 2.0 (Swagger) and OpenAPI 3.0+ specifications.
+    
+    Duplicate tools (by ID) are automatically skipped.
+    
+    Args:
+        request: FastAPI request object
+        body: Swagger import request with URL and options
+        
+    Returns:
+        Import result with counts and lists of imported/skipped tools
+    """
+    request_id = getattr(request.state, "request_id", None)
+    
+    logger.info(
+        "Importing tools from Swagger",
+        request_id=request_id,
+        swagger_url=body.swagger_url,
+        endpoint_filter=body.endpoint_filter,
+    )
+    
+    try:
+        # Load existing tools config
+        config = _load_tools_config()
+        existing_ids = {t["id"] for t in config["tools"]}
+        
+        # Parse and generate tools
+        parser = SwaggerParser()
+        parse_result = await parser.parse(body.swagger_url)
+        
+        tools, skipped = parser.generate_tool_configs(
+            parse_result=parse_result,
+            existing_tool_ids=existing_ids.copy(),  # Pass copy to track duplicates
+            endpoint_filter=body.endpoint_filter,
+            default_auth_type=body.auth_type,
+            default_auth_env_var=body.auth_env_var,
+            forward_user_context=body.forward_user_context,
+            timeout=body.timeout,
+        )
+        
+        # Import non-duplicate tools
+        imported_tools = []
+        errors = []
+        
+        for tool in tools:
+            try:
+                # Check again for duplicates (in case of race condition)
+                if tool.id in existing_ids:
+                    skipped.append(f"{tool.id} (already exists)")
+                    continue
+                
+                # Create tool config
+                tool_dict = {
+                    "id": tool.id,
+                    "name": tool.name,
+                    "description": tool.description,
+                    "entrypoint": tool.entrypoint,
+                    "enabled": body.enabled,
+                    "settings": tool.settings,
+                }
+                
+                config["tools"].append(tool_dict)
+                existing_ids.add(tool.id)
+                imported_tools.append(tool.id)
+                
+            except Exception as e:
+                errors.append(f"Failed to import {tool.id}: {str(e)}")
+        
+        # Save config if any tools were imported
+        if imported_tools:
+            _save_tools_config(config)
+            
+            # Reload tool registry
+            try:
+                tool_registry = get_tool_registry()
+                tool_registry.reload_from_config()
+            except Exception as e:
+                logger.warning(
+                    "Failed to reload tool registry after import",
+                    error=str(e),
+                )
+        
+        logger.info(
+            "Swagger import completed",
+            request_id=request_id,
+            imported_count=len(imported_tools),
+            skipped_count=len(skipped),
+        )
+        
+        return SwaggerImportResult(
+            success=True,
+            imported_count=len(imported_tools),
+            skipped_duplicates=skipped,
+            imported_tools=imported_tools,
+            errors=errors + parse_result.errors,
+        )
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to import Swagger tools",
+            request_id=request_id,
+            swagger_url=body.swagger_url,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to import tools from Swagger: {str(e)}",
         )

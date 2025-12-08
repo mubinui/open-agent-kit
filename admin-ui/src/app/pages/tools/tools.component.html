@@ -1,10 +1,16 @@
 <div class="tools-container">
   <div class="header">
     <h1>Tools Management</h1>
-    <button mat-raised-button color="primary" (click)="openCreateDialog()">
-      <mat-icon>add</mat-icon>
-      Register Tool
-    </button>
+    <div class="header-actions">
+      <button mat-raised-button color="accent" (click)="openSwaggerImportDialog()">
+        <mat-icon>cloud_download</mat-icon>
+        Import from Swagger
+      </button>
+      <button mat-raised-button color="primary" (click)="openCreateDialog()">
+        <mat-icon>add</mat-icon>
+        Register Tool
+      </button>
+    </div>
   </div>
 
   @if (loading()) {

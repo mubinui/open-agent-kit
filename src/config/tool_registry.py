@@ -138,12 +138,70 @@ class ToolRegistry:
             tool_name=tool_def.name,
         )
 
+    def register_api_tool(
+        self,
+        tool_id: str,
+        settings: dict[str, Any],
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        """
+        Register an API tool by creating a bound function.
+
+        This method creates a closure that binds the tool settings,
+        allowing the API tool to be called by Autogen with just the
+        user-provided arguments.
+
+        Args:
+            tool_id: Unique identifier for the tool
+            settings: Tool settings containing API configuration
+            name: Optional name for the tool
+            description: Optional description
+
+        Raises:
+            ValueError: If registration fails
+        """
+        try:
+            from src.tools.api_tool_executor import create_api_tool_function
+            
+            # Create the bound function
+            function = create_api_tool_function(
+                tool_id=tool_id,
+                settings=settings,
+                description=description or f"API tool: {tool_id}",
+            )
+            
+            # Register the function
+            self.register_tool(
+                tool_id=tool_id,
+                function=function,
+                description=description,
+                name=name,
+            )
+            
+            _get_logger().info(
+                "Registered API tool",
+                tool_id=tool_id,
+                api_url=settings.get("api_url"),
+            )
+            
+        except Exception as e:
+            _get_logger().error(
+                "Failed to register API tool",
+                tool_id=tool_id,
+                error=str(e),
+            )
+            raise ValueError(
+                f"Failed to register API tool {tool_id}: {e}"
+            ) from e
+
     def register_tool_from_entrypoint(
         self,
         tool_id: str,
         entrypoint: str,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        settings: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Register a tool by importing from an entrypoint.
@@ -153,10 +211,21 @@ class ToolRegistry:
             entrypoint: Import path in format "module.path:function_name"
             name: Optional name for the tool
             description: Optional description
+            settings: Optional tool settings (used for API tools)
 
         Raises:
             ValueError: If entrypoint is invalid or import fails
         """
+        # Check if this is an API tool that needs special handling
+        if settings and settings.get("type") == "api":
+            self.register_api_tool(
+                tool_id=tool_id,
+                settings=settings,
+                name=name,
+                description=description,
+            )
+            return
+            
         try:
             # Parse entrypoint
             if ":" not in entrypoint:
@@ -221,20 +290,31 @@ class ToolRegistry:
             raise ValueError(f"Tool not found: {tool_id}")
 
         try:
+            # Use tool_id as the name for consistency
+            # This ensures the agent config tool references match what Autogen sees
+            # The human-readable name goes in the description
+            tool_name = tool_id
+            
+            # Build description that includes the human-readable name if different
+            description = tool_def.description
+            if tool_def.name and tool_def.name != tool_id:
+                description = f"{tool_def.name}: {description}"
+            
             # Register for LLM (caller gets the schema)
             caller.register_for_llm(
-                name=tool_def.name,
-                description=tool_def.description,
+                name=tool_name,
+                description=description,
             )(tool_def.function)
 
             # Register for execution (executor can run the function)
             executor.register_for_execution(
-                name=tool_def.name,
+                name=tool_name,
             )(tool_def.function)
 
             _get_logger().info(
                 "Registered tool with agents",
                 tool_id=tool_id,
+                tool_name=tool_name,
                 caller=caller.name,
                 executor=executor.name,
             )
@@ -372,6 +452,7 @@ class ToolRegistry:
                         entrypoint=tool_config.entrypoint,
                         name=tool_config.name,
                         description=tool_config.description,
+                        settings=tool_config.settings,  # Pass settings for API tools
                     )
                     loaded_count += 1
                 except Exception as e:

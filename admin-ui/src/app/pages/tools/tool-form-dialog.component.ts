@@ -171,10 +171,12 @@ import { ToolConfig } from '../../models/tool.model';
     }
 
     mat-dialog-content {
-      width: 100%;
+      width: 600px;
+      max-width: 90vw;
+      max-height: 70vh;
       padding: 20px 24px;
       box-sizing: border-box;
-      overflow-x: auto;
+      overflow-x: hidden;
       overflow-y: auto;
       flex: 1;
       
@@ -229,21 +231,28 @@ export class ToolFormDialogComponent {
       this.tool = { ...this.data.tool };
       this.isEdit.set(true);
       
-      // Map settings to top-level properties for API tools
-      if (this.tool.settings && this.tool.settings['type'] === 'api') {
-        this.tool.type = 'api';
-        this.tool.api_url = this.tool.settings['api_url'];
-        this.tool.http_method = this.tool.settings['http_method'];
-        this.tool.auth_type = this.tool.settings['auth_type'];
-        this.tool.auth_header = this.tool.settings['auth_header'];
-        this.tool.auth_env_var = this.tool.settings['auth_env_var'];
-        this.tool.headers = this.tool.settings['headers'];
-        this.tool.body_template = this.tool.settings['body_template'];
-        this.tool.response_path = this.tool.settings['response_path'];
-        this.tool.timeout = this.tool.settings['timeout'];
-        this.tool.forward_user_context = this.tool.settings['forward_user_context'];
-        this.tool.client_username = this.tool.settings['client_username'];
-        this.tool.client_roles = this.tool.settings['client_roles'];
+      // Prefer settings.type, otherwise infer from entrypoint (API executor)
+      const settings = this.tool.settings || {};
+      const inferredType =
+        settings['type'] ||
+        (settings['api_url'] ? 'api' : undefined) ||
+        (this.tool.entrypoint?.includes('api_tool_executor') ? 'api' : 'function');
+      this.tool.type = inferredType as 'api' | 'function';
+      
+      if (this.tool.type === 'api') {
+        // Map API fields from settings (fall back to empty strings so inputs render)
+        this.tool.api_url = settings['api_url'] || '';
+        this.tool.http_method = settings['http_method'] || 'GET';
+        this.tool.auth_type = settings['auth_type'] || 'none';
+        this.tool.auth_header = settings['auth_header'] || '';
+        this.tool.auth_env_var = settings['auth_env_var'] || '';
+        this.tool.headers = settings['headers'] || undefined;
+        this.tool.body_template = settings['body_template'] || '';
+        this.tool.response_path = settings['response_path'] || '';
+        this.tool.timeout = settings['timeout'] ?? 30;
+        this.tool.forward_user_context = settings['forward_user_context'] ?? true;
+        this.tool.client_username = settings['client_username'] || '';
+        this.tool.client_roles = settings['client_roles'] || '';
       } else {
         this.tool.type = 'function';
       }
