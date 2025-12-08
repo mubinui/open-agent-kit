@@ -13,6 +13,7 @@ import { catchError, throwError } from 'rxjs';
 import { ApiService } from '../../services/api.service';
 import { ToolConfig } from '../../models/tool.model';
 import { ToolFormDialogComponent } from './tool-form-dialog.component';
+import { ToolTestDialogComponent } from './tool-test-dialog.component';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog.component';
 import { ConflictDialogComponent } from '../../components/conflict-dialog.component';
 import { ConfigHistoryComponent } from '../../components/config-history.component';
@@ -206,8 +207,12 @@ export class ToolsComponent implements OnInit, OnDestroy {
   }
 
   testTool(tool: ToolConfig): void {
-    this.snackBar.open(`Testing tool: ${tool.name}`, 'Close', { duration: 2000 });
-    // TODO: Implement tool testing functionality
+    this.dialog.open(ToolTestDialogComponent, {
+      width: '800px',
+      maxWidth: '95vw',
+      maxHeight: '90vh',
+      data: { tool }
+    });
   }
 
   formatDate(dateString: string): string {

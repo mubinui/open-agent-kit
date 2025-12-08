@@ -18,6 +18,8 @@ export interface ToolConfig {
   response_path?: string;    // JSON path to extract response (e.g., 'data.result')
   timeout?: number;          // Request timeout in seconds
   forward_user_context?: boolean; // Whether to forward user context headers
+  client_username?: string;  // Override x-client-username header value
+  client_roles?: string;     // Override x-client-ref header value (comma-separated)
   
   // Versioning fields
   version?: number;

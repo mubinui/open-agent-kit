@@ -355,6 +355,30 @@
       "persistence": "mongo_only",
       "version": 1,
       "last_updated": "2024-12-03T00:00:00Z"
+    },
+    {
+      "id": "requisition_assistant",
+      "name": "Requisition Assistant",
+      "description": "An assistant that queries the Requisition API to fetch and explain procurement requisition details. Ask about any requisition by number (e.g., REQ20250010638).",
+      "pattern": "two_agent",
+      "entry_agent_id": "user_proxy",
+      "recipient_agent_id": "requisition_agent",
+      "max_turns": 6,
+      "summary_method": "last_msg",
+      "enabled": true,
+      "metadata": {
+        "use_case": "procurement",
+        "complexity": "simple",
+        "external_api": "requisition"
+      },
+      "workflow_type": "sequential",
+      "persistence": "mongo_only",
+      "version": 1,
+      "last_updated": "2024-12-08T00:00:00Z",
+      "steps": null,
+      "group_chat": null,
+      "nodes": null,
+      "connections": null
     }
   ]
 }

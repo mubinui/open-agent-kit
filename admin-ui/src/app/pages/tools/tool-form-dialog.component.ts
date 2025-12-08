@@ -127,9 +127,23 @@ import { ToolConfig } from '../../models/tool.model';
 
           <div class="checkbox-field">
             <mat-checkbox [(ngModel)]="tool.forward_user_context" name="forward_user_context">
-              Forward User Context (x-client-ref, x-client-username)
+              Forward User Context Headers
             </mat-checkbox>
           </div>
+
+          @if (tool.forward_user_context) {
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Client Username (x-client-username)</mat-label>
+              <input matInput [(ngModel)]="tool.client_username" name="client_username">
+              <mat-hint>Username to send in x-client-username header (leave empty to use from JWT)</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Client Roles (x-client-ref)</mat-label>
+              <input matInput [(ngModel)]="tool.client_roles" name="client_roles">
+              <mat-hint>Comma-separated roles for x-client-ref header (leave empty to use from JWT)</mat-hint>
+            </mat-form-field>
+          }
         }
 
         <div class="checkbox-field">
@@ -228,6 +242,8 @@ export class ToolFormDialogComponent {
         this.tool.response_path = this.tool.settings['response_path'];
         this.tool.timeout = this.tool.settings['timeout'];
         this.tool.forward_user_context = this.tool.settings['forward_user_context'];
+        this.tool.client_username = this.tool.settings['client_username'];
+        this.tool.client_roles = this.tool.settings['client_roles'];
       } else {
         this.tool.type = 'function';
       }
@@ -264,6 +280,8 @@ export class ToolFormDialogComponent {
       delete this.tool.response_path;
       delete this.tool.timeout;
       delete this.tool.forward_user_context;
+      delete this.tool.client_username;
+      delete this.tool.client_roles;
       this.headersJson = '';
     } else if (this.tool.type === 'api') {
       delete this.tool.entrypoint;
@@ -307,7 +325,9 @@ export class ToolFormDialogComponent {
         body_template: this.tool.body_template,
         response_path: this.tool.response_path,
         timeout: this.tool.timeout,
-        forward_user_context: this.tool.forward_user_context
+        forward_user_context: this.tool.forward_user_context,
+        client_username: this.tool.client_username,
+        client_roles: this.tool.client_roles
       };
     }
     

@@ -108,6 +108,12 @@ export interface RagCollections {
   total: number;
 }
 
+export interface ToolExecutionResponse {
+  status: string;
+  result: any;
+  error?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -116,8 +122,9 @@ export class ApiService {
   private baseUrl = '/api/v1';
 
   // Session endpoints
-  createSession(workflowId: string, userId?: string): Observable<Session> {
-    return this.http.post<Session>(`${this.baseUrl}/sessions`, { workflow_id: workflowId, user_id: userId });
+  createSession(workflowId: string, userId?: string, headers?: Record<string, string>): Observable<Session> {
+    const options = headers ? { headers } : {};
+    return this.http.post<Session>(`${this.baseUrl}/sessions`, { workflow_id: workflowId, user_id: userId }, options);
   }
 
   getSession(sessionId: string): Observable<Session> {
@@ -128,8 +135,9 @@ export class ApiService {
     return this.http.delete<void>(`${this.baseUrl}/sessions/${sessionId}`);
   }
 
-  sendMessage(sessionId: string, message: string, pattern?: string): Observable<ConversationResult> {
-    return this.http.post<ConversationResult>(`${this.baseUrl}/sessions/${sessionId}/messages`, { message, pattern });
+  sendMessage(sessionId: string, message: string, pattern?: string, headers?: Record<string, string>): Observable<ConversationResult> {
+    const options = headers ? { headers } : {};
+    return this.http.post<ConversationResult>(`${this.baseUrl}/sessions/${sessionId}/messages`, { message, pattern }, options);
   }
 
   getChatHistory(sessionId: string): Observable<Message[]> {
@@ -202,6 +210,11 @@ export class ApiService {
 
   rollbackTool(toolId: string, targetVersion: number): Observable<ToolConfig> {
     return this.http.post<ToolConfig>(`${this.baseUrl}/configs/tool/${toolId}/rollback`, { target_version: targetVersion });
+  }
+
+  executeTool(toolId: string, args: Record<string, any>, headers?: Record<string, string>): Observable<ToolExecutionResponse> {
+    const options = headers ? { headers } : {};
+    return this.http.post<ToolExecutionResponse>(`${this.baseUrl}/tools/${toolId}/execute`, { args }, options);
   }
 
   // Workflow endpoints

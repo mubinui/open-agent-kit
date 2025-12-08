@@ -10,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ApiService, Message } from '../../services/api.service';
 import { WorkflowConfig } from '../../models/workflow.model';
 import { MarkdownPipe } from '../../pipes/markdown.pipe';
@@ -29,6 +30,7 @@ import { MarkdownPipe } from '../../pipes/markdown.pipe';
     MatProgressSpinnerModule,
     MatSnackBarModule,
     MatExpansionModule,
+    MatCheckboxModule,
     MarkdownPipe
   ],
   templateUrl: './testing.component.html',
@@ -45,6 +47,10 @@ export class TestingComponent implements OnInit {
   userMessage = signal('');
   loading = signal(false);
   sending = signal(false);
+  
+  // Authentication configuration
+  enableAuth = signal(false);
+  bearerToken = signal('');
 
   @ViewChild('chatContainer') private chatContainer!: ElementRef;
 
@@ -93,7 +99,14 @@ export class TestingComponent implements OnInit {
     }
 
     this.loading.set(true);
-    this.apiService.createSession(this.selectedWorkflowId()).subscribe({
+    
+    // Prepare headers with bearer token if enabled
+    const headers: Record<string, string> = {};
+    if (this.enableAuth() && this.bearerToken()) {
+      headers['Authorization'] = `Bearer ${this.bearerToken()}`;
+    }
+    
+    this.apiService.createSession(this.selectedWorkflowId(), undefined, headers).subscribe({
       next: (session) => {
         this.sessionId.set(session.session_id);
         this.messages.set([]);
@@ -137,7 +150,13 @@ export class TestingComponent implements OnInit {
       timestamp: new Date().toISOString()
     }]);
 
-    this.apiService.sendMessage(this.sessionId()!, message).subscribe({
+    // Prepare headers with bearer token if enabled
+    const headers: Record<string, string> = {};
+    if (this.enableAuth() && this.bearerToken()) {
+      headers['Authorization'] = `Bearer ${this.bearerToken()}`;
+    }
+
+    this.apiService.sendMessage(this.sessionId()!, message, undefined, headers).subscribe({
       next: (result) => {
         // Add assistant response to chat
         this.messages.update(msgs => [...msgs, {

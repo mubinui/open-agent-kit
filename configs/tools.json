@@ -109,6 +109,41 @@
       "settings": {},
       "version": 1,
       "last_updated": "2024-12-07T00:00:00Z"
+    },
+    {
+      "_comment": "Requisition API Tools - External service for procurement requisitions",
+      "id": "get_requisition",
+      "name": "get_requisition",
+      "description": "Get requisition details by requisition number from the Requisition API. Parameters: req_no (string, required) - The requisition number like 'REQ20250010638'. Uses x-client-username and x-client-ref headers from user context.",
+      "entrypoint": "src.tools.requisition_api:get_requisition",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "base_url": "http://10.42.65.155:8012",
+        "api_path": "/api/v1",
+        "http_method": "GET",
+        "forward_user_context": true,
+        "timeout": 30
+      },
+      "version": 1,
+      "last_updated": "2024-12-08T00:00:00Z"
+    },
+    {
+      "id": "search_requisitions",
+      "name": "search_requisitions",
+      "description": "Search requisitions with optional filters. Parameters: query (string), status (string), from_date (string ISO), to_date (string ISO). Uses x-client-username and x-client-ref headers from user context.",
+      "entrypoint": "src.tools.requisition_api:search_requisitions",
+      "enabled": true,
+      "settings": {
+        "type": "api",
+        "base_url": "http://10.42.65.155:8012",
+        "api_path": "/api/v1",
+        "http_method": "GET",
+        "forward_user_context": true,
+        "timeout": 30
+      },
+      "version": 1,
+      "last_updated": "2024-12-08T00:00:00Z"
     }
   ]
 }

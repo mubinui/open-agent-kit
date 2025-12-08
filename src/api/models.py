@@ -392,3 +392,13 @@ class HealthResponse(BaseModel):
     service: str
     version: str
     timestamp: float = Field(default_factory=lambda: datetime.utcnow().timestamp())
+
+class ToolExecutionRequest(BaseModel):
+    """Request to execute a tool."""
+    args: Dict[str, Any] = Field(default_factory=dict, description="Arguments for the tool execution")
+
+class ToolExecutionResponse(BaseModel):
+    """Response from tool execution."""
+    status: str = Field(description="Status of execution (success/error)")
+    result: Any = Field(description="Result of the tool execution")
+    error: Optional[str] = Field(default=None, description="Error message if failed")

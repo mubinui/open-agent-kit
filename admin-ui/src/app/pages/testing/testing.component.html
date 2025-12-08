@@ -18,6 +18,28 @@
           <mat-icon matSuffix>account_tree</mat-icon>
         </mat-form-field>
 
+        <mat-expansion-panel class="context-panel">
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              Authentication
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+
+          <div class="context-controls">
+            <mat-checkbox [(ngModel)]="enableAuth">Enable Authentication</mat-checkbox>
+            
+            @if (enableAuth()) {
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Bearer Token</mat-label>
+                <input matInput [(ngModel)]="bearerToken" placeholder="eyJhbGciOi...">
+                <mat-hint>JWT from Keycloak</mat-hint>
+              </mat-form-field>
+            }
+          </div>
+        </mat-expansion-panel>
+
+        <div class="spacer"></div>
+
         @if (sessionId() === null) {
           <button mat-raised-button color="primary" class="full-width" (click)="startSession()" [disabled]="!selectedWorkflowId() || loading()">
             @if (loading()) {

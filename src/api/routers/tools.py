@@ -1,6 +1,7 @@
 """Tool management endpoints."""
 
 import json
+import inspect
 from pathlib import Path
 from typing import List
 
@@ -10,6 +11,8 @@ from src.api.models import (
     ToolRegisterRequest,
     ToolResponse,
     ToolUpdateRequest,
+    ToolExecutionRequest,
+    ToolExecutionResponse,
 )
 from src.audit_logging import get_logger
 from src.config.dependency_validation import DependencyError, get_validator
@@ -394,4 +397,67 @@ async def delete_tool(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete tool: {str(e)}",
+        )
+
+@router.post("/{tool_id}/execute", response_model=ToolExecutionResponse)
+async def execute_tool(
+    request: Request,
+    tool_id: str,
+    body: ToolExecutionRequest,
+) -> ToolExecutionResponse:
+    """
+    Execute a tool directly.
+    
+    Args:
+        request: FastAPI request object
+        tool_id: Tool identifier
+        body: Execution arguments
+        
+    Returns:
+        Execution result
+    """
+    request_id = getattr(request.state, "request_id", None)
+    
+    logger.info(
+        "Executing tool",
+        request_id=request_id,
+        tool_id=tool_id,
+    )
+    
+    try:
+        tool_registry = get_tool_registry()
+        tool_def = tool_registry.get_tool(tool_id)
+        
+        if not tool_def:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Tool not found: {tool_id}",
+            )
+            
+        # Execute the tool function
+        # Note: Context is already set by middleware if headers were provided
+        if inspect.iscoroutinefunction(tool_def.function):
+            result = await tool_def.function(**body.args)
+        else:
+            result = tool_def.function(**body.args)
+            
+        return ToolExecutionResponse(
+            status="success",
+            result=result,
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Tool execution failed",
+            request_id=request_id,
+            tool_id=tool_id,
+            error=str(e),
+            exc_info=True,
+        )
+        return ToolExecutionResponse(
+            status="error",
+            result=None,
+            error=str(e),
         )

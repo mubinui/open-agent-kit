@@ -324,6 +324,28 @@
       "version": 2,
       "last_updated": "2024-12-07T00:00:00Z",
       "retrieve_config": null
+    },
+    {
+      "_comment": "Requisition Agent - Queries the Requisition API service for procurement data",
+      "id": "requisition_agent",
+      "type": "conversable",
+      "name": "RequisitionAgent",
+      "system_message": "You are a requisition assistant that helps users query and understand procurement requisitions. Use the get_requisition tool to fetch requisition details by requisition number. When users ask about a specific requisition, extract the requisition number (format: REQ followed by numbers, e.g., REQ20250010638) and use the tool to fetch details. Present the information clearly and answer any follow-up questions about the requisition data.",
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "max_consecutive_auto_reply": 5,
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b",
+        "temperature": 0.3,
+        "max_tokens": 2000,
+        "timeout": 120
+      },
+      "tools": ["get_requisition", "search_requisitions"],
+      "description": "Queries requisition data from the Requisition API",
+      "version": 1,
+      "last_updated": "2024-12-08T00:00:00Z",
+      "retrieve_config": null
     }
   ]
 }

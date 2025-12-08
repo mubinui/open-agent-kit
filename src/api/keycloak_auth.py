@@ -39,6 +39,7 @@ class KeycloakTokenData(BaseModel):
     family_name: Optional[str] = None
     realm_access: Optional[dict[str, Any]] = None
     resource_access: Optional[dict[str, Any]] = None
+    authorities: Optional[list[str]] = None  # Direct authorities claim (BRAC Keycloak)
     scope: Optional[str] = None
     azp: Optional[str] = None  # Authorized party (client_id)
     iss: Optional[str] = None  # Issuer
@@ -47,7 +48,11 @@ class KeycloakTokenData(BaseModel):
 
     @property
     def roles(self) -> list[str]:
-        """Extract realm roles from token."""
+        """Extract roles from token - checks authorities first, then realm_access."""
+        # Check authorities claim first (BRAC Keycloak setup)
+        if self.authorities:
+            return self.authorities
+        # Fall back to realm_access.roles
         if self.realm_access and "roles" in self.realm_access:
             return self.realm_access["roles"]
         return []

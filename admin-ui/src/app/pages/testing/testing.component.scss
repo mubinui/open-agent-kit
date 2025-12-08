@@ -330,3 +330,22 @@
     }
   }
 }
+
+.context-panel {
+  margin-bottom: 16px;
+  
+  .context-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 16px;
+    
+    mat-checkbox {
+      margin-bottom: 8px;
+    }
+  }
+}
+
+.spacer {
+  height: 16px;
+}

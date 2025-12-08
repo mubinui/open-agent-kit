@@ -888,7 +888,12 @@ class SessionManager:
         chat_result: Any,
         recipient: ConversableAgent,
     ) -> str:
-        """Extract response text from a chat result."""
+        """Extract response text from a chat result.
+        
+        For tool-using workflows, we want the FIRST substantive response from the
+        recipient agent after a tool call, not the last message (which may be a
+        follow-up question asking for more input).
+        """
         response_text = ""
         
         # Log what we got for debugging
@@ -900,22 +905,47 @@ class SessionManager:
             chat_history_len=len(getattr(chat_result, 'chat_history', [])),
         )
         
-        # First try to get from chat_history - last message from recipient
+        # For tool-using workflows: find the first substantive response after a tool result
         if hasattr(chat_result, 'chat_history') and chat_result.chat_history:
-            for msg in reversed(chat_result.chat_history):
-                # Check if message is from the recipient (by name or role)
+            tool_result_found = False
+            
+            for msg in chat_result.chat_history:
                 msg_name = msg.get('name', '')
                 msg_role = msg.get('role', '')
                 msg_content = msg.get('content', '')
                 
-                # Skip empty messages or tool calls
-                if not msg_content or msg_content.strip() == '':
+                # Check if this is a tool result message
+                if msg_role == 'tool' or (msg_content and 'Response from calling tool' in msg_content):
+                    tool_result_found = True
                     continue
-                    
-                # Get message from recipient or assistant role
-                if msg_name == recipient.name or msg_role == 'assistant':
-                    response_text = msg_content
-                    break
+                
+                # After finding a tool result, get the next substantive assistant response
+                if tool_result_found:
+                    if (msg_name == recipient.name or msg_role == 'assistant') and msg_content and msg_content.strip():
+                        # Skip follow-up questions that don't contain substantive data
+                        lower_content = msg_content.lower()
+                        if ('didn\'t contain a question' not in lower_content and
+                            'how can i help' not in lower_content and
+                            'anything else' not in lower_content and
+                            len(msg_content) > 50):  # Substantive responses are usually longer
+                            response_text = msg_content
+                            break
+        
+        # If no post-tool response found, fall back to finding the longest assistant response
+        if not response_text and hasattr(chat_result, 'chat_history') and chat_result.chat_history:
+            longest_response = ""
+            for msg in chat_result.chat_history:
+                msg_name = msg.get('name', '')
+                msg_role = msg.get('role', '')
+                msg_content = msg.get('content', '')
+                
+                if (msg_name == recipient.name or msg_role == 'assistant') and msg_content:
+                    # Prefer longer responses (more likely to be substantive)
+                    if len(msg_content) > len(longest_response):
+                        longest_response = msg_content
+            
+            if longest_response:
+                response_text = longest_response
         
         # Fall back to summary if no response found in history
         if not response_text and hasattr(chat_result, 'summary') and chat_result.summary:

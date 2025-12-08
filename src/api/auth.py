@@ -62,7 +62,9 @@ class CurrentUser(BaseModel):
     username: Optional[str] = None
     api_key_id: Optional[UUID] = None
     role: UserRole
-    auth_method: str  # "api_key", "jwt", or "development"
+    roles: Optional[list[str]] = None  # Multiple roles from x-client-ref header
+    auth_method: str  # "api_key", "jwt", "keycloak", or "development"
+    raw_token: Optional[str] = None  # Raw JWT token for forwarding to external services
 
 
 # Re-export for backwards compatibility
@@ -260,7 +262,18 @@ async def authenticate_jwt(
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> CurrentUser:
-    """Get current authenticated user (supports both API key and JWT)."""
+    """Get current authenticated user (supports Keycloak, API key, and JWT)."""
+    # First check if user was already authenticated by Keycloak middleware
+    from src.api.context import get_request_user
+    keycloak_user = get_request_user()
+    if keycloak_user is not None:
+        logger.debug(
+            "using_keycloak_authenticated_user",
+            username=keycloak_user.username,
+            auth_method=keycloak_user.auth_method,
+        )
+        return keycloak_user
+    
     # In development mode, allow access without authentication
     settings = get_settings()
     if settings.app.environment == "development" and credentials is None:

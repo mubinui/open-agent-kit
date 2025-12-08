@@ -199,10 +199,35 @@ async def jwt_validation_middleware(request: Request, call_next):
                 token_data = await validate_keycloak_token(token)
                 request.state.keycloak_user = token_data
                 request.state.keycloak_authenticated = True
+                
+                # Set request user context for tools to access
+                from src.api.auth import CurrentUser, UserRole
+                from src.api.context import set_request_user
+                
+                # Determine primary role (admin if in token roles, else user)
+                primary_role = UserRole.ADMIN if "admin" in token_data.roles else UserRole.USER
+                
+                # Use username from header if provided, otherwise from token
+                effective_username = username or token_data.preferred_username
+                
+                # Use roles from header if provided, otherwise from token
+                effective_roles = roles if roles else token_data.roles
+                
+                current_user = CurrentUser(
+                    user_id=None,  # Keycloak users don't have internal UUIDs
+                    username=effective_username,
+                    role=primary_role,
+                    roles=effective_roles,
+                    auth_method="keycloak",
+                    raw_token=token,  # Store raw token for forwarding to external services
+                )
+                set_request_user(current_user)
+                
                 logger.debug(
                     "keycloak_token_validated",
-                    username=token_data.preferred_username,
-                    roles=token_data.roles,
+                    username=effective_username,
+                    roles=effective_roles,
+                    primary_role=primary_role.value,
                 )
             except Exception as e:
                 logger.warning("keycloak_validation_failed", error=str(e))

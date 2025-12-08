@@ -265,16 +265,28 @@ async def send_message(
         
     Requirements: 1.1, 1.3
     """
+    from src.tools.context_utils import set_tool_execution_context, clear_tool_execution_context
+    
     request_id = getattr(request.state, "request_id", None)
     
-    # Set request context
+    # Set request context (ContextVar - for direct access)
     set_request_user(current_user)
+    
+    # Set tool execution context (thread-local - persists through agent execution)
+    # This ensures tools like get_requisition can access user info
+    set_tool_execution_context(
+        username=current_user.username,
+        roles=current_user.roles,
+        raw_token=current_user.raw_token,
+    )
     
     logger.info(
         "Sending message",
         request_id=request_id,
         session_id=session_id,
         pattern=body.pattern,
+        username=current_user.username,
+        has_roles=bool(current_user.roles),
     )
     
     try:
@@ -305,3 +317,6 @@ async def send_message(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send message: {str(e)}",
         )
+    finally:
+        # Clean up tool execution context
+        clear_tool_execution_context()
