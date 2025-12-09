@@ -561,21 +561,49 @@ export class WorkflowVisualizerDialogComponent implements OnInit {
     this.nodes = [];
     this.edges = [];
 
-    switch (workflow.pattern) {
-      case ConversationPattern.TWO_AGENT:
-        this.buildTwoAgentGraph();
-        break;
-      case ConversationPattern.SEQUENTIAL:
-        this.buildSequentialGraph();
-        break;
-      case ConversationPattern.GROUP_CHAT:
-        this.buildGroupChatGraph();
-        break;
-      case ConversationPattern.NESTED:
-        this.buildNestedGraph();
-        break;
-      default:
-        this.buildTwoAgentGraph();
+    if (workflow.nodes && workflow.nodes.length > 0) {
+      this.buildCustomGraph();
+    } else {
+      switch (workflow.pattern) {
+        case ConversationPattern.TWO_AGENT:
+          this.buildTwoAgentGraph();
+          break;
+        case ConversationPattern.SEQUENTIAL:
+          this.buildSequentialGraph();
+          break;
+        case ConversationPattern.GROUP_CHAT:
+          this.buildGroupChatGraph();
+          break;
+        case ConversationPattern.NESTED:
+          this.buildNestedGraph();
+          break;
+        default:
+          this.buildTwoAgentGraph();
+      }
+    }
+  }
+
+  buildCustomGraph(): void {
+    const workflow = this.data.workflow;
+    if (!workflow.nodes) return;
+
+    // Map nodes
+    this.nodes = workflow.nodes.map(node => ({
+      id: node.id,
+      label: node.agent_id,
+      x: node.position.x,
+      y: node.position.y,
+      type: node.id === workflow.entry_agent_id ? 'entry' : 'agent',
+      color: node.id === workflow.entry_agent_id ? '#4caf50' : '#ff9800'
+    }));
+
+    // Map connections
+    if (workflow.connections) {
+      this.edges = workflow.connections.map(conn => ({
+        from: conn.from_node,
+        to: conn.to_node,
+        label: conn.type
+      }));
     }
   }
 

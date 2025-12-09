@@ -21,6 +21,24 @@ export interface GroupChatConfig {
   send_introductions: boolean;
 }
 
+export interface WorkflowNodePosition {
+  x: number;
+  y: number;
+}
+
+export interface WorkflowNode {
+  id: string;
+  agent_id: string;
+  position: WorkflowNodePosition;
+  config: Record<string, any>;
+}
+
+export interface WorkflowConnection {
+  from_node: string;
+  to_node: string;
+  type: string;
+}
+
 export interface WorkflowConfig {
   id: string;
   name: string;
@@ -40,4 +58,6 @@ export interface WorkflowConfig {
   workflow_type?: string;
   persistence?: string;
   enabled?: boolean;
+  nodes?: WorkflowNode[];
+  connections?: WorkflowConnection[];
 }

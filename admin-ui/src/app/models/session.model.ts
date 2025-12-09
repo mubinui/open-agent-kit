@@ -5,6 +5,7 @@ export interface Session {
   created_at: string;
   updated_at: string;
   active: boolean;
+  turn_count: number;
   metadata: Record<string, any>;
 }
 
