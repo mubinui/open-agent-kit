@@ -6,6 +6,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config.behavior_models import AgentBehaviorConfig
+
 
 class AgentType(str, Enum):
     """Type of agent."""
@@ -94,6 +96,10 @@ class AgentConfig(BaseModel):
     description: Optional[str] = Field(
         default=None,
         description="Agent description for GroupChat speaker selection"
+    )
+    behavior: Optional[AgentBehaviorConfig] = Field(
+        default=None,
+        description="Behavior configuration for output format, constraints, and validation"
     )
     
     # Versioning and metadata fields

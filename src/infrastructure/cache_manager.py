@@ -1,14 +1,24 @@
-"""Cache manager for coordinating cache invalidation and warming strategies."""
+"""
+AUTOGEN 0.2 RESEARCH:
+- Feature needed: Multi-layer cache management with configuration hierarchy
+- Autogen provides: cache_seed parameter for basic LLM response caching
+- Using: Custom CacheManager extending Autogen's basic caching with fine-grained control
+- Documentation: https://microsoft.github.io/autogen/0.2/docs/reference/agentchat/conversable_agent
+- Decision: Custom implementation - Autogen's cache_seed is too basic, we need workflow/agent-level control
+"""
 
 import logging
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from uuid import UUID
 from datetime import datetime, timedelta
+from collections import OrderedDict
+from threading import Lock
 
 from src.infrastructure.cache import RedisCache
 from src.infrastructure.session_cache import SessionCache
 from src.infrastructure.embedding_cache import EmbeddingCache
 from src.infrastructure.llm_cache import LLMCacheMonitor
+from src.config.cache_models import CacheConfig, CacheType, LayerConfig, EvictionPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -54,20 +64,176 @@ class TimeBasedInvalidation(CacheInvalidationStrategy):
             return False
 
 
+class LRUCache:
+    """Simple LRU cache implementation for in-memory caching."""
+    
+    def __init__(self, max_size: int):
+        """Initialize LRU cache.
+        
+        Args:
+            max_size: Maximum number of items in cache
+        """
+        self.max_size = max_size
+        self.cache: OrderedDict = OrderedDict()
+        self.lock = Lock()
+    
+    def get(self, key: str) -> Optional[Any]:
+        """Get item from cache.
+        
+        Args:
+            key: Cache key
+            
+        Returns:
+            Cached value or None
+        """
+        with self.lock:
+            if key in self.cache:
+                # Move to end (most recently used)
+                self.cache.move_to_end(key)
+                return self.cache[key]
+            return None
+    
+    def set(self, key: str, value: Any) -> None:
+        """Set item in cache.
+        
+        Args:
+            key: Cache key
+            value: Value to cache
+        """
+        with self.lock:
+            if key in self.cache:
+                # Update and move to end
+                self.cache.move_to_end(key)
+            self.cache[key] = value
+            
+            # Evict oldest if over max size
+            if len(self.cache) > self.max_size:
+                self.cache.popitem(last=False)
+    
+    def delete(self, key: str) -> bool:
+        """Delete item from cache.
+        
+        Args:
+            key: Cache key
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        with self.lock:
+            if key in self.cache:
+                del self.cache[key]
+                return True
+            return False
+    
+    def clear(self) -> int:
+        """Clear all items from cache.
+        
+        Returns:
+            Number of items cleared
+        """
+        with self.lock:
+            count = len(self.cache)
+            self.cache.clear()
+            return count
+
+
+class LFUCache:
+    """Simple LFU cache implementation for in-memory caching."""
+    
+    def __init__(self, max_size: int):
+        """Initialize LFU cache.
+        
+        Args:
+            max_size: Maximum number of items in cache
+        """
+        self.max_size = max_size
+        self.cache: Dict[str, Any] = {}
+        self.frequencies: Dict[str, int] = {}
+        self.lock = Lock()
+    
+    def get(self, key: str) -> Optional[Any]:
+        """Get item from cache.
+        
+        Args:
+            key: Cache key
+            
+        Returns:
+            Cached value or None
+        """
+        with self.lock:
+            if key in self.cache:
+                self.frequencies[key] = self.frequencies.get(key, 0) + 1
+                return self.cache[key]
+            return None
+    
+    def set(self, key: str, value: Any) -> None:
+        """Set item in cache.
+        
+        Args:
+            key: Cache key
+            value: Value to cache
+        """
+        with self.lock:
+            if key in self.cache:
+                self.cache[key] = value
+                self.frequencies[key] = self.frequencies.get(key, 0) + 1
+            else:
+                if len(self.cache) >= self.max_size:
+                    # Evict least frequently used
+                    lfu_key = min(self.frequencies, key=self.frequencies.get)
+                    del self.cache[lfu_key]
+                    del self.frequencies[lfu_key]
+                
+                self.cache[key] = value
+                self.frequencies[key] = 1
+    
+    def delete(self, key: str) -> bool:
+        """Delete item from cache.
+        
+        Args:
+            key: Cache key
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        with self.lock:
+            if key in self.cache:
+                del self.cache[key]
+                del self.frequencies[key]
+                return True
+            return False
+    
+    def clear(self) -> int:
+        """Clear all items from cache.
+        
+        Returns:
+            Number of items cleared
+        """
+        with self.lock:
+            count = len(self.cache)
+            self.cache.clear()
+            self.frequencies.clear()
+            return count
+
+
 class CacheManager:
     """
     Manager for coordinating cache operations across different cache types.
     
     Handles:
+    - Multi-layer cache configuration with hierarchy (global → workflow → agent)
+    - Cache enable/disable at different levels
+    - TTL configuration per cache type
+    - Multiple eviction policies (LRU, LFU, TTL)
+    - Cache metrics and monitoring
     - Cache invalidation strategies
     - Cache warming
-    - Cache metrics and monitoring
-    - Coordinated cache operations
     """
 
     def __init__(
         self,
         redis_cache: RedisCache,
+        cache_config: Optional[CacheConfig] = None,
         session_cache: Optional[SessionCache] = None,
         embedding_cache: Optional[EmbeddingCache] = None,
         llm_cache_monitor: Optional[LLMCacheMonitor] = None,
@@ -76,17 +242,219 @@ class CacheManager:
 
         Args:
             redis_cache: Redis cache client
+            cache_config: Cache configuration with hierarchy support
             session_cache: Optional session cache
             embedding_cache: Optional embedding cache
             llm_cache_monitor: Optional LLM cache monitor
         """
         self.redis_cache = redis_cache
+        self.cache_config = cache_config or CacheConfig()
         self.session_cache = session_cache or SessionCache(redis_cache)
         self.embedding_cache = embedding_cache or EmbeddingCache(redis_cache)
         self.llm_cache_monitor = llm_cache_monitor
         
-        logger.info("Cache manager initialized")
+        # In-memory caches for LRU/LFU policies
+        self._memory_caches: Dict[str, Any] = {}
+        self._cache_metrics: Dict[str, Dict[str, int]] = {
+            cache_type.value: {
+                'hits': 0,
+                'misses': 0,
+                'sets': 0,
+                'deletes': 0,
+                'bypasses': 0
+            }
+            for cache_type in CacheType
+        }
+        
+        logger.info(f"Cache manager initialized with config: global_enabled={self.cache_config.global_enabled}")
 
+    def is_cache_enabled(
+        self,
+        cache_type: CacheType,
+        workflow_id: Optional[str] = None,
+        agent_id: Optional[str] = None
+    ) -> bool:
+        """
+        Check if cache is enabled for a specific type, workflow, and agent.
+        
+        Args:
+            cache_type: Type of cache to check
+            workflow_id: Optional workflow ID for workflow-specific override
+            agent_id: Optional agent ID for agent-specific override
+            
+        Returns:
+            True if cache is enabled, False otherwise
+        """
+        return self.cache_config.is_cache_enabled(cache_type, workflow_id, agent_id)
+    
+    def get_effective_config(
+        self,
+        cache_type: CacheType,
+        workflow_id: Optional[str] = None,
+        agent_id: Optional[str] = None
+    ) -> Optional[LayerConfig]:
+        """
+        Get the effective cache configuration considering hierarchy.
+        
+        Args:
+            cache_type: Type of cache layer
+            workflow_id: Optional workflow ID for workflow-specific override
+            agent_id: Optional agent ID for agent-specific override
+            
+        Returns:
+            Effective LayerConfig or None if cache is disabled
+        """
+        return self.cache_config.get_effective_layer_config(cache_type, workflow_id, agent_id)
+    
+    def _get_memory_cache(self, cache_key: str, layer_config: LayerConfig) -> Optional[Any]:
+        """Get or create in-memory cache based on eviction policy.
+        
+        Args:
+            cache_key: Unique key for this cache instance
+            layer_config: Layer configuration with eviction policy
+            
+        Returns:
+            In-memory cache instance or None
+        """
+        if layer_config.max_size is None:
+            return None
+        
+        if cache_key not in self._memory_caches:
+            if layer_config.eviction_policy == EvictionPolicy.LRU:
+                self._memory_caches[cache_key] = LRUCache(layer_config.max_size)
+            elif layer_config.eviction_policy == EvictionPolicy.LFU:
+                self._memory_caches[cache_key] = LFUCache(layer_config.max_size)
+            else:
+                # TTL policy doesn't need in-memory cache
+                return None
+        
+        return self._memory_caches.get(cache_key)
+    
+    def get_cached_response(
+        self,
+        cache_key: str,
+        cache_type: CacheType,
+        workflow_id: Optional[str] = None,
+        agent_id: Optional[str] = None
+    ) -> Optional[Any]:
+        """
+        Get cached response with configuration hierarchy support.
+        
+        Args:
+            cache_key: Cache key
+            cache_type: Type of cache
+            workflow_id: Optional workflow ID
+            agent_id: Optional agent ID
+            
+        Returns:
+            Cached value or None
+        """
+        # Check if cache is enabled
+        if not self.is_cache_enabled(cache_type, workflow_id, agent_id):
+            self._cache_metrics[cache_type.value]['bypasses'] += 1
+            logger.debug(f"Cache bypassed for {cache_type.value}: disabled")
+            return None
+        
+        # Get effective configuration
+        layer_config = self.get_effective_config(cache_type, workflow_id, agent_id)
+        if layer_config is None:
+            self._cache_metrics[cache_type.value]['bypasses'] += 1
+            return None
+        
+        # Check in-memory cache first (for LRU/LFU)
+        memory_cache_key = f"{cache_type.value}:{workflow_id or 'global'}:{agent_id or 'global'}"
+        memory_cache = self._get_memory_cache(memory_cache_key, layer_config)
+        if memory_cache:
+            value = memory_cache.get(cache_key)
+            if value is not None:
+                self._cache_metrics[cache_type.value]['hits'] += 1
+                logger.debug(f"Memory cache hit for {cache_type.value}: {cache_key}")
+                return value
+        
+        # Check Redis cache
+        value = self.redis_cache.get_json(cache_key)
+        if value is not None:
+            self._cache_metrics[cache_type.value]['hits'] += 1
+            logger.debug(f"Redis cache hit for {cache_type.value}: {cache_key}")
+            
+            # Update memory cache if applicable
+            if memory_cache:
+                memory_cache.set(cache_key, value)
+            
+            return value
+        
+        self._cache_metrics[cache_type.value]['misses'] += 1
+        logger.debug(f"Cache miss for {cache_type.value}: {cache_key}")
+        return None
+    
+    def cache_response(
+        self,
+        cache_key: str,
+        value: Any,
+        cache_type: CacheType,
+        workflow_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        ttl: Optional[int] = None
+    ) -> bool:
+        """
+        Cache response with configuration hierarchy support.
+        
+        Args:
+            cache_key: Cache key
+            value: Value to cache
+            cache_type: Type of cache
+            workflow_id: Optional workflow ID
+            agent_id: Optional agent ID
+            ttl: Optional TTL override
+            
+        Returns:
+            True if cached successfully, False otherwise
+        """
+        # Check if cache is enabled
+        if not self.is_cache_enabled(cache_type, workflow_id, agent_id):
+            self._cache_metrics[cache_type.value]['bypasses'] += 1
+            logger.debug(f"Cache bypassed for {cache_type.value}: disabled")
+            return False
+        
+        # Get effective configuration
+        layer_config = self.get_effective_config(cache_type, workflow_id, agent_id)
+        if layer_config is None:
+            self._cache_metrics[cache_type.value]['bypasses'] += 1
+            return False
+        
+        # Use configured TTL if not overridden
+        effective_ttl = ttl if ttl is not None else layer_config.ttl
+        if effective_ttl == 0:
+            effective_ttl = None  # No expiration
+        
+        # Cache in Redis
+        success = self.redis_cache.set_json(cache_key, value, effective_ttl)
+        if success:
+            self._cache_metrics[cache_type.value]['sets'] += 1
+            logger.debug(f"Cached {cache_type.value}: {cache_key} (ttl={effective_ttl})")
+            
+            # Update memory cache if applicable
+            memory_cache_key = f"{cache_type.value}:{workflow_id or 'global'}:{agent_id or 'global'}"
+            memory_cache = self._get_memory_cache(memory_cache_key, layer_config)
+            if memory_cache:
+                memory_cache.set(cache_key, value)
+        
+        return success
+    
+    def update_cache_config(self, new_config: CacheConfig) -> None:
+        """
+        Update cache configuration at runtime.
+        
+        Args:
+            new_config: New cache configuration
+        """
+        logger.info("Updating cache configuration")
+        self.cache_config = new_config
+        
+        # Clear memory caches to apply new policies
+        self._memory_caches.clear()
+        logger.info("Cache configuration updated and memory caches cleared")
+    
     def invalidate_session(self, session_id: UUID) -> bool:
         """Invalidate session cache.
 
@@ -270,18 +638,41 @@ class CacheManager:
         return count
 
     def get_cache_metrics(self) -> dict[str, Any]:
-        """Get metrics for all caches.
+        """Get metrics for all caches including hit rates and configuration status.
 
         Returns:
             Dictionary with cache metrics
         """
         metrics = {
+            'global_enabled': self.cache_config.global_enabled,
+            'layers': {},
             'sessions': {
                 'total': len(self.session_cache.get_all_session_ids()),
                 'ttl_seconds': self.session_cache.session_ttl,
             },
             'embeddings': self.embedding_cache.get_cache_stats(),
         }
+        
+        # Add per-layer metrics
+        for cache_type in CacheType:
+            layer_metrics = self._cache_metrics[cache_type.value].copy()
+            total_requests = layer_metrics['hits'] + layer_metrics['misses']
+            hit_rate = (layer_metrics['hits'] / total_requests * 100) if total_requests > 0 else 0.0
+            
+            layer_config = self.cache_config.layers.get(cache_type)
+            
+            metrics['layers'][cache_type.value] = {
+                'enabled': layer_config.enabled if layer_config else False,
+                'ttl': layer_config.ttl if layer_config else 0,
+                'eviction_policy': layer_config.eviction_policy.value if layer_config else None,
+                'max_size': layer_config.max_size if layer_config else None,
+                'hits': layer_metrics['hits'],
+                'misses': layer_metrics['misses'],
+                'bypasses': layer_metrics['bypasses'],
+                'sets': layer_metrics['sets'],
+                'deletes': layer_metrics['deletes'],
+                'hit_rate': round(hit_rate, 2),
+            }
         
         # Add LLM cache metrics if monitor is available
         if self.llm_cache_monitor:
@@ -291,6 +682,12 @@ class CacheManager:
         # Add Redis connection status
         metrics['redis'] = {
             'connected': self.redis_cache.ping(),
+        }
+        
+        # Add configuration overrides count
+        metrics['overrides'] = {
+            'workflows': len(self.cache_config.workflow_overrides),
+            'agents': len(self.cache_config.agent_overrides),
         }
         
         return metrics

@@ -98,6 +98,48 @@ provider_client_created_total = Counter(
     ["provider_id", "client_type"],
 )
 
+# Resource Management Metrics
+workflow_executions_active = Gauge(
+    "workflow_executions_active",
+    "Number of currently active workflow executions",
+    ["workflow_id"],
+)
+
+workflow_executions_queued = Gauge(
+    "workflow_executions_queued",
+    "Number of queued workflow executions waiting for resources",
+    ["workflow_id"],
+)
+
+workflow_resource_limit_rejections_total = Counter(
+    "workflow_resource_limit_rejections_total",
+    "Total workflow executions rejected due to resource limits",
+    ["workflow_id"],
+)
+
+workflow_timeouts_total = Counter(
+    "workflow_timeouts_total",
+    "Total workflow executions that timed out",
+    ["workflow_id"],
+)
+
+agent_timeouts_total = Counter(
+    "agent_timeouts_total",
+    "Total agent executions that timed out",
+    ["agent_id"],
+)
+
+worker_pool_utilization = Gauge(
+    "worker_pool_utilization",
+    "Worker pool utilization (active workers / max workers)",
+)
+
+execution_time_seconds = Histogram(
+    "execution_time_seconds",
+    "Execution time in seconds",
+    ["execution_type", "workflow_id"],
+)
+
 
 def get_metrics_registry():
     """Get the Prometheus metrics registry."""
@@ -168,3 +210,38 @@ def track_cache_miss(cache_type: str) -> None:
 def track_queue_depth(queue_name: str, depth: int) -> None:
     """Track message queue depth."""
     queue_depth.labels(queue_name=queue_name).set(depth)
+
+
+def track_workflow_execution_active(workflow_id: str, count: int) -> None:
+    """Track active workflow executions."""
+    workflow_executions_active.labels(workflow_id=workflow_id).set(count)
+
+
+def track_workflow_execution_queued(workflow_id: str, count: int) -> None:
+    """Track queued workflow executions."""
+    workflow_executions_queued.labels(workflow_id=workflow_id).set(count)
+
+
+def track_workflow_resource_limit_rejection(workflow_id: str) -> None:
+    """Track workflow rejection due to resource limits."""
+    workflow_resource_limit_rejections_total.labels(workflow_id=workflow_id).inc()
+
+
+def track_workflow_timeout(workflow_id: str) -> None:
+    """Track workflow timeout."""
+    workflow_timeouts_total.labels(workflow_id=workflow_id).inc()
+
+
+def track_agent_timeout(agent_id: str) -> None:
+    """Track agent timeout."""
+    agent_timeouts_total.labels(agent_id=agent_id).inc()
+
+
+def track_worker_pool_utilization(utilization: float) -> None:
+    """Track worker pool utilization (0.0 to 1.0)."""
+    worker_pool_utilization.set(utilization)
+
+
+def track_execution_time(execution_type: str, workflow_id: str, duration: float) -> None:
+    """Track execution time."""
+    execution_time_seconds.labels(execution_type=execution_type, workflow_id=workflow_id).observe(duration)

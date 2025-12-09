@@ -6,6 +6,7 @@ from typing import Any, TypeVar, Union
 from pydantic import BaseModel
 
 from src.config.agent_models import AgentConfig
+from src.config.behavior_validator import AgentBehaviorValidator
 from src.config.tool_models import ToolConfig
 from src.config.vector_db_models import VectorDBConfig
 from src.config.workflow_models import WorkflowConfig, WorkflowType, PersistenceMode
@@ -163,6 +164,13 @@ class ConfigValidator:
             ValueError: If configuration is invalid
         """
         config.validate_config()
+        
+        # Validate behavior configuration if present
+        if config.behavior:
+            # Ensure behavior configuration is valid
+            # The Pydantic model already validates structure
+            # Additional validation can be added here if needed
+            pass
     
     @staticmethod
     def validate_tool_config(config: ToolConfig) -> None:

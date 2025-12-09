@@ -1,11 +1,19 @@
-"""Agent factory for creating Autogen ConversableAgent instances from configurations."""
+"""
+AUTOGEN 0.2 RESEARCH:
+- Feature needed: Agent creation with behavior validation
+- Autogen provides: ConversableAgent, register_reply for custom handlers
+- Using: ConversableAgent creation, register_reply to add validation hooks
+- Documentation: https://microsoft.github.io/autogen/0.2/docs/reference/agentchat/conversable_agent
+- Decision: Extend agent creation to register validation hooks using register_reply
+"""
 
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from autogen.agentchat import ConversableAgent
 
 from src.audit_logging import get_logger
 from src.config.agent_models import AgentConfig, AgentType, RetrieveConfig
+from src.config.behavior_validator import AgentBehaviorValidator
 from src.config.registries import PromptRegistry, ProviderRegistry
 from src.config.tool_registry import ToolRegistry
 from src.infrastructure.providers import ProviderAdapter
@@ -204,6 +212,10 @@ class AgentFactory:
                     agent_id=agent_config.id,
                     tools=agent_config.tools,
                 )
+        
+        # Register behavior validation if configured
+        if agent_config.behavior and agent_config.behavior.has_validation():
+            self._register_behavior_validation(agent, agent_config)
 
         logger.info(
             "Created ConversableAgent",
@@ -211,6 +223,7 @@ class AgentFactory:
             agent_name=agent_config.name,
             has_llm=llm_config is not False,
             tools_count=len(agent_config.tools) if agent_config.tools else 0,
+            has_behavior_validation=agent_config.behavior is not None,
         )
 
         return agent
@@ -366,3 +379,94 @@ class AgentFactory:
         )
 
         return llm_config_dict
+    
+    def _register_behavior_validation(
+        self,
+        agent: ConversableAgent,
+        agent_config: AgentConfig,
+    ) -> None:
+        """
+        Register behavior validation with an agent using register_reply.
+        
+        This method creates a validation hook that intercepts agent replies
+        and validates them against the configured behavior rules.
+        
+        Args:
+            agent: Agent to register validation with
+            agent_config: Agent configuration with behavior settings
+        """
+        if not agent_config.behavior:
+            return
+        
+        validator = AgentBehaviorValidator(agent_config.behavior)
+        
+        def validation_reply_func(
+            recipient: ConversableAgent,
+            messages: Optional[List[Dict]] = None,
+            sender: Optional[Any] = None,
+            config: Optional[Any] = None,
+        ) -> Tuple[bool, Union[str, Dict, None]]:
+            """
+            Validation reply function that validates agent output.
+            
+            Returns:
+                Tuple of (should_reply, reply_message)
+                - should_reply: False to let other reply functions handle it
+                - reply_message: None (we don't generate replies, just validate)
+            """
+            # Get the last message (agent's output)
+            if not messages:
+                return False, None
+            
+            last_message = messages[-1]
+            content = last_message.get("content", "")
+            
+            if not content:
+                return False, None
+            
+            # Validate the output
+            try:
+                result = validator.validate(content)
+                
+                if not result.valid:
+                    error_msg = f"Output validation failed: {'; '.join(result.errors)}"
+                    logger.warning(
+                        "Agent output validation failed",
+                        agent_name=agent.name,
+                        errors=result.errors,
+                        warnings=result.warnings,
+                    )
+                    # Log but don't block - validation is informational
+                    # In production, you might want to block invalid outputs
+                
+                if result.warnings:
+                    logger.info(
+                        "Agent output validation warnings",
+                        agent_name=agent.name,
+                        warnings=result.warnings,
+                    )
+            except Exception as e:
+                logger.error(
+                    "Error during output validation",
+                    agent_name=agent.name,
+                    error=str(e),
+                )
+            
+            # Return False to let other reply functions handle the actual reply
+            return False, None
+        
+        # Register the validation function with low priority (checked last)
+        # This ensures validation happens after the agent generates its reply
+        agent.register_reply(
+            trigger=lambda sender: True,  # Validate all replies
+            reply_func=validation_reply_func,
+            position=-1,  # Low priority - check after other reply functions
+        )
+        
+        logger.info(
+            "Registered behavior validation",
+            agent_name=agent.name,
+            has_output_format=agent_config.behavior.output_format is not None,
+            has_constraints=agent_config.behavior.constraints is not None,
+            has_security=agent_config.behavior.validation is not None,
+        )

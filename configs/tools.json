@@ -148,8 +148,8 @@
       "last_updated": "2024-12-08T00:00:00Z"
     },
     {
-      "id": "getrequisitioninfo",
-      "name": "Find requisition by requisition no",
+      "id": "get_requisition_info",
+      "name": "find_requisition_by_requisition_no",
       "description": "Find requisition by requisition no\n\nParameters:\n  - reqNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
@@ -200,8 +200,8 @@
       }
     },
     {
-      "id": "gettenderinfo",
-      "name": "Find tender info by requisition no",
+      "id": "get_tender_info",
+      "name": "find_tender_info_by_requisition_no",
       "description": "Find tender info by requisition no\n\nParameters:\n  - reqNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
@@ -252,8 +252,8 @@
       }
     },
     {
-      "id": "getselfrequisitioninfo",
-      "name": "Find latest(max 10) requisitions of myself",
+      "id": "get_self_requisition_info",
+      "name": "find_latest_max_10_requisitions_of_myself",
       "description": "Find latest(max 10) requisitions of myself\n\nParameters:\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
@@ -295,8 +295,8 @@
       }
     },
     {
-      "id": "getrequisitioninfowithinitiator",
-      "name": "Find requisition initiator name and contact info by requisition no",
+      "id": "get_requisition_info_with_initiator",
+      "name": "find_requisition_initiator_name_and_contact_info_by_requisition_no",
       "description": "Find requisition initiator name and contact info by requisition no\n\nParameters:\n  - reqNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
@@ -347,8 +347,8 @@
       }
     },
     {
-      "id": "getpurchaseorderinfo",
-      "name": "Find purchase order by purchase order no",
+      "id": "get_purchase_order_info",
+      "name": "find_purchase_order_by_purchase_order_no",
       "description": "Find purchase order by purchase order no\n\nParameters:\n  - purchaseOrderNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
@@ -399,8 +399,8 @@
       }
     },
     {
-      "id": "getselfpurchaseorderinfo",
-      "name": "Find lastest(max 10) Purchase Order of self",
+      "id": "get_self_purchase_order_info",
+      "name": "find_lastest_max_10_purchase_order_of_self",
       "description": "Find lastest(max 10) Purchase Order of self\n\nParameters:\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
@@ -442,8 +442,8 @@
       }
     },
     {
-      "id": "getallframeworkagreementnobyitem",
-      "name": "Find lastest(max 10) Framework Agreement by item code or item name",
+      "id": "get_all_framework_agreement_no_by_item",
+      "name": "find_lastest_max_10_framework_agreement_by_item_code_or_item_name",
       "description": "Find lastest(max 10) Framework Agreement by item code or item name\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
@@ -503,9 +503,9 @@
       }
     },
     {
-      "id": "gettotalframeworkagreement",
-      "name": "Total active framework agreement",
-      "description": "Get the total COUNT of active framework agreements. Use this tool when the user asks:\n- How many framework agreements are there?\n- What is the total framework agreement count?\n- Count of framework agreements\n- Total framework agreements\n\nOptional filters:\n- itemCode: Filter by item code\n- itemName: Filter by item name\n\nReturns a count/number, not a list of agreements.",
+      "id": "get_total_framework_agreement",
+      "name": "total_active_framework_agreement",
+      "description": "Total active framework agreement\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -564,8 +564,8 @@
       }
     },
     {
-      "id": "getframeworkagreementwithbrandbyitem",
-      "name": "Find lastest(max 10) Framework Agreement with brands by item code or item name",
+      "id": "get_framework_agreement_with_brand_by_item",
+      "name": "find_lastest_max_10_framework_agreement_with_brands_by_item_code_or_item_name",
       "description": "Find lastest(max 10) Framework Agreement with brands by item code or item name\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,

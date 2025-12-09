@@ -350,8 +350,7 @@
       },
       "tools": [
         "get_requisition",
-        "search_requisitions",
-        "gettotalframeworkagreement"
+        "search_requisitions"
       ],
       "description": "Queries requisition data from the Requisition API",
       "version": 1,
