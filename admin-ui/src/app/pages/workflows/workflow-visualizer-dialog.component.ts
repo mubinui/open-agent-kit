@@ -547,7 +547,7 @@ interface GraphEdge {
 })
 export class WorkflowVisualizerDialogComponent implements OnInit {
   data = inject<{ workflow: WorkflowConfig }>(MAT_DIALOG_DATA);
-  
+
   nodes: GraphNode[] = [];
   edges: GraphEdge[] = [];
   viewBox = '0 0 800 350';
@@ -576,6 +576,9 @@ export class WorkflowVisualizerDialogComponent implements OnInit {
           break;
         case ConversationPattern.NESTED:
           this.buildNestedGraph();
+          break;
+        case ConversationPattern.SELECTOR:
+          this.buildSelectorGraph();
           break;
         default:
           this.buildTwoAgentGraph();
@@ -609,7 +612,7 @@ export class WorkflowVisualizerDialogComponent implements OnInit {
 
   buildTwoAgentGraph(): void {
     const workflow = this.data.workflow;
-    
+
     // Entry agent (left)
     this.nodes.push({
       id: workflow.entry_agent_id,
@@ -644,7 +647,7 @@ export class WorkflowVisualizerDialogComponent implements OnInit {
   buildSequentialGraph(): void {
     const workflow = this.data.workflow;
     const steps = workflow.steps || [];
-    
+
     // Collect unique agents
     const agentIds = new Set<string>();
     agentIds.add(workflow.entry_agent_id);
@@ -681,7 +684,7 @@ export class WorkflowVisualizerDialogComponent implements OnInit {
   buildGroupChatGraph(): void {
     const workflow = this.data.workflow;
     const groupChat = workflow.group_chat;
-    
+
     if (!groupChat) return;
 
     const agents = groupChat.agents;
@@ -723,8 +726,96 @@ export class WorkflowVisualizerDialogComponent implements OnInit {
   }
 
   buildNestedGraph(): void {
-    // Simplified nested graph - similar to two-agent with nested indicator
-    this.buildTwoAgentGraph();
+    const workflow = this.data.workflow;
+    const nestedChats = workflow.nested_chats || [];
+
+    // Trigger agent (left)
+    const triggerAgentId = nestedChats[0]?.trigger_agent_id || workflow.entry_agent_id;
+    this.nodes.push({
+      id: triggerAgentId,
+      label: triggerAgentId,
+      x: 200,
+      y: 175,
+      type: 'entry',
+      color: '#4caf50'
+    });
+
+    // Nested chat recipients (right column)
+    const uniqueRecipients = new Set<string>();
+    nestedChats.forEach(chat => {
+      chat.nested_chats.forEach(subChat => {
+        uniqueRecipients.add(subChat.recipient_id);
+      });
+    });
+
+    const recipients = Array.from(uniqueRecipients);
+    const startY = 175 - ((recipients.length - 1) * 80) / 2;
+
+    recipients.forEach((recipientId, index) => {
+      this.nodes.push({
+        id: recipientId,
+        label: recipientId,
+        x: 600,
+        y: startY + (index * 80),
+        type: 'recipient',
+        color: '#2196f3'
+      });
+
+      // Edge from trigger to recipient
+      this.edges.push({
+        from: triggerAgentId,
+        to: recipientId,
+        label: 'nested',
+        bidirectional: true
+      });
+    });
+  }
+
+  buildSelectorGraph(): void {
+    const workflow = this.data.workflow;
+    const selector = workflow.selector_config;
+    if (!selector) return;
+
+    // Router/Default agent (left)
+    const defaultAgent = selector.default_agent;
+    this.nodes.push({
+      id: defaultAgent,
+      label: defaultAgent,
+      x: 200,
+      y: 175,
+      type: 'entry',
+      color: '#4caf50'
+    });
+
+    // Routed agents (right fan-out)
+    const routingMap = selector.routing_agents;
+    const domains = Object.keys(routingMap);
+
+    const startY = 175 - ((domains.length - 1) * 70) / 2;
+
+    domains.forEach((domain, index) => {
+      const agentId = routingMap[domain];
+      // Check if node already exists (multiple domains can map to same agent)
+      let node = this.getNodeById(agentId);
+
+      if (!node) {
+        node = {
+          id: agentId,
+          label: agentId,
+          x: 600,
+          y: startY + (index * 70),
+          type: 'recipient',
+          color: '#2196f3'
+        };
+        this.nodes.push(node);
+      }
+
+      this.edges.push({
+        from: defaultAgent,
+        to: agentId,
+        label: domain
+      });
+    });
   }
 
   getNodeById(id: string): GraphNode | undefined {
@@ -735,7 +826,7 @@ export class WorkflowVisualizerDialogComponent implements OnInit {
     const toNode = this.getNodeById(edge.to);
     const fromNode = this.getNodeById(edge.from);
     if (!toNode || !fromNode) return 0;
-    
+
     // Calculate point on circle edge
     const dx = toNode.x - fromNode.x;
     const dy = toNode.y - fromNode.y;
@@ -747,7 +838,7 @@ export class WorkflowVisualizerDialogComponent implements OnInit {
     const toNode = this.getNodeById(edge.to);
     const fromNode = this.getNodeById(edge.from);
     if (!toNode || !fromNode) return 0;
-    
+
     const dx = toNode.x - fromNode.x;
     const dy = toNode.y - fromNode.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -763,7 +854,8 @@ export class WorkflowVisualizerDialogComponent implements OnInit {
       case ConversationPattern.TWO_AGENT: return 'people';
       case ConversationPattern.SEQUENTIAL: return 'format_list_numbered';
       case ConversationPattern.GROUP_CHAT: return 'groups';
-      case ConversationPattern.NESTED: return 'account_tree';
+      case ConversationPattern.NESTED: return 'layers';
+      case ConversationPattern.SELECTOR: return 'alt_route';
       default: return 'hub';
     }
   }

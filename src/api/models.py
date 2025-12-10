@@ -31,6 +31,32 @@ class SessionResponse(BaseModel):
     metadata: dict[str, Any]
 
 
+class UserSessionsResponse(BaseModel):
+    """Response containing all sessions for a user."""
+
+    user_id: str
+    sessions: List["SessionResponse"]
+    total_count: int
+    active_count: int
+
+
+class Chat(BaseModel):
+    """Chat DTO for frontend consumption."""
+
+    id: str = Field(description="Unique chat/session identifier")
+    title: str = Field(description="Chat title (derived from first message or workflow name)")
+    messageCount: Optional[int] = Field(default=0, description="Number of messages in the chat")
+    createdAt: str = Field(description="ISO timestamp when chat was created")
+    updatedAt: str = Field(description="ISO timestamp when chat was last updated")
+
+
+class ChatListResponse(BaseModel):
+    """Response containing list of chats for a user."""
+
+    chats: List[Chat]
+    total: int
+
+
 # Message Models
 class MessageRequest(BaseModel):
     """Request to send a message in a session."""

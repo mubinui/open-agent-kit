@@ -2,7 +2,8 @@ export enum ConversationPattern {
   TWO_AGENT = 'two_agent',
   SEQUENTIAL = 'sequential',
   GROUP_CHAT = 'group_chat',
-  NESTED = 'nested'
+  NESTED = 'nested',
+  SELECTOR = 'selector'
 }
 
 export interface WorkflowStep {
@@ -11,6 +12,8 @@ export interface WorkflowStep {
   message?: string;
   max_turns: number;
   summary_method: string;
+  carryover?: boolean;
+  clear_history?: boolean;
 }
 
 export interface GroupChatConfig {
@@ -19,6 +22,27 @@ export interface GroupChatConfig {
   speaker_selection_method: string;
   allowed_transitions?: Record<string, string[]>;
   send_introductions: boolean;
+  admin_name?: string;
+  select_speaker_message_template?: string;
+  select_speaker_auto_verbose?: boolean;
+}
+
+export interface NestedChatConfig {
+  trigger_agent_id: string;
+  nested_chats: Array<{
+    recipient_id: string;
+    message?: string;
+    max_turns?: number;
+    summary_method?: string;
+  }>;
+  trigger_condition?: string;
+  position?: number;
+}
+
+export interface SelectorConfig {
+  routing_agents: Record<string, string>;
+  default_agent: string;
+  max_routing_attempts: number;
 }
 
 export interface WorkflowNodePosition {
@@ -46,6 +70,8 @@ export interface WorkflowConfig {
   pattern: ConversationPattern;
   steps?: WorkflowStep[];
   group_chat?: GroupChatConfig;
+  nested_chats?: NestedChatConfig[];
+  selector_config?: SelectorConfig;
   entry_agent_id: string;
   recipient_agent_id?: string;
   max_turns?: number;

@@ -7,12 +7,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from src.api.auth import CurrentUser, get_current_user, require_user
 from src.api.context import set_request_user
 from src.api.models import (
+    Chat,
     ChatHistoryResponse,
+    ChatListResponse,
     MessageRequest,
     MessageResponse,
     SessionCreateRequest,
     SessionResponse,
+    UserSessionsResponse,
 )
+from typing import List
 from src.api.session_manager import get_session_manager
 from src.audit_logging import get_logger
 
@@ -79,6 +83,225 @@ async def create_session(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create session: {str(e)}",
+        )
+
+
+@router.get("", response_model=List[SessionResponse])
+async def list_sessions(
+    request: Request,
+    user_id: str = None,
+    active_only: bool = True,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> List[SessionResponse]:
+    """
+    List all sessions, optionally filtered by user.
+    
+    Args:
+        request: FastAPI request object
+        user_id: Optional user ID to filter sessions
+        active_only: If True, only return active sessions
+        
+    Returns:
+        List of sessions
+        
+    Requirements: 1.1, 1.3
+    """
+    request_id = getattr(request.state, "request_id", None)
+    
+    logger.info(
+        "Listing sessions",
+        request_id=request_id,
+        user_id=user_id,
+        active_only=active_only,
+    )
+    
+    try:
+        session_manager = get_session_manager()
+        sessions = await session_manager.list_sessions(
+            user_id=user_id,
+            active_only=active_only,
+        )
+        
+        return [
+            SessionResponse(
+                session_id=session.session_id,
+                workflow_id=session.metadata.get("workflow_id", ""),
+                user_id=session.metadata.get("user_id"),
+                active=session.active,
+                created_at=session.created_at,
+                updated_at=session.updated_at,
+                turn_count=session.turn_count,
+                metadata=session.metadata,
+            )
+            for session in sessions
+        ]
+        
+    except Exception as e:
+        logger.error(
+            "Failed to list sessions",
+            request_id=request_id,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list sessions: {str(e)}",
+        )
+
+
+@router.get("/chats", response_model=ChatListResponse)
+async def get_user_chats(
+    request: Request,
+    user_id: str = None,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ChatListResponse:
+    """
+    Get all chats for a user in a simplified DTO format.
+    
+    Args:
+        request: FastAPI request object
+        user_id: Optional user ID (defaults to current user)
+        
+    Returns:
+        List of Chat objects with id, title, messageCount, createdAt, updatedAt
+    """
+    request_id = getattr(request.state, "request_id", None)
+    
+    # Use provided user_id or fall back to current user
+    effective_user_id = user_id or current_user.username
+    
+    logger.info(
+        "Getting user chats",
+        request_id=request_id,
+        user_id=effective_user_id,
+    )
+    
+    try:
+        session_manager = get_session_manager()
+        sessions = await session_manager.list_sessions(
+            user_id=effective_user_id,
+            active_only=False,  # Get all chats, not just active
+        )
+        
+        chats = []
+        for session in sessions:
+            # Generate title from first user message or workflow name
+            title = session.metadata.get("title")
+            if not title:
+                # Try to get first user message as title
+                if session.messages:
+                    first_user_msg = next(
+                        (m for m in session.messages if m.role.value == "user"),
+                        None
+                    )
+                    if first_user_msg:
+                        # Truncate to first 50 chars
+                        title = first_user_msg.content[:50]
+                        if len(first_user_msg.content) > 50:
+                            title += "..."
+                    else:
+                        title = f"Chat {str(session.session_id)[:8]}"
+                else:
+                    workflow_id = session.metadata.get("workflow_id", "")
+                    title = workflow_id.replace("_", " ").title() if workflow_id else f"Chat {str(session.session_id)[:8]}"
+            
+            chats.append(Chat(
+                id=str(session.session_id),
+                title=title,
+                messageCount=len(session.messages),
+                createdAt=session.created_at.isoformat(),
+                updatedAt=session.updated_at.isoformat(),
+            ))
+        
+        return ChatListResponse(
+            chats=chats,
+            total=len(chats),
+        )
+        
+    except Exception as e:
+        logger.error(
+            "Failed to get user chats",
+            request_id=request_id,
+            user_id=effective_user_id,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get user chats: {str(e)}",
+        )
+
+
+@router.get("/user/{user_id}", response_model=UserSessionsResponse)
+async def get_user_sessions(
+    request: Request,
+    user_id: str,
+    active_only: bool = False,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> UserSessionsResponse:
+    """
+    Get all sessions for a specific user with their messages.
+    
+    Args:
+        request: FastAPI request object
+        user_id: User identifier
+        active_only: If True, only return active sessions
+        
+    Returns:
+        User sessions with message counts
+        
+    Requirements: 1.1, 1.3
+    """
+    request_id = getattr(request.state, "request_id", None)
+    
+    logger.info(
+        "Getting user sessions",
+        request_id=request_id,
+        user_id=user_id,
+        active_only=active_only,
+    )
+    
+    try:
+        session_manager = get_session_manager()
+        sessions = await session_manager.list_sessions(
+            user_id=user_id,
+            active_only=active_only,
+        )
+        
+        session_responses = [
+            SessionResponse(
+                session_id=session.session_id,
+                workflow_id=session.metadata.get("workflow_id", ""),
+                user_id=session.metadata.get("user_id"),
+                active=session.active,
+                created_at=session.created_at,
+                updated_at=session.updated_at,
+                turn_count=session.turn_count,
+                metadata=session.metadata,
+            )
+            for session in sessions
+        ]
+        
+        active_count = sum(1 for s in sessions if s.active)
+        
+        return UserSessionsResponse(
+            user_id=user_id,
+            sessions=session_responses,
+            total_count=len(sessions),
+            active_count=active_count,
+        )
+        
+    except Exception as e:
+        logger.error(
+            "Failed to get user sessions",
+            request_id=request_id,
+            user_id=user_id,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get user sessions: {str(e)}",
         )
 
 

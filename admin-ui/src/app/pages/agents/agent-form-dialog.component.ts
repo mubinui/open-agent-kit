@@ -11,7 +11,7 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { AgentConfig, AgentType, HumanInputMode, LLMConfig } from '../../models/agent.model';
+import { AgentConfig, AgentType, HumanInputMode, LLMConfig, RetrieveConfig, AgentBehaviorConfig } from '../../models/agent.model';
 import { ApiService, ApiProvider, ApiProviderModel } from '../../services/api.service';
 import { ToolConfig } from '../../models/tool.model';
 
@@ -74,6 +74,52 @@ import { ToolConfig } from '../../models/tool.model';
           <mat-label>Description</mat-label>
           <textarea matInput [(ngModel)]="agent.description" name="description" rows="2"></textarea>
         </mat-form-field>
+
+        <!-- Retrieval Configuration Section (Only for Retrieve User Proxy) -->
+        <div *ngIf="agent.type === AgentType.RETRIEVE_USER_PROXY" class="config-section">
+          <div class="section-header">
+            <mat-icon>find_in_page</mat-icon>
+            <span>Retrieval Configuration</span>
+          </div>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Task</mat-label>
+            <mat-select [(ngModel)]="retrieveConfig.task" name="retrieve_task">
+              <mat-option value="qa">QA</mat-option>
+              <mat-option value="code">Code</mat-option>
+              <mat-option value="default">Default</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Docs Path (comma separated)</mat-label>
+            <input matInput [ngModel]="docsPathString" (ngModelChange)="updateDocsPath($event)" name="docs_path" required>
+            <mat-hint>Paths or URLs to index</mat-hint>
+          </mat-form-field>
+
+          <div class="row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Vector DB</mat-label>
+              <input matInput [(ngModel)]="retrieveConfig.vector_db" name="vector_db">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Collection Name</mat-label>
+              <input matInput [(ngModel)]="retrieveConfig.collection_name" name="collection_name">
+            </mat-form-field>
+          </div>
+          
+           <div class="row">
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>Chunk Token Size</mat-label>
+              <input matInput type="number" [(ngModel)]="retrieveConfig.chunk_token_size" name="chunk_token_size">
+            </mat-form-field>
+
+            <mat-checkbox [(ngModel)]="retrieveConfig.get_or_create" name="get_or_create">
+              Get/Create Collection
+            </mat-checkbox>
+          </div>
+        </div>
 
         <!-- LLM Configuration Section -->
         <div class="section-header">
@@ -141,6 +187,11 @@ import { ToolConfig } from '../../models/tool.model';
           <mat-icon>settings</mat-icon>
           <span>Behavior Settings</span>
         </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Output Format</mat-label>
+            <input matInput [(ngModel)]="behaviorConfig.output_format" name="output_format" placeholder="e.g. JSON, XML">
+        </mat-form-field>
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Human Input Mode</mat-label>
@@ -299,120 +350,152 @@ export class AgentFormDialogComponent implements OnInit {
   HumanInputMode = HumanInputMode;
 
   agent: AgentConfig;
-  llmConfig: LLMConfig = {
-    provider_id: 'openrouter',
-    model: 'openai/gpt-oss-20b',
-    temperature: 0.7,
-    max_tokens: 1000,
-    timeout: 120,
-    cache_seed: 42
-  };
+  timeout: 120,
+  cache_seed: 42
+};
 
-  isEdit = signal(false);
-  availableTools = signal<ToolConfig[]>([]);
-  llmProviders = signal<ApiProvider[]>([]);
-  availableModels = signal<ApiProviderModel[]>([]);
+retrieveConfig: RetrieveConfig = {
+  task: 'qa',
+  docs_path: [],
+  chunk_token_size: 2000,
+  vector_db: 'chromadb',
+  collection_name: 'autogen_docs',
+  embedding_model: 'all-mpnet-base-v2',
+  get_or_create: true
+};
 
-  constructor() {
-    if (this.data.agent) {
-      this.agent = { ...this.data.agent };
-      // Load existing LLM config if present
-      if (this.agent.llm_config) {
-        this.llmConfig = { ...this.agent.llm_config };
-      }
-      this.isEdit.set(true);
-    } else {
-      this.agent = {
-        id: '',
-        type: AgentType.CONVERSABLE,
-        name: '',
-        human_input_mode: HumanInputMode.NEVER,
-        tools: [],
-        max_consecutive_auto_reply: 10
-      };
+behaviorConfig: AgentBehaviorConfig = {};
+
+docsPathString = '';
+
+isEdit = signal(false);
+availableTools = signal<ToolConfig[]>([]);
+llmProviders = signal<ApiProvider[]>([]);
+availableModels = signal<ApiProviderModel[]>([]);
+
+constructor() {
+  if (this.data.agent) {
+    this.agent = { ...this.data.agent };
+    // Load existing LLM config if present
+    if (this.agent.llm_config) {
+      this.llmConfig = { ...this.agent.llm_config };
     }
-  }
-
-  ngOnInit(): void {
-    this.loadTools();
-    this.loadProviders();
-  }
-
-  loadTools(): void {
-    this.apiService.getTools().subscribe({
-      next: (tools) => {
-        this.availableTools.set(tools);
-      },
-      error: (err) => {
-        console.error('Error loading tools:', err);
-      }
-    });
-  }
-
-  loadProviders(): void {
-    this.apiService.getApiProviders().subscribe({
-      next: (providers) => {
-        // Filter to only LLM type providers
-        const llmProviders = providers.filter(p => p.type === 'llm');
-        this.llmProviders.set(llmProviders);
-        
-        // Set available models based on current provider
-        this.updateAvailableModels();
-      },
-      error: (err) => {
-        console.error('Error loading providers:', err);
-        // Fallback to default provider
-        this.llmProviders.set([{
-          id: 'openrouter',
-          name: 'OpenRouter',
-          type: 'llm',
-          models: [{ name: 'openai/gpt-oss-20b', default: true }]
-        }]);
-        this.updateAvailableModels();
-      }
-    });
-  }
-
-  onProviderChange(): void {
-    this.updateAvailableModels();
-    // Reset model selection when provider changes
-    const models = this.availableModels();
-    if (models.length > 0) {
-      const defaultModel = models.find(m => m.default) || models[0];
-      this.llmConfig.model = defaultModel.name;
+    if (this.agent.retrieve_config) {
+      this.retrieveConfig = { ...this.agent.retrieve_config };
+      this.docsPathString = this.retrieveConfig.docs_path.join(', ');
     }
-  }
-
-  updateAvailableModels(): void {
-    const provider = this.llmProviders().find(p => p.id === this.llmConfig.provider_id);
-    if (provider && provider.models) {
-      this.availableModels.set(provider.models);
-    } else {
-      this.availableModels.set([]);
+    if (this.agent.behavior) {
+      this.behaviorConfig = { ...this.agent.behavior };
     }
+    this.isEdit.set(true);
+  } else {
+    this.agent = {
+      id: '',
+      type: AgentType.CONVERSABLE,
+      name: '',
+      human_input_mode: HumanInputMode.NEVER,
+      tools: [],
+      max_consecutive_auto_reply: 10
+    };
   }
+}
 
-  onCancel(): void {
-    this.dialogRef.close();
-  }
+ngOnInit(): void {
+  this.loadTools();
+  this.loadProviders();
+}
 
-  sanitizeName(value: string): void {
-    // Remove spaces from agent name (Autogen requirement)
-    this.agent.name = value.replace(/\s+/g, '');
-  }
-
-  onSave(): void {
-    // Ensure name has no spaces
-    this.agent.name = this.agent.name.replace(/\s+/g, '');
-    
-    // Attach LLM config to agent before saving
-    this.agent.llm_config = { ...this.llmConfig };
-    
-    // Set code_execution_config to false by default
-    if (this.agent.code_execution_config === undefined) {
-      this.agent.code_execution_config = false;
+loadTools(): void {
+  this.apiService.getTools().subscribe({
+    next: (tools) => {
+      this.availableTools.set(tools);
+    },
+    error: (err) => {
+      console.error('Error loading tools:', err);
     }
-    
-    this.dialogRef.close(this.agent);
+  });
+}
+
+loadProviders(): void {
+  this.apiService.getApiProviders().subscribe({
+    next: (providers) => {
+      // Filter to only LLM type providers
+      const llmProviders = providers.filter(p => p.type === 'llm');
+      this.llmProviders.set(llmProviders);
+
+      // Set available models based on current provider
+      this.updateAvailableModels();
+    },
+    error: (err) => {
+      console.error('Error loading providers:', err);
+      // Fallback to default provider
+      this.llmProviders.set([{
+        id: 'openrouter',
+        name: 'OpenRouter',
+        type: 'llm',
+        models: [{ name: 'openai/gpt-oss-20b', default: true }]
+      }]);
+      this.updateAvailableModels();
+    }
+  });
+}
+
+onProviderChange(): void {
+  this.updateAvailableModels();
+  // Reset model selection when provider changes
+  const models = this.availableModels();
+  if(models.length > 0) {
+  const defaultModel = models.find(m => m.default) || models[0];
+  this.llmConfig.model = defaultModel.name;
+}
+  }
+
+updateAvailableModels(): void {
+  const provider = this.llmProviders().find(p => p.id === this.llmConfig.provider_id);
+  if(provider && provider.models) {
+  this.availableModels.set(provider.models);
+} else {
+  this.availableModels.set([]);
+}
+  }
+
+onCancel(): void {
+  this.dialogRef.close();
+}
+
+sanitizeName(value: string): void {
+  // Remove spaces from agent name (Autogen requirement)
+  this.agent.name = value.replace(/\s+/g, '');
+}
+
+updateDocsPath(value: string): void {
+  this.docsPathString = value;
+  this.retrieveConfig.docs_path = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+}
+
+onSave(): void {
+  // Ensure name has no spaces
+  this.agent.name = this.agent.name.replace(/\s+/g, '');
+
+  // Attach LLM config to agent before saving
+  this.agent.llm_config = { ...this.llmConfig };
+
+  // Set code_execution_config to false by default
+  if(this.agent.code_execution_config === undefined) {
+  this.agent.code_execution_config = false;
+}
+
+if (this.agent.type === AgentType.RETRIEVE_USER_PROXY) {
+  this.agent.retrieve_config = { ...this.retrieveConfig };
+} else {
+  delete this.agent.retrieve_config;
+}
+
+// Add behavior config if fields are set
+if (Object.keys(this.behaviorConfig).length > 0) {
+  this.agent.behavior = { ...this.behaviorConfig };
+}
+
+this.dialogRef.close(this.agent);
   }
 }

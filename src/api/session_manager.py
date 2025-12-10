@@ -403,6 +403,57 @@ class SessionManager:
             "turn_count": session.turn_count,
         }
 
+    async def list_sessions(
+        self,
+        user_id: Optional[str] = None,
+        active_only: bool = True,
+    ) -> list[ConversationState]:
+        """
+        List all sessions, optionally filtered by user.
+
+        Args:
+            user_id: Optional user ID to filter sessions
+            active_only: If True, only return active sessions
+
+        Returns:
+            List of ConversationState objects
+        """
+        logger.info(
+            "Listing sessions",
+            user_id=user_id,
+            active_only=active_only,
+        )
+
+        # Get all sessions from the default store
+        all_sessions = await self.default_conversation_store.list_sessions(active_only=active_only)
+        
+        # Also check MongoDB store if available and different from default
+        if self._mongo_store is not None and self._mongo_store != self.default_conversation_store:
+            mongo_sessions = await self._mongo_store.list_sessions(active_only=active_only)
+            # Merge sessions, avoiding duplicates by session_id
+            existing_ids = {s.session_id for s in all_sessions}
+            for session in mongo_sessions:
+                if session.session_id not in existing_ids:
+                    all_sessions.append(session)
+        
+        # Filter by user_id if provided
+        if user_id:
+            all_sessions = [
+                s for s in all_sessions
+                if s.metadata.get("user_id") == user_id
+            ]
+        
+        # Sort by updated_at descending
+        all_sessions.sort(key=lambda s: s.updated_at, reverse=True)
+        
+        logger.info(
+            "Listed sessions",
+            total_count=len(all_sessions),
+            user_id=user_id,
+        )
+        
+        return all_sessions
+
     async def _get_workflow(
         self,
         session_id: UUID,

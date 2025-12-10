@@ -30,6 +30,14 @@ export interface RetrieveConfig {
   db_config?: Record<string, any>;
 }
 
+// ... existing enums ...
+
+export interface AgentBehaviorConfig {
+  output_format?: string;
+  constraints?: string[];
+  validation_rules?: Record<string, any>;
+}
+
 export interface AgentConfig {
   id: string;
   type: AgentType;
@@ -42,6 +50,7 @@ export interface AgentConfig {
   max_consecutive_auto_reply: number;
   retrieve_config?: RetrieveConfig;
   description?: string;
+  behavior?: AgentBehaviorConfig;
   version?: number;
   last_updated?: string;
   updated_by?: string;

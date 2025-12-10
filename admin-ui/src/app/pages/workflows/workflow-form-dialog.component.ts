@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { WorkflowConfig, ConversationPattern } from '../../models/workflow.model';
+import { WorkflowConfig, ConversationPattern, WorkflowStep, NestedChatConfig, SelectorConfig } from '../../models/workflow.model';
 import { ApiService } from '../../services/api.service';
 import { AgentConfig } from '../../models/agent.model';
 
@@ -112,6 +112,126 @@ import { AgentConfig } from '../../models/agent.model';
                 <mat-option value="reflection_with_llm">Reflection with LLM</mat-option>
               </mat-select>
             </mat-form-field>
+          </div>
+        </ng-container>
+
+        </ng-container>
+
+        <!-- Sequential Pattern Fields -->
+        <ng-container *ngIf="workflow.pattern === ConversationPattern.SEQUENTIAL">
+          <div class="row">
+            <h3 class="subsection-title">Steps</h3>
+            <button mat-icon-button (click)="addStep()" matTooltip="Add Step">
+              <mat-icon>add</mat-icon>
+            </button>
+          </div>
+          
+          <div class="steps-list">
+            <div *ngFor="let step of steps; let i = index" class="step-item-form">
+              <div class="step-header">
+                <span>Step {{i + 1}}</span>
+                <button mat-icon-button color="warn" (click)="removeStep(i)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              
+              <div class="row">
+                <mat-form-field appearance="outline" class="half-width">
+                  <mat-label>Sender</mat-label>
+                  <mat-select [(ngModel)]="step.sender_id" [name]="'step_sender_'+i" required>
+                    <mat-option *ngFor="let agent of availableAgents()" [value]="agent.id">
+                      {{ agent.name }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                
+                <mat-form-field appearance="outline" class="half-width">
+                  <mat-label>Recipient</mat-label>
+                  <mat-select [(ngModel)]="step.recipient_id" [name]="'step_recipient_'+i" required>
+                    <mat-option *ngFor="let agent of availableAgents()" [value]="agent.id">
+                      {{ agent.name }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div class="row">
+                 <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Message (Optional)</mat-label>
+                    <input matInput [(ngModel)]="step.message" [name]="'step_msg_'+i">
+                 </mat-form-field>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- Nested Pattern Fields -->
+        <ng-container *ngIf="workflow.pattern === ConversationPattern.NESTED">
+           <div class="row">
+            <h3 class="subsection-title">Nested Chats</h3>
+            <button mat-icon-button (click)="addNestedChat()" matTooltip="Add Nested Chat">
+              <mat-icon>add</mat-icon>
+            </button>
+          </div>
+
+          <div class="nested-list">
+             <div *ngFor="let chat of nestedChats; let i = index" class="nested-item-form">
+                <div class="step-header">
+                    <span>Nested Chat {{i + 1}}</span>
+                    <button mat-icon-button color="warn" (click)="removeNestedChat(i)">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                </div>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Trigger Agent</mat-label>
+                  <mat-select [(ngModel)]="chat.trigger_agent_id" [name]="'nested_trigger_'+i" required>
+                    <mat-option *ngFor="let agent of availableAgents()" [value]="agent.id">
+                      {{ agent.name }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                
+                <!-- Simplified nested chat config: specific recipient -->
+                <p><strong>Chat Config:</strong></p>
+                <div *ngFor="let subChat of chat.nested_chats; let j = index">
+                   <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Recipient Agent</mat-label>
+                      <mat-select [(ngModel)]="subChat.recipient_id" [name]="'nested_sub_recipient_'+i+'_'+j" required>
+                        <mat-option *ngFor="let agent of availableAgents()" [value]="agent.id">
+                          {{ agent.name }}
+                        </mat-option>
+                      </mat-select>
+                   </mat-form-field>
+                   
+                   <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Message</mat-label>
+                      <input matInput [(ngModel)]="subChat.message" [name]="'nested_sub_msg_'+i+'_'+j">
+                   </mat-form-field>
+                </div>
+             </div>
+          </div>
+        </ng-container>
+
+        <!-- Selector Pattern Fields -->
+        <ng-container *ngIf="workflow.pattern === ConversationPattern.SELECTOR">
+          <div class="config-section">
+             <h3 class="subsection-title">Selector Configuration</h3>
+             
+             <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Default Agent</mat-label>
+                <mat-select [(ngModel)]="selectorConfig.default_agent" name="selector_default" required>
+                    <mat-option *ngFor="let agent of availableAgents()" [value]="agent.id">
+                      {{ agent.name }}
+                    </mat-option>
+                </mat-select>
+             </mat-form-field>
+
+             <p class="subsection-title">Routing Agents (JSON)</p>
+             <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Map: Domain -> Agent ID</mat-label>
+                <textarea matInput [ngModel]="routingAgentsJson" (ngModelChange)="updateRoutingAgents($event)" name="routing_agents" rows="5" placeholder='{"tech": "tech_agent", "sales": "sales_agent"}'></textarea>
+             </mat-form-field>
           </div>
         </ng-container>
 
@@ -269,6 +389,36 @@ import { AgentConfig } from '../../models/agent.model';
     .checkbox-field {
       margin-bottom: 16px;
     }
+    
+    .subsection-title {
+        font-size: 14px;
+        color: #1976d2;
+        margin: 10px 0;
+        font-weight: 500;
+    }
+    
+    .steps-list, .nested-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    
+    .step-item-form, .nested-item-form {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 12px;
+        background: #fcfcfc;
+    }
+    
+    .step-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #666;
+    }
   `]
 })
 export class WorkflowFormDialogComponent implements OnInit {
@@ -287,16 +437,43 @@ export class WorkflowFormDialogComponent implements OnInit {
   groupMaxRound: number = 10;
   groupSpeakerMethod: string = 'auto';
 
+  // Sequential fields
+  steps: WorkflowStep[] = [];
+
+  // Nested fields
+  nestedChats: NestedChatConfig[] = [];
+
+  // Selector fields
+  selectorConfig: SelectorConfig = {
+    routing_agents: {},
+    default_agent: '',
+    max_routing_attempts: 3
+  };
+  routingAgentsJson: string = '{}';
+
   constructor() {
     if (this.data.workflow) {
       this.workflow = { ...this.data.workflow };
       this.isEdit.set(true);
-      
+
       // Extract group chat settings if present
       if (this.workflow.group_chat) {
         this.groupAgents = this.workflow.group_chat.agents || [];
         this.groupMaxRound = this.workflow.group_chat.max_round || 10;
         this.groupSpeakerMethod = this.workflow.group_chat.speaker_selection_method || 'auto';
+      }
+
+      if (this.workflow.steps) {
+        this.steps = [...this.workflow.steps];
+      }
+
+      if (this.workflow.nested_chats) {
+        this.nestedChats = JSON.parse(JSON.stringify(this.workflow.nested_chats));
+      }
+
+      if (this.workflow.selector_config) {
+        this.selectorConfig = { ...this.workflow.selector_config };
+        this.routingAgentsJson = JSON.stringify(this.selectorConfig.routing_agents, null, 2);
       }
     } else {
       // Initialize with all required defaults
@@ -336,15 +513,15 @@ export class WorkflowFormDialogComponent implements OnInit {
     if (!this.workflow.id || !this.workflow.name || !this.workflow.entry_agent_id) {
       return false;
     }
-    
+
     if (this.workflow.pattern === ConversationPattern.TWO_AGENT) {
       return !!this.workflow.recipient_agent_id;
     }
-    
+
     if (this.workflow.pattern === ConversationPattern.GROUP_CHAT) {
       return this.groupAgents.length >= 2;
     }
-    
+
     return true;
   }
 
@@ -362,7 +539,19 @@ export class WorkflowFormDialogComponent implements OnInit {
         send_introductions: false
       };
     }
-    
+
+    if (this.workflow.pattern === ConversationPattern.SEQUENTIAL) {
+      this.workflow.steps = this.steps;
+    }
+
+    if (this.workflow.pattern === ConversationPattern.NESTED) {
+      this.workflow.nested_chats = this.nestedChats;
+    }
+
+    if (this.workflow.pattern === ConversationPattern.SELECTOR) {
+      this.workflow.selector_config = this.selectorConfig;
+    }
+
     // Ensure all required fields have values
     if (!this.workflow.max_turns) {
       this.workflow.max_turns = 10;
@@ -379,7 +568,47 @@ export class WorkflowFormDialogComponent implements OnInit {
     if (!this.workflow.persistence) {
       this.workflow.persistence = 'postgres';
     }
-    
+
     this.dialogRef.close(this.workflow);
+  }
+
+  addStep(): void {
+    this.steps.push({
+      sender_id: '',
+      recipient_id: '',
+      message: '',
+      max_turns: 10,
+      summary_method: 'last_msg'
+    });
+  }
+
+  removeStep(index: number): void {
+    this.steps.splice(index, 1);
+  }
+
+  addNestedChat(): void {
+    this.nestedChats.push({
+      trigger_agent_id: '',
+      nested_chats: [{
+        recipient_id: '',
+        message: '',
+        max_turns: 10,
+        summary_method: 'last_msg'
+      }],
+      trigger_condition: ''
+    });
+  }
+
+  removeNestedChat(index: number): void {
+    this.nestedChats.splice(index, 1);
+  }
+
+  updateRoutingAgents(val: string): void {
+    this.routingAgentsJson = val;
+    try {
+      this.selectorConfig.routing_agents = JSON.parse(val);
+    } catch (e) {
+      // ignore parse error while typing
+    }
   }
 }
