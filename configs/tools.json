@@ -118,7 +118,7 @@
     {
       "id": "get_self_requisition_info",
       "name": "find_latest_max_10_requisitions_of_myself",
-      "description": "Find latest(max 10) requisitions of myself",
+      "description": "Find latest(max 10) requisitions of myself. This tool takes NO parameters - it automatically uses the logged-in user's identity to fetch their requisitions. Call this with empty arguments {}.",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -188,7 +188,7 @@
     {
       "id": "get_self_purchase_order_info",
       "name": "find_lastest_max_10_purchase_order_of_self",
-      "description": "Find lastest(max 10) Purchase Order of self",
+      "description": "Find latest(max 10) Purchase Orders of myself. This tool takes NO parameters - it automatically uses the logged-in user's identity to fetch their purchase orders. Call this with empty arguments {}.",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {

@@ -523,6 +523,13 @@ async def send_message(
             metadata=body.metadata,
         )
         
+        # Ensure required fields have default values if null
+        result.setdefault("cost", {})
+        result.setdefault("metadata", {})
+        result.setdefault("chat_history", [])
+        result.setdefault("summary", "")
+        result.setdefault("safety_passed", True)
+        
         return MessageResponse(**result)
         
     except ValueError as e:

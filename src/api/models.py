@@ -76,8 +76,8 @@ class MessageResponse(BaseModel):
     session_id: UUID
     response: str
     turn_count: int
-    cost: dict[str, Any]
-    metadata: dict[str, Any]
+    cost: dict[str, Any] = Field(default_factory=dict, description="Cost information")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Response metadata")
     chat_history: list[dict[str, Any]] = Field(default_factory=list, description="Conversation history")
     summary: str = Field(default="", description="Conversation summary")
     safety_passed: bool = Field(default=True, description="Content safety check result")

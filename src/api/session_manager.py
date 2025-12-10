@@ -1142,13 +1142,47 @@ Please respond to the current message, taking into account the previous conversa
             max_consecutive_auto_reply=0,
         )
         
+        # Build message with conversation context for selector
+        # This helps the selector understand references like "the number I gave you"
+        selector_message = message
+        if session and session.messages:
+            recent_messages = session.messages[-6:]  # Last 3 exchanges for context
+            if len(recent_messages) > 1:
+                # Build a compact context summary for the selector
+                context_parts = []
+                for m in recent_messages[:-1]:  # Exclude current message
+                    content = m.content
+                    # Skip messages that are just context wrappers
+                    if "[Previous conversation context]" in content or "[Recent conversation for context]" in content:
+                        continue
+                    role = "User" if m.role.value == "user" else "Assistant"
+                    # Truncate long messages for selector context
+                    if len(content) > 200:
+                        content = content[:200] + "..."
+                    context_parts.append(f"{role}: {content}")
+                
+                if context_parts:
+                    context_summary = "\n".join(context_parts)
+                    selector_message = f"""[Recent conversation for context]
+{context_summary}
+
+[Current user message to route]
+{message}
+
+Analyze the CURRENT message and route it appropriately. Use the conversation context to understand any references (like "the number", "that requisition", etc.)."""
+                    
+                    logger.debug(
+                        "Added context to selector message",
+                        context_messages=len(context_parts),
+                    )
+        
         # Execute chat with selector to get routing decision
         turns = max_turns if max_turns is not None else 2
         
         selector_result = self.pattern_engine.execute_two_agent_chat(
             sender=user_proxy,
             recipient=selector_agent,
-            message=message,
+            message=selector_message,
             max_turns=turns,
             summary_method="last_msg",
         )
@@ -1277,11 +1311,24 @@ Please respond to the current message, taking into account the previous conversa
             # Build context from recent conversation history (last 5 exchanges)
             recent_messages = session.messages[-10:]  # Last 10 messages (5 exchanges)
             if len(recent_messages) > 1:  # Only add context if there's history
-                history_text = "\n".join([
-                    f"{'User' if m.role.value == 'user' else 'Assistant'}: {m.content}"
-                    for m in recent_messages[:-1]  # Exclude current message
-                ])
-                context_message = f"""[Previous conversation context]
+                history_parts = []
+                for m in recent_messages[:-1]:  # Exclude current message
+                    content = m.content
+                    # Strip out any existing context markers to avoid nesting
+                    if "[Previous conversation context]" in content:
+                        # Extract just the actual response, not the context wrapper
+                        if "[Current message]" in content:
+                            # This was a wrapped message, skip it or extract the response
+                            continue
+                    # Truncate very long messages to keep context manageable
+                    if len(content) > 500:
+                        content = content[:500] + "..."
+                    role = "User" if m.role.value == "user" else "Assistant"
+                    history_parts.append(f"{role}: {content}")
+                
+                if history_parts:
+                    history_text = "\n".join(history_parts)
+                    context_message = f"""[Previous conversation context]
 {history_text}
 
 [Current message]
@@ -1290,35 +1337,112 @@ Please respond to the current message, taking into account the previous conversa
 Please respond to the current message, taking into account the previous conversation context above."""
         
         # Register tools for the domain agent if it has any
+        # Note: domain_user_proxy is created fresh each request, so we must always
+        # register tools for execution on it. We only skip LLM registration if
+        # already done on the cached target_agent.
         from src.config.loader import load_agents_config
         agents_config = load_agents_config()
         target_agent_config = agents_config.get_agent(target_agent_id)
         
         if target_agent_config and target_agent_config.tools:
             tool_registry = self.agent_factory.tool_registry
+            logger.info(
+                "Tool registration check",
+                has_tool_registry=tool_registry is not None,
+                target_agent_tools=target_agent_config.tools,
+                available_tools=tool_registry.list_tools() if tool_registry else [],
+                get_self_tool_exists='get_self_requisition_info' in (tool_registry.list_tools() if tool_registry else []),
+            )
             if tool_registry:
+                # Check which tools are already registered for LLM on the target agent
+                llm_registered_tools = getattr(target_agent, '_registered_tool_ids', set())
+                
                 for tool_id in target_agent_config.tools:
                     try:
-                        tool_registry.register_tool_with_agents(
-                            tool_id=tool_id,
-                            caller=target_agent,
-                            executor=domain_user_proxy,
-                        )
+                        tool_def = tool_registry.get_tool(tool_id)
+                        if tool_def is None:
+                            logger.warning(
+                                "Tool not found in registry",
+                                tool_id=tool_id,
+                            )
+                            continue
+                        
+                        # Get the function and ensure it has the correct name
+                        tool_func = tool_def.function
+                        
+                        # Log function details for debugging
                         logger.debug(
-                            "Registered tool for selector workflow",
+                            "Registering tool function",
                             tool_id=tool_id,
+                            func_name=getattr(tool_func, '__name__', 'unknown'),
+                            func_type=type(tool_func).__name__,
+                            is_coroutine=str(tool_func).startswith('<coroutine') or 'async' in str(type(tool_func)),
+                        )
+                        
+                        # Always register for execution on the new domain_user_proxy
+                        # Use the decorator pattern correctly
+                        registered_func = domain_user_proxy.register_for_execution(
+                            name=tool_id,
+                        )(tool_func)
+                        
+                        # Verify the function was registered by checking the function_map
+                        func_map = getattr(domain_user_proxy, 'function_map', {})
+                        is_registered = tool_id in func_map
+                        
+                        logger.info(
+                            "Tool registered for execution",
+                            tool_id=tool_id,
+                            executor=domain_user_proxy.name,
+                            registered_func_name=getattr(registered_func, '__name__', 'unknown'),
+                            is_in_function_map=is_registered,
+                            function_map_keys=list(func_map.keys()) if func_map else [],
+                        )
+                        
+                        # Only register for LLM if not already done on cached agent
+                        if tool_id not in llm_registered_tools:
+                            description = tool_def.description
+                            if tool_def.name and tool_def.name != tool_id:
+                                description = f"{tool_def.name}: {description}"
+                            
+                            target_agent.register_for_llm(
+                                name=tool_id,
+                                description=description,
+                            )(tool_func)
+                            
+                            llm_registered_tools.add(tool_id)
+                            target_agent._registered_tool_ids = llm_registered_tools
+                        
+                        logger.info(
+                            "Registered tool with agents",
+                            tool_id=tool_id,
+                            tool_name=tool_id,
                             caller=target_agent.name,
                             executor=domain_user_proxy.name,
                         )
                     except Exception as e:
-                        logger.warning(
+                        logger.error(
                             "Failed to register tool",
                             tool_id=tool_id,
                             error=str(e),
+                            exc_info=True,
                         )
         
         # Execute chat with domain agent
         domain_turns = max_turns if max_turns is not None else workflow.max_turns
+        
+        # Log the function map before initiating chat
+        logger.info(
+            "Starting domain agent chat",
+            target_agent=target_agent_id,
+            executor_name=domain_user_proxy.name,
+            executor_id=id(domain_user_proxy),
+            executor_function_map=list(domain_user_proxy.function_map.keys()) if domain_user_proxy.function_map else [],
+            executor_can_execute_get_self=domain_user_proxy.can_execute_function('get_self_requisition_info'),
+            target_agent_name=target_agent.name,
+            target_agent_id=id(target_agent),
+            target_agent_tools=list(getattr(target_agent, '_registered_tool_ids', set())),
+            target_agent_function_map=list(target_agent.function_map.keys()) if target_agent.function_map else [],
+        )
         
         domain_result = self.pattern_engine.execute_two_agent_chat(
             sender=domain_user_proxy,
