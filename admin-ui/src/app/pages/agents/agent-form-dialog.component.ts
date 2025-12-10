@@ -247,6 +247,7 @@ import { ToolConfig } from '../../models/tool.model';
       &::-webkit-scrollbar {
         width: 12px;
         height: 12px;
+        background: transparent;
       }
       
       &::-webkit-scrollbar-track {
@@ -350,152 +351,162 @@ export class AgentFormDialogComponent implements OnInit {
   HumanInputMode = HumanInputMode;
 
   agent: AgentConfig;
-  timeout: 120,
-  cache_seed: 42
-};
 
-retrieveConfig: RetrieveConfig = {
-  task: 'qa',
-  docs_path: [],
-  chunk_token_size: 2000,
-  vector_db: 'chromadb',
-  collection_name: 'autogen_docs',
-  embedding_model: 'all-mpnet-base-v2',
-  get_or_create: true
-};
+  retrieveConfig: RetrieveConfig = {
+    task: 'qa',
+    docs_path: [],
+    chunk_token_size: 2000,
+    vector_db: 'chromadb',
+    collection_name: 'autogen_docs',
+    embedding_model: 'all-mpnet-base-v2',
+    get_or_create: true
+  };
 
-behaviorConfig: AgentBehaviorConfig = {};
+  behaviorConfig: AgentBehaviorConfig = {};
 
-docsPathString = '';
+  docsPathString = '';
 
-isEdit = signal(false);
-availableTools = signal<ToolConfig[]>([]);
-llmProviders = signal<ApiProvider[]>([]);
-availableModels = signal<ApiProviderModel[]>([]);
+  isEdit = signal(false);
+  availableTools = signal<ToolConfig[]>([]);
+  llmProviders = signal<ApiProvider[]>([]);
+  availableModels = signal<ApiProviderModel[]>([]);
 
-constructor() {
-  if (this.data.agent) {
-    this.agent = { ...this.data.agent };
-    // Load existing LLM config if present
-    if (this.agent.llm_config) {
-      this.llmConfig = { ...this.agent.llm_config };
+  llmConfig: LLMConfig = {
+    provider_id: '',
+    model: '',
+    temperature: 0.7,
+    max_tokens: 1000,
+    timeout: 120,
+    cache_seed: 42
+  };
+
+  constructor() {
+    if (this.data.agent) {
+      this.agent = { ...this.data.agent };
+      // Load existing LLM config if present
+      if (this.agent.llm_config && typeof (this.agent.llm_config) !== 'boolean') {
+        const config = this.agent.llm_config as LLMConfig;
+        this.llmConfig = { ...config };
+      }
+      if (this.agent.retrieve_config) {
+        this.retrieveConfig = { ...this.agent.retrieve_config };
+        this.docsPathString = this.retrieveConfig.docs_path.join(', ');
+      }
+      if (this.agent.behavior) {
+        this.behaviorConfig = { ...this.agent.behavior };
+      }
+      this.isEdit.set(true);
+    } else {
+      this.agent = {
+        id: '',
+        type: AgentType.CONVERSABLE,
+        name: '',
+        human_input_mode: HumanInputMode.NEVER,
+        tools: [],
+        max_consecutive_auto_reply: 10
+      };
     }
-    if (this.agent.retrieve_config) {
-      this.retrieveConfig = { ...this.agent.retrieve_config };
-      this.docsPathString = this.retrieveConfig.docs_path.join(', ');
-    }
-    if (this.agent.behavior) {
-      this.behaviorConfig = { ...this.agent.behavior };
-    }
-    this.isEdit.set(true);
-  } else {
-    this.agent = {
-      id: '',
-      type: AgentType.CONVERSABLE,
-      name: '',
-      human_input_mode: HumanInputMode.NEVER,
-      tools: [],
-      max_consecutive_auto_reply: 10
-    };
-  }
-}
-
-ngOnInit(): void {
-  this.loadTools();
-  this.loadProviders();
-}
-
-loadTools(): void {
-  this.apiService.getTools().subscribe({
-    next: (tools) => {
-      this.availableTools.set(tools);
-    },
-    error: (err) => {
-      console.error('Error loading tools:', err);
-    }
-  });
-}
-
-loadProviders(): void {
-  this.apiService.getApiProviders().subscribe({
-    next: (providers) => {
-      // Filter to only LLM type providers
-      const llmProviders = providers.filter(p => p.type === 'llm');
-      this.llmProviders.set(llmProviders);
-
-      // Set available models based on current provider
-      this.updateAvailableModels();
-    },
-    error: (err) => {
-      console.error('Error loading providers:', err);
-      // Fallback to default provider
-      this.llmProviders.set([{
-        id: 'openrouter',
-        name: 'OpenRouter',
-        type: 'llm',
-        models: [{ name: 'openai/gpt-oss-20b', default: true }]
-      }]);
-      this.updateAvailableModels();
-    }
-  });
-}
-
-onProviderChange(): void {
-  this.updateAvailableModels();
-  // Reset model selection when provider changes
-  const models = this.availableModels();
-  if(models.length > 0) {
-  const defaultModel = models.find(m => m.default) || models[0];
-  this.llmConfig.model = defaultModel.name;
-}
   }
 
-updateAvailableModels(): void {
-  const provider = this.llmProviders().find(p => p.id === this.llmConfig.provider_id);
-  if(provider && provider.models) {
-  this.availableModels.set(provider.models);
-} else {
-  this.availableModels.set([]);
-}
+  ngOnInit(): void {
+    this.loadTools();
+    this.loadProviders();
   }
 
-onCancel(): void {
-  this.dialogRef.close();
-}
+  loadTools(): void {
+    this.apiService.getTools().subscribe({
+      next: (tools) => {
+        this.availableTools.set(tools);
+      },
+      error: (err) => {
+        console.error('Error loading tools:', err);
+      }
+    });
+  }
 
-sanitizeName(value: string): void {
-  // Remove spaces from agent name (Autogen requirement)
-  this.agent.name = value.replace(/\s+/g, '');
-}
+  loadProviders(): void {
+    this.apiService.getApiProviders().subscribe({
+      next: (providers) => {
+        // Filter to only LLM type providers
+        const llmProviders = providers.filter(p => p.type === 'llm');
+        this.llmProviders.set(llmProviders);
 
-updateDocsPath(value: string): void {
-  this.docsPathString = value;
-  this.retrieveConfig.docs_path = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
-}
+        // Set available models based on current provider
+        this.updateAvailableModels();
+      },
+      error: (err) => {
+        console.error('Error loading providers:', err);
+        // Fallback to default provider
+        this.llmProviders.set([{
+          id: 'openrouter',
+          name: 'OpenRouter',
+          type: 'llm',
+          models: [{ name: 'openai/gpt-oss-20b', default: true }]
+        }]);
+        this.updateAvailableModels();
+      }
+    });
+  }
 
-onSave(): void {
-  // Ensure name has no spaces
-  this.agent.name = this.agent.name.replace(/\s+/g, '');
+  onProviderChange(): void {
+    this.updateAvailableModels();
+    // Reset model selection when provider changes
+    const models = this.availableModels();
+    if (models.length > 0) {
+      const defaultModel = models.find(m => m.default) || models[0];
+      this.llmConfig.model = defaultModel.name;
+    }
+  }
 
-  // Attach LLM config to agent before saving
-  this.agent.llm_config = { ...this.llmConfig };
+  updateAvailableModels(): void {
+    const provider = this.llmProviders().find(p => p.id === this.llmConfig.provider_id);
+    if (provider && provider.models) {
+      this.availableModels.set(provider.models);
+    } else {
+      this.availableModels.set([]);
+    }
+  }
 
-  // Set code_execution_config to false by default
-  if(this.agent.code_execution_config === undefined) {
-  this.agent.code_execution_config = false;
-}
+  onCancel(): void {
+    this.dialogRef.close();
+  }
 
-if (this.agent.type === AgentType.RETRIEVE_USER_PROXY) {
-  this.agent.retrieve_config = { ...this.retrieveConfig };
-} else {
-  delete this.agent.retrieve_config;
-}
+  sanitizeName(value: string): void {
+    if (!value) return;
+    // Remove spaces from agent name (Autogen requirement)
+    this.agent.name = value.replace(/\s+/g, '');
+  }
 
-// Add behavior config if fields are set
-if (Object.keys(this.behaviorConfig).length > 0) {
-  this.agent.behavior = { ...this.behaviorConfig };
-}
+  updateDocsPath(value: string): void {
+    this.docsPathString = value;
+    this.retrieveConfig.docs_path = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  }
 
-this.dialogRef.close(this.agent);
+  onSave(): void {
+    // Ensure name has no spaces
+    if (this.agent.name) {
+      this.agent.name = this.agent.name.replace(/\s+/g, '');
+    }
+
+    // Attach LLM config to agent before saving
+    this.agent.llm_config = { ...this.llmConfig };
+
+    // Set code_execution_config to false by default
+    if (this.agent.code_execution_config === undefined) {
+      this.agent.code_execution_config = false;
+    }
+
+    if (this.agent.type === AgentType.RETRIEVE_USER_PROXY) {
+      this.agent.retrieve_config = { ...this.retrieveConfig };
+    } else {
+      delete this.agent.retrieve_config;
+    }
+
+    // Add behavior config if fields are set
+    if (Object.keys(this.behaviorConfig).length > 0) {
+      this.agent.behavior = { ...this.behaviorConfig };
+    }
+
+    this.dialogRef.close(this.agent);
   }
 }

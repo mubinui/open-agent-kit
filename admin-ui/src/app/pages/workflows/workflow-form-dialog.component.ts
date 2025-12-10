@@ -115,8 +115,6 @@ import { AgentConfig } from '../../models/agent.model';
           </div>
         </ng-container>
 
-        </ng-container>
-
         <!-- Sequential Pattern Fields -->
         <ng-container *ngIf="workflow.pattern === ConversationPattern.SEQUENTIAL">
           <div class="row">

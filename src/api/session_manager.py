@@ -1191,6 +1191,22 @@ class SessionManager:
             intent=routing_decision.get('intent'),
         )
         
+        # Handle "general" domain queries directly without routing to avoid loops
+        if domain == 'general' or target_agent_id == workflow.entry_agent_id:
+            # Generate a helpful response for general queries
+            general_response = self._generate_general_help_response(
+                message=message,
+                routing_agents=routing_agents,
+                selector_agent=selector_agent,
+            )
+            return {
+                "response": general_response,
+                "cost": getattr(selector_result, 'cost', {}),
+                "pattern": "selector",
+                "routing_decision": routing_decision,
+                "metadata": {"domain": "general", "handled_directly": True},
+            }
+        
         target_agent = agents.get(target_agent_id)
         if target_agent is None:
             logger.warning(
@@ -1275,6 +1291,53 @@ class SessionManager:
                 "intent": routing_decision.get('intent'),
             },
         }
+
+    def _generate_general_help_response(
+        self,
+        message: str,
+        routing_agents: Dict[str, str],
+        selector_agent: Any,
+    ) -> str:
+        """
+        Generate a helpful response for general queries.
+        
+        Args:
+            message: Original user message
+            routing_agents: Available domain agents
+            selector_agent: The selector agent instance
+            
+        Returns:
+            Helpful response string
+        """
+        # Build list of available domains
+        domains = list(routing_agents.keys())
+        domain_descriptions = {
+            "requisition": "requisitions and purchase requests",
+            "purchase_order": "purchase orders and PO status",
+            "framework_agreement": "framework agreements and contracts",
+        }
+        
+        capabilities = []
+        for domain in domains:
+            desc = domain_descriptions.get(domain, domain.replace("_", " "))
+            capabilities.append(f"• **{domain.replace('_', ' ').title()}**: I can help you with {desc}")
+        
+        capabilities_text = "\n".join(capabilities)
+        
+        response = f"""Hello! I'm your Procurement Assistant. I can help you with various procurement-related queries.
+
+**Here's what I can help you with:**
+
+{capabilities_text}
+
+**Example questions you can ask:**
+• "What is the status of requisition REQ20250010638?"
+• "Show me details of purchase order PO-2024-001"
+• "What framework agreements are available?"
+
+Please ask me a specific question about requisitions, purchase orders, or framework agreements, and I'll be happy to help!"""
+        
+        return response
 
     def _parse_selector_routing_decision(self, response: str) -> Optional[Dict[str, Any]]:
         """
