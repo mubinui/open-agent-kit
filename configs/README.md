@@ -20,7 +20,7 @@ Defines all conversable agents and their behaviors.
       "system_message": "System prompt for the agent",
       "llm_config": {
         "provider_id": "openrouter",
-        "model": "openai/gpt-4",
+        "model": "openai/gpt-oss-20b",
         "temperature": 0.7,
         "max_tokens": 1000,
         "cache_seed": 42,
@@ -455,6 +455,88 @@ POST /api/v1/configs/reload
 3. Ensure `max_turns` is reasonable (not 0 or negative)
 4. Validate `group_chat.agents` list is not empty
 
+## Configuration Templates
+
+The `templates/` directory contains comprehensive examples and templates for the industry-grade orchestration system:
+
+### Templates Directory Structure
+
+```
+templates/
+├── README.md                           # Comprehensive template guide
+├── topologies/                         # Workflow topology examples
+│   ├── sequential_workflow.json       # Simple sequential topology
+│   ├── tree_topology.json             # Parallel tree topology
+│   ├── graph_topology.json            # Complex graph with cycles
+│   └── hybrid_topology.json           # Mixed sequential/parallel
+├── execution/                          # Execution strategy examples
+│   ├── sequential_strategy.json       # Sequential execution
+│   ├── parallel_strategy.json         # Parallel execution
+│   └── hybrid_strategy.json           # Hybrid execution
+├── cache/                              # Cache configuration examples
+│   ├── cache_full.json                # Full caching enabled
+│   ├── cache_selective.json           # Selective caching
+│   └── cache_disabled.json            # Caching disabled
+├── agents/                             # Agent behavior examples
+│   ├── agent_with_validation.json     # Agent with output validation
+│   ├── agent_with_constraints.json    # Agent with constraints
+│   └── agent_minimal.json             # Minimal agent config
+└── complete_examples/                  # Full workflow examples
+    ├── research_workflow.json          # Complete research workflow
+    ├── code_review_workflow.json       # Code review workflow
+    └── customer_support_workflow.json  # Customer support workflow
+```
+
+### Quick Start with Templates
+
+1. **Copy a template:**
+   ```bash
+   cp configs/templates/topologies/sequential_workflow.json configs/workflows/my_workflow.json
+   ```
+
+2. **Customize for your needs:**
+   - Update agent IDs to match your agents
+   - Adjust execution strategy
+   - Configure cache settings
+   - Set resource limits
+
+3. **Deploy via API:**
+   ```bash
+   curl -X POST http://localhost:8000/api/v1/workflows \
+     -H "Content-Type: application/json" \
+     -d @configs/workflows/my_workflow.json
+   ```
+
+### Template Categories
+
+**Topology Templates:**
+- Sequential: Linear agent chains
+- Tree: Parallel branches with aggregation
+- Graph: Complex routing with cycles
+- Hybrid: Optimized mixed execution
+
+**Execution Strategies:**
+- Sequential: Strict ordering
+- Parallel: Maximum concurrency
+- Hybrid: Automatic optimization
+
+**Cache Configurations:**
+- Full: All layers enabled
+- Selective: Strategic caching
+- Disabled: No caching (real-time)
+
+**Agent Behaviors:**
+- With Validation: Output format validation
+- With Constraints: Resource and output limits
+- Minimal: Basic configuration
+
+**Complete Examples:**
+- Research Workflow: Multi-source parallel research
+- Code Review: Sequential specialized reviewers
+- Customer Support: Intelligent routing and escalation
+
+See `templates/README.md` for detailed documentation on configuration hierarchy, override rules, and best practices.
+
 ## Examples
 
-See individual JSON files in this directory for complete examples of each configuration type.
+See individual JSON files in this directory and the `templates/` directory for complete examples of each configuration type.

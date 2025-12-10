@@ -315,9 +315,31 @@ async def send_message(
             error=str(e),
             exc_info=True,
         )
+        
+        # Build detailed error response
+        error_detail = {
+            "error_code": "MESSAGE_PROCESSING_FAILED",
+            "error_message": f"Failed to send message: {str(e)}",
+            "error_type": type(e).__name__,
+            "request_id": request_id,
+            "session_id": str(session_id),
+            "context": {
+                "message_length": len(body.message),
+                "pattern": body.pattern.value if body.pattern else None,
+                "max_turns": body.max_turns,
+            },
+        }
+        
+        # Add specific error details if available
+        if hasattr(e, '__dict__'):
+            error_detail["details"] = {
+                k: str(v) for k, v in e.__dict__.items()
+                if not k.startswith('_')
+            }
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to send message: {str(e)}",
+            detail=error_detail,
         )
     finally:
         # Clean up tool execution context

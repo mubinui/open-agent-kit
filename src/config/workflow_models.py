@@ -14,6 +14,7 @@ class ConversationPattern(str, Enum):
     SEQUENTIAL = "sequential"
     GROUP_CHAT = "group_chat"
     NESTED = "nested"
+    SELECTOR = "selector"
 
 
 class SpeakerSelectionMethod(str, Enum):
@@ -192,6 +193,47 @@ class NestedChatConfig(BaseModel):
     )
 
 
+class SelectorConfig(BaseModel):
+    """Configuration for a selector (router) workflow pattern.
+    
+    The selector pattern uses a routing agent to analyze user intent
+    and route queries to specialized domain agents.
+    """
+
+    routing_agents: dict[str, str] = Field(
+        description="Mapping of domain names to agent IDs (e.g., {'requisition': 'requisition_agent'})"
+    )
+    default_agent: str = Field(
+        description="Agent ID to use when no specific domain is matched"
+    )
+    max_routing_attempts: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum number of routing attempts before failing"
+    )
+
+    @field_validator('routing_agents')
+    @classmethod
+    def validate_routing_agents(cls, v: dict[str, str]) -> dict[str, str]:
+        """Validate routing agents mapping."""
+        if not v:
+            raise ValueError("routing_agents cannot be empty")
+        
+        for domain, agent_id in v.items():
+            if not domain or not domain.strip():
+                raise ValueError("Domain name cannot be empty")
+            if not agent_id or not agent_id.strip():
+                raise ValueError(f"Agent ID for domain '{domain}' cannot be empty")
+            if not agent_id.replace('_', '').replace('-', '').isalnum():
+                raise ValueError(
+                    f"Agent ID '{agent_id}' must contain only alphanumeric characters, "
+                    "underscores, and hyphens"
+                )
+        
+        return v
+
+
 class WorkflowConfig(BaseModel):
     """Configuration for a complete workflow."""
 
@@ -224,6 +266,10 @@ class WorkflowConfig(BaseModel):
     nested_chats: Optional[list[NestedChatConfig]] = Field(
         default=None,
         description="Nested chat configurations (required for NESTED pattern)"
+    )
+    selector_config: Optional[SelectorConfig] = Field(
+        default=None,
+        description="Selector configuration (required for SELECTOR pattern)"
     )
     
     # Two-agent pattern configuration
@@ -330,6 +376,12 @@ class WorkflowConfig(BaseModel):
                 raise ValueError(
                     f"Workflow {self.id}: NESTED pattern requires at least one nested chat"
                 )
+        
+        elif self.pattern == ConversationPattern.SELECTOR:
+            if not self.selector_config:
+                raise ValueError(
+                    f"Workflow {self.id}: SELECTOR pattern requires selector_config"
+                )
 
     def get_all_agent_ids(self) -> set[str]:
         """
@@ -358,6 +410,11 @@ class WorkflowConfig(BaseModel):
             if self.nested_chats:
                 for nested_chat in self.nested_chats:
                     agent_ids.add(nested_chat.trigger_agent_id)
+        
+        elif self.pattern == ConversationPattern.SELECTOR:
+            if self.selector_config:
+                agent_ids.add(self.selector_config.default_agent)
+                agent_ids.update(self.selector_config.routing_agents.values())
         
         return agent_ids
 

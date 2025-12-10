@@ -1,0 +1,275 @@
+{
+  "_comment": "Complete Code Review Workflow - Sequential review with multiple specialized reviewers",
+  "id": "complete_code_review",
+  "name": "Comprehensive Code Review Workflow",
+  "description": "A complete code review workflow with specialized reviewers for security, performance, style, and best practices",
+  "version": "2.0",
+  "topology": {
+    "type": "sequential",
+    "nodes": [
+      {
+        "id": "code_analyzer",
+        "agent_id": "reasoning_agent",
+        "description": "Initial code analysis and categorization",
+        "input_transform": null,
+        "output_transform": ".analysis",
+        "config_override": {
+          "system_message": "You are a code analyzer. Examine the code and identify: language, complexity, key components, and areas needing review. Return JSON.",
+          "llm_config": {
+            "temperature": 0.2,
+            "max_tokens": 800
+          },
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["language", "complexity", "review_areas"],
+                "properties": {
+                  "language": {"type": "string"},
+                  "complexity": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"]
+                  },
+                  "review_areas": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "security_reviewer",
+        "agent_id": "code_assistant",
+        "description": "Reviews code for security vulnerabilities",
+        "input_transform": null,
+        "output_transform": ".security_review",
+        "config_override": {
+          "system_message": "You are a security code reviewer. Check for: SQL injection, XSS, insecure dependencies, hardcoded secrets, authentication issues, and other security vulnerabilities. Provide specific line numbers and severity ratings.",
+          "llm_config": {
+            "temperature": 0.1,
+            "max_tokens": 2000
+          },
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["issues", "severity", "recommendations"],
+                "properties": {
+                  "issues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "line": {"type": "number"},
+                        "issue": {"type": "string"},
+                        "severity": {
+                          "type": "string",
+                          "enum": ["critical", "high", "medium", "low"]
+                        }
+                      }
+                    }
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low", "none"]
+                  },
+                  "recommendations": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "performance_reviewer",
+        "agent_id": "code_assistant",
+        "description": "Reviews code for performance issues",
+        "input_transform": null,
+        "output_transform": ".performance_review",
+        "config_override": {
+          "system_message": "You are a performance code reviewer. Identify: inefficient algorithms, memory leaks, unnecessary computations, database query issues, and optimization opportunities. Provide specific suggestions.",
+          "llm_config": {
+            "temperature": 0.2,
+            "max_tokens": 2000
+          },
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["issues", "impact", "optimizations"],
+                "properties": {
+                  "issues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "line": {"type": "number"},
+                        "issue": {"type": "string"},
+                        "impact": {
+                          "type": "string",
+                          "enum": ["high", "medium", "low"]
+                        }
+                      }
+                    }
+                  },
+                  "impact": {
+                    "type": "string",
+                    "enum": ["high", "medium", "low", "none"]
+                  },
+                  "optimizations": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "style_reviewer",
+        "agent_id": "code_assistant",
+        "description": "Reviews code style and best practices",
+        "input_transform": null,
+        "output_transform": ".style_review",
+        "config_override": {
+          "system_message": "You are a code style reviewer. Check for: naming conventions, code organization, documentation, error handling, and adherence to language best practices. Be constructive.",
+          "llm_config": {
+            "temperature": 0.3,
+            "max_tokens": 1500
+          },
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["issues", "suggestions"],
+                "properties": {
+                  "issues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "category": {"type": "string"},
+                        "description": {"type": "string"}
+                      }
+                    }
+                  },
+                  "suggestions": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "report_generator",
+        "agent_id": "response_agent",
+        "description": "Generates comprehensive review report",
+        "input_transform": null,
+        "output_transform": null,
+        "config_override": {
+          "system_message": "You are a code review report generator. Synthesize all review findings into a clear, actionable report with: executive summary, critical issues, recommendations, and overall assessment. Use markdown formatting.",
+          "llm_config": {
+            "temperature": 0.5,
+            "max_tokens": 3000
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from_node": "code_analyzer",
+        "to_node": "security_reviewer",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "security_reviewer",
+        "to_node": "performance_reviewer",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "performance_reviewer",
+        "to_node": "style_reviewer",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "style_reviewer",
+        "to_node": "report_generator",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      }
+    ],
+    "entry_node": "code_analyzer",
+    "termination_conditions": [
+      {
+        "type": "agent_completion",
+        "agent_id": "report_generator"
+      }
+    ]
+  },
+  "execution_strategy": "sequential",
+  "strategy_config": {
+    "wait_for_completion": true,
+    "fail_fast": false,
+    "preserve_order": true,
+    "continue_on_error": true
+  },
+  "cache_config": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 7200
+    },
+    "agent_result": {
+      "enabled": true,
+      "ttl": 3600
+    }
+  },
+  "resource_limits": {
+    "max_concurrent_executions": 3,
+    "max_execution_time": 400,
+    "max_agent_calls": 15,
+    "max_context_size": 100000
+  },
+  "retry_strategy": {
+    "max_retries": 2,
+    "backoff_type": "exponential",
+    "backoff_factor": 2.0,
+    "initial_delay": 1.0,
+    "retry_on": ["timeout", "rate_limit"]
+  },
+  "metadata": {
+    "use_case": "code_review",
+    "complexity": "medium",
+    "estimated_duration": "60-120s",
+    "review_aspects": ["security", "performance", "style"]
+  },
+  "enabled": true,
+  "usage_example": {
+    "api_call": "POST /api/v1/sessions",
+    "request_body": {
+      "workflow_id": "complete_code_review",
+      "message": "Review this Python code:\n\n```python\ndef process_user_data(user_input):\n    query = f\"SELECT * FROM users WHERE name = '{user_input}'\"\n    results = db.execute(query)\n    return results\n```"
+    },
+    "expected_output": "Comprehensive review report identifying SQL injection vulnerability, suggesting parameterized queries, and providing style improvements"
+  }
+}

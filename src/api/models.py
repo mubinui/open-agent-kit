@@ -311,6 +311,7 @@ class WorkflowCreateRequest(BaseModel):
     steps: Optional[list[WorkflowStepConfig]] = None
     group_chat: Optional[GroupChatConfigModel] = None
     nested_chats: Optional[List[dict]] = None
+    selector_config: Optional[Dict[str, Any]] = Field(default=None, description="Selector configuration (for selector pattern)")
     nodes: Optional[List[WorkflowNode]] = Field(default=None, description="Visual workflow nodes")
     connections: Optional[List[WorkflowConnection]] = Field(default=None, description="Visual workflow connections")
 
@@ -330,6 +331,7 @@ class WorkflowResponse(BaseModel):
     steps: Optional[list[WorkflowStepConfig]] = None
     group_chat: Optional[GroupChatConfigModel] = None
     nested_chats: Optional[List[dict]] = None
+    selector_config: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
     workflow_type: Optional[str] = None
     persistence: Optional[str] = None
@@ -504,3 +506,66 @@ class ToolExecutionResponse(BaseModel):
     status: str = Field(description="Status of execution (success/error)")
     result: Any = Field(description="Result of the tool execution")
     error: Optional[str] = Field(default=None, description="Error message if failed")
+
+
+# Topology Models
+class TopologyNodeRequest(BaseModel):
+    """Request model for topology node."""
+    
+    id: str = Field(description="Unique node identifier")
+    agent_id: str = Field(description="Agent ID for this node")
+    input_transform: Optional[str] = Field(default=None, description="jq-style input transformation")
+    output_transform: Optional[str] = Field(default=None, description="jq-style output transformation")
+    timeout: Optional[float] = Field(default=None, description="Node-specific timeout")
+    config_override: Optional[Dict[str, Any]] = Field(default=None, description="Node-specific config overrides")
+
+
+class TopologyEdgeRequest(BaseModel):
+    """Request model for topology edge."""
+    
+    from_node: str = Field(description="Source node ID")
+    to_node: str = Field(description="Target node ID")
+    context_strategy: str = Field(default="full", description="Context passing strategy: full, summary, selective")
+    fields: Optional[List[str]] = Field(default=None, description="Fields to include for selective strategy")
+    condition: Optional[str] = Field(default=None, description="Conditional routing expression")
+
+
+class TopologyCreateRequest(BaseModel):
+    """Request to create a workflow topology."""
+    
+    workflow_id: str = Field(description="Workflow ID to attach topology to")
+    type: str = Field(description="Topology type: single, sequential, tree, graph")
+    nodes: List[TopologyNodeRequest] = Field(description="List of topology nodes")
+    edges: List[TopologyEdgeRequest] = Field(description="List of topology edges")
+    entry_node: str = Field(description="Entry node ID")
+    max_iterations: Optional[int] = Field(default=None, description="Max iterations for cyclic graphs")
+
+
+class TopologyResponse(BaseModel):
+    """Response containing topology information."""
+    
+    workflow_id: str
+    type: str
+    nodes: List[Dict[str, Any]]
+    edges: List[Dict[str, Any]]
+    entry_node: str
+    max_iterations: Optional[int] = None
+    validation: Dict[str, Any]
+
+
+class TopologyValidationResponse(BaseModel):
+    """Response from topology validation."""
+    
+    is_valid: bool
+    errors: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class WorkflowExecutionStatusResponse(BaseModel):
+    """Response containing workflow execution status."""
+    
+    workflow_id: str
+    active_executions: int
+    max_concurrent: int
+    queued_requests: int
+    resource_limit_reached: bool

@@ -39,7 +39,7 @@ def provider_registry() -> ProviderRegistry:
         ),
         models=[
             ModelConfig(
-                name="openai/gpt-4",
+                name="openai/gpt-oss-20b",
                 default=True,
                 capabilities=[],
                 temperature=0.7,
@@ -81,7 +81,7 @@ def test_create_conversable_agent(agent_factory: AgentFactory) -> None:
         system_message="You are a test agent.",
         llm_config=LLMConfig(
             provider_id="openrouter",
-            model="openai/gpt-4",
+            model="openai/gpt-oss-20b",
             temperature=0.7,
             max_tokens=500,
             cache_seed=42,
@@ -124,7 +124,7 @@ def test_build_llm_config(agent_factory: AgentFactory) -> None:
         name="TestAgent",
         llm_config=LLMConfig(
             provider_id="openrouter",
-            model="openai/gpt-4",
+            model="openai/gpt-oss-20b",
             temperature=0.8,
             max_tokens=1000,
             cache_seed=42,
@@ -137,7 +137,7 @@ def test_build_llm_config(agent_factory: AgentFactory) -> None:
     assert isinstance(llm_config, dict)
     assert "config_list" in llm_config
     assert len(llm_config["config_list"]) == 1
-    assert llm_config["config_list"][0]["model"] == "openai/gpt-4"
+    assert llm_config["config_list"][0]["model"] == "openai/gpt-oss-20b"
     assert llm_config["config_list"][0]["base_url"] == "https://openrouter.ai/api/v1"
     assert llm_config["temperature"] == 0.8
     assert llm_config["max_tokens"] == 1000
@@ -153,7 +153,7 @@ def test_build_llm_config_with_invalid_provider(agent_factory: AgentFactory) -> 
         name="TestAgent",
         llm_config=LLMConfig(
             provider_id="invalid_provider",
-            model="openai/gpt-4",
+            model="openai/gpt-oss-20b",
         ),
     )
     
@@ -170,7 +170,7 @@ def test_agent_config_validation() -> None:
         name="TestAgent",
         llm_config=LLMConfig(
             provider_id="openrouter",
-            model="openai/gpt-4",
+            model="openai/gpt-oss-20b",
         ),
     )
     config.validate_config()  # Should not raise
@@ -217,7 +217,7 @@ def test_llm_config_temperature_validation() -> None:
     # Valid temperature
     config = LLMConfig(
         provider_id="openrouter",
-        model="openai/gpt-4",
+        model="openai/gpt-oss-20b",
         temperature=0.7,
     )
     assert config.temperature == 0.7
@@ -226,7 +226,7 @@ def test_llm_config_temperature_validation() -> None:
     with pytest.raises(ValueError):
         LLMConfig(
             provider_id="openrouter",
-            model="openai/gpt-4",
+            model="openai/gpt-oss-20b",
             temperature=3.0,
         )
     
@@ -234,6 +234,6 @@ def test_llm_config_temperature_validation() -> None:
     with pytest.raises(ValueError):
         LLMConfig(
             provider_id="openrouter",
-            model="openai/gpt-4",
+            model="openai/gpt-oss-20b",
             temperature=-0.5,
         )

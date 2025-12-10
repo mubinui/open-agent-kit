@@ -1,0 +1,67 @@
+{
+  "_comment": "Sequential Execution Strategy - Execute agents one at a time in strict order",
+  "execution_strategy": "sequential",
+  "strategy_config": {
+    "wait_for_completion": true,
+    "fail_fast": true,
+    "preserve_order": true,
+    "timeout_per_agent": 120,
+    "continue_on_error": false
+  },
+  "description": "Sequential execution ensures strict ordering. Each agent completes before the next begins.",
+  "use_cases": [
+    "Workflows where each step depends on the previous",
+    "Debugging and testing workflows",
+    "Resource-constrained environments",
+    "Workflows requiring strict audit trails"
+  ],
+  "advantages": [
+    "Predictable execution order",
+    "Easy to debug and trace",
+    "Lower resource usage",
+    "Simpler error handling"
+  ],
+  "disadvantages": [
+    "Higher latency (sum of all agent times)",
+    "No parallelization benefits",
+    "Underutilizes available resources"
+  ],
+  "configuration_options": {
+    "wait_for_completion": {
+      "type": "boolean",
+      "default": true,
+      "description": "Wait for each agent to complete before starting next"
+    },
+    "fail_fast": {
+      "type": "boolean",
+      "default": true,
+      "description": "Stop execution immediately on first error"
+    },
+    "preserve_order": {
+      "type": "boolean",
+      "default": true,
+      "description": "Maintain strict ordering even if agents could run in parallel"
+    },
+    "timeout_per_agent": {
+      "type": "number",
+      "default": 120,
+      "description": "Timeout in seconds for each agent execution"
+    },
+    "continue_on_error": {
+      "type": "boolean",
+      "default": false,
+      "description": "Continue to next agent even if current agent fails"
+    }
+  },
+  "example_workflow": {
+    "topology": {
+      "nodes": ["agent_a", "agent_b", "agent_c"],
+      "edges": [
+        {"from": "agent_a", "to": "agent_b"},
+        {"from": "agent_b", "to": "agent_c"}
+      ]
+    },
+    "execution_order": ["agent_a", "agent_b", "agent_c"],
+    "total_time": "time(agent_a) + time(agent_b) + time(agent_c)"
+  }
+}

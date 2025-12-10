@@ -26,7 +26,7 @@ def test_agent_versioning():
         name="Test Agent",
         llm_config=LLMConfig(
             provider_id="openrouter",
-            model="openai/gpt-4"
+            model="openai/gpt-oss-20b"
         )
     )
     
@@ -181,7 +181,7 @@ def test_version_comparison():
         name="Test Agent V1",
         llm_config=LLMConfig(
             provider_id="openrouter",
-            model="openai/gpt-4",
+            model="openai/gpt-oss-20b",
             temperature=0.7
         )
     )
@@ -192,7 +192,7 @@ def test_version_comparison():
         name="Test Agent V2",
         llm_config=LLMConfig(
             provider_id="openrouter",
-            model="openai/gpt-4",
+            model="openai/gpt-oss-20b",
             temperature=0.5
         ),
         version=2

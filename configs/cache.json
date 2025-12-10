@@ -1,0 +1,65 @@
+{
+  "global_enabled": true,
+  "layers": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 3600,
+      "max_size": 10000,
+      "eviction_policy": "LRU"
+    },
+    "embedding": {
+      "enabled": true,
+      "ttl": 86400,
+      "max_size": 50000,
+      "eviction_policy": "LFU"
+    },
+    "session": {
+      "enabled": true,
+      "ttl": 1800,
+      "max_size": null,
+      "eviction_policy": "TTL"
+    },
+    "agent_result": {
+      "enabled": false,
+      "ttl": 600,
+      "max_size": 5000,
+      "eviction_policy": "LRU"
+    }
+  },
+  "workflow_overrides": {
+    "realtime_chat": {
+      "llm_response": {
+        "enabled": false,
+        "ttl": 0,
+        "max_size": null,
+        "eviction_policy": "LRU"
+      }
+    },
+    "batch_processing": {
+      "llm_response": {
+        "enabled": true,
+        "ttl": 7200,
+        "max_size": 20000,
+        "eviction_policy": "LRU"
+      }
+    }
+  },
+  "agent_overrides": {
+    "reasoning_agent": {
+      "llm_response": {
+        "enabled": true,
+        "ttl": 7200,
+        "max_size": 5000,
+        "eviction_policy": "LRU"
+      }
+    },
+    "code_generator": {
+      "llm_response": {
+        "enabled": false,
+        "ttl": 0,
+        "max_size": null,
+        "eviction_policy": "LRU"
+      }
+    }
+  }
+}

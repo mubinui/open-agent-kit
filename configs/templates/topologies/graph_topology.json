@@ -1,0 +1,253 @@
+{
+  "_comment": "Graph Topology Template - Complex graph with conditional routing and cycles",
+  "id": "graph_template",
+  "name": "Graph Topology Template",
+  "description": "A complex graph workflow with conditional routing, cycles for iterative refinement, and dynamic decision-making",
+  "version": "2.0",
+  "topology": {
+    "type": "graph",
+    "nodes": [
+      {
+        "id": "intake",
+        "agent_id": "reasoning_agent",
+        "description": "Initial analysis and routing decision",
+        "input_transform": null,
+        "output_transform": ".decision",
+        "config_override": {
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["route", "confidence"],
+                "properties": {
+                  "route": {
+                    "type": "string",
+                    "enum": ["simple", "complex", "research"]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "simple_handler",
+        "agent_id": "response_agent",
+        "description": "Handles simple queries directly",
+        "input_transform": null,
+        "output_transform": ".response",
+        "config_override": {
+          "llm_config": {
+            "temperature": 0.7,
+            "max_tokens": 500
+          }
+        }
+      },
+      {
+        "id": "complex_analyzer",
+        "agent_id": "reasoning_agent",
+        "description": "Deep analysis for complex queries",
+        "input_transform": null,
+        "output_transform": ".analysis",
+        "config_override": {
+          "llm_config": {
+            "temperature": 0.3,
+            "max_tokens": 1500
+          }
+        }
+      },
+      {
+        "id": "researcher",
+        "agent_id": "knowledge_agent",
+        "description": "Conducts research for information needs",
+        "input_transform": null,
+        "output_transform": ".research_results",
+        "config_override": {
+          "tools": ["rag_query", "web_search"]
+        }
+      },
+      {
+        "id": "quality_checker",
+        "agent_id": "reasoning_agent",
+        "description": "Validates quality of results and decides if refinement needed",
+        "input_transform": null,
+        "output_transform": ".quality_assessment",
+        "config_override": {
+          "system_message": "You are a quality checker. Evaluate if the response meets quality standards. Return JSON with 'approved' (boolean) and 'feedback' (string).",
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["approved", "feedback"],
+                "properties": {
+                  "approved": { "type": "boolean" },
+                  "feedback": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "refiner",
+        "agent_id": "response_agent",
+        "description": "Refines response based on quality feedback",
+        "input_transform": ".quality_assessment.feedback",
+        "output_transform": ".refined_response",
+        "config_override": {
+          "llm_config": {
+            "temperature": 0.6
+          }
+        }
+      },
+      {
+        "id": "finalizer",
+        "agent_id": "response_agent",
+        "description": "Produces final polished response",
+        "input_transform": null,
+        "output_transform": null,
+        "config_override": {
+          "llm_config": {
+            "temperature": 0.7,
+            "max_tokens": 2000
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from_node": "intake",
+        "to_node": "simple_handler",
+        "condition": ".decision.route == \"simple\"",
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "intake",
+        "to_node": "complex_analyzer",
+        "condition": ".decision.route == \"complex\"",
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "intake",
+        "to_node": "researcher",
+        "condition": ".decision.route == \"research\"",
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["query", "metadata"]
+        }
+      },
+      {
+        "from_node": "simple_handler",
+        "to_node": "quality_checker",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "complex_analyzer",
+        "to_node": "researcher",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["analysis.research_needs"]
+        }
+      },
+      {
+        "from_node": "researcher",
+        "to_node": "finalizer",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "quality_checker",
+        "to_node": "finalizer",
+        "condition": ".quality_assessment.approved == true",
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "quality_checker",
+        "to_node": "refiner",
+        "condition": ".quality_assessment.approved == false",
+        "context_strategy": "full",
+        "context_config": {
+          "include_feedback": true
+        }
+      },
+      {
+        "from_node": "refiner",
+        "to_node": "quality_checker",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {},
+        "max_iterations": 3,
+        "_comment": "Cycle: refiner -> quality_checker -> refiner (max 3 iterations)"
+      }
+    ],
+    "entry_node": "intake",
+    "termination_conditions": [
+      {
+        "type": "agent_completion",
+        "agent_id": "finalizer"
+      },
+      {
+        "type": "max_iterations",
+        "value": 10
+      },
+      {
+        "type": "timeout",
+        "value": 600
+      }
+    ]
+  },
+  "execution_strategy": "hybrid",
+  "strategy_config": {
+    "max_concurrent": 5,
+    "dependency_resolution": "automatic",
+    "optimization_level": "balanced",
+    "cycle_detection": true,
+    "max_cycle_iterations": 3
+  },
+  "cache_config": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 3600
+    },
+    "agent_result": {
+      "enabled": true,
+      "ttl": 1800
+    }
+  },
+  "resource_limits": {
+    "max_concurrent_executions": 2,
+    "max_execution_time": 600,
+    "max_agent_calls": 30,
+    "max_context_size": 150000
+  },
+  "retry_strategy": {
+    "max_retries": 3,
+    "backoff_type": "exponential",
+    "backoff_factor": 2.0,
+    "initial_delay": 1.0,
+    "max_delay": 30.0,
+    "retry_on": ["timeout", "rate_limit", "temporary_failure"],
+    "dont_retry_on": ["validation_error", "authentication_error"]
+  },
+  "metadata": {
+    "use_case": "adaptive_workflow",
+    "complexity": "high",
+    "estimated_duration": "120-300s",
+    "features": ["conditional_routing", "cycles", "quality_control"]
+  },
+  "enabled": true
+}

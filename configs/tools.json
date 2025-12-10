@@ -2,16 +2,6 @@
   "version": "1.0",
   "tools": [
     {
-      "id": "calculator",
-      "name": "calculate",
-      "description": "Perform arithmetic calculations on mathematical expressions. Supports basic operations like +, -, *, /, and functions like abs, round, min, max, sum, pow.",
-      "entrypoint": "src.tools.calculator:calculate",
-      "enabled": true,
-      "settings": {},
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
       "id": "web_search",
       "name": "search_web",
       "description": "Search the web using DuckDuckGo and return formatted results with titles, descriptions, and URLs. Useful for finding current information, facts, and resources.",
@@ -22,41 +12,6 @@
       },
       "version": 1,
       "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "call_service1",
-      "name": "call_service1",
-      "description": "Call Service1 API with user authentication token. Used for making authenticated requests where the user's Keycloak token is forwarded directly. Parameters: endpoint (string), method (string, default POST), payload (object), auth_token (string).",
-      "entrypoint": "src.tools.external_service:call_service1",
-      "enabled": true,
-      "settings": {
-        "http_method": "POST",
-        "auth_type": "none",
-        "timeout": 30,
-        "forward_user_context": true
-      },
-      "version": 1,
-      "last_updated": "2024-12-01T00:00:00Z"
-    },
-    {
-      "id": "call_service2",
-      "name": "call_service2",
-      "description": "Call Service2 API with admin authentication and client context headers (x-client-ref, x-client-username). Used for admin-authenticated requests with user context. Parameters: endpoint (string), method (string, default POST), payload (object), roles (array), username (string).",
-      "entrypoint": "src.tools.external_service:call_service2",
-      "enabled": true,
-      "settings": {},
-      "version": 1,
-      "last_updated": "2024-12-01T00:00:00Z"
-    },
-    {
-      "id": "call_external_service",
-      "name": "call_external_service",
-      "description": "Generic external service caller that routes to Service1 or Service2 based on service_name parameter. Parameters: service_name ('service1' or 'service2'), endpoint (string), method (string), payload (object), auth_token (string), roles (array), username (string).",
-      "entrypoint": "src.tools.external_service:call_external_service",
-      "enabled": true,
-      "settings": {},
-      "version": 1,
-      "last_updated": "2024-12-01T00:00:00Z"
     },
     {
       "_comment": "RAG Tools - Remote RAG Pipeline service. Requires RAG_PIPELINE_BASE_URL and RAG_PIPELINE_ENABLED=true. Optional: RAG_PIPELINE_API_KEY for authenticated access.",
@@ -111,43 +66,6 @@
     },
     {
       "_comment": "Requisition API Tools - External service for procurement requisitions",
-      "id": "get_requisition",
-      "name": "get_requisition",
-      "description": "Get requisition details by requisition number from the Requisition API. Parameters: req_no (string, required) - The requisition number like 'REQ20250010638'. Uses x-client-username and x-client-ref headers from user context.",
-      "entrypoint": "src.tools.requisition_api:get_requisition",
-      "enabled": true,
-      "settings": {
-        "api_url": "http://10.42.65.155:8012/api/v1/requisition",
-        "http_method": "GET",
-        "auth_type": "none",
-        "auth_header": "",
-        "auth_env_var": "",
-        "body_template": "",
-        "response_path": "",
-        "timeout": 30,
-        "forward_user_context": true,
-        "client_username": "",
-        "client_roles": ""
-      },
-      "version": 1,
-      "last_updated": "2024-12-08T00:00:00Z"
-    },
-    {
-      "id": "search_requisitions",
-      "name": "search_requisitions",
-      "description": "Search requisitions with optional filters. Parameters: query (string), status (string), from_date (string ISO), to_date (string ISO). Uses x-client-username and x-client-ref headers from user context.",
-      "entrypoint": "src.tools.requisition_api:search_requisitions",
-      "enabled": true,
-      "settings": {
-        "api_url": "http://10.42.65.155:8012/api/v1/requisition/search",
-        "http_method": "GET",
-        "timeout": 30,
-        "forward_user_context": true
-      },
-      "version": 1,
-      "last_updated": "2024-12-08T00:00:00Z"
-    },
-    {
       "id": "get_requisition_info",
       "name": "find_requisition_by_requisition_no",
       "description": "Find requisition by requisition no\n\nParameters:\n  - reqNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
@@ -163,37 +81,11 @@
         "_swagger_metadata": {
           "operation_id": "getRequisitionInfo",
           "path": "/api/v1/requisition",
-          "tags": [
-            "requisition-controller"
-          ],
+          "tags": ["requisition-controller"],
           "parameters": [
-            {
-              "name": "reqNo",
-              "in": "query",
-              "required": true,
-              "schema": {
-                "type": "string"
-              },
-              "example": "REQ20250010638"
-            },
-            {
-              "name": "x-client-username",
-              "in": "header",
-              "description": "Username",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "x-client-ref",
-              "in": "header",
-              "description": "Comma-separated roles",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            }
+            {"name": "reqNo", "in": "query", "required": true, "schema": {"type": "string"}, "example": "REQ20250010638"},
+            {"name": "x-client-username", "in": "header", "description": "Username", "required": false, "schema": {"type": "string"}},
+            {"name": "x-client-ref", "in": "header", "description": "Comma-separated roles", "required": false, "schema": {"type": "string"}}
           ],
           "source_spec": "API Documentation"
         }
@@ -202,7 +94,7 @@
     {
       "id": "get_tender_info",
       "name": "find_tender_info_by_requisition_no",
-      "description": "Find tender info by requisition no\n\nParameters:\n  - reqNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "description": "Find tender info by requisition no\n\nParameters:\n  - reqNo [query] (required)",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -215,37 +107,9 @@
         "_swagger_metadata": {
           "operation_id": "getTenderInfo",
           "path": "/api/v1/requisition/tender-info",
-          "tags": [
-            "requisition-controller"
-          ],
+          "tags": ["requisition-controller"],
           "parameters": [
-            {
-              "name": "reqNo",
-              "in": "query",
-              "required": true,
-              "schema": {
-                "type": "string"
-              },
-              "example": "REQ20250010638"
-            },
-            {
-              "name": "x-client-username",
-              "in": "header",
-              "description": "Username",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "x-client-ref",
-              "in": "header",
-              "description": "Comma-separated roles",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            }
+            {"name": "reqNo", "in": "query", "required": true, "schema": {"type": "string"}, "example": "REQ20250010638"}
           ],
           "source_spec": "API Documentation"
         }
@@ -254,7 +118,7 @@
     {
       "id": "get_self_requisition_info",
       "name": "find_latest_max_10_requisitions_of_myself",
-      "description": "Find latest(max 10) requisitions of myself\n\nParameters:\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "description": "Find latest(max 10) requisitions of myself",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -267,29 +131,8 @@
         "_swagger_metadata": {
           "operation_id": "getSelfRequisitionInfo",
           "path": "/api/v1/requisition/self",
-          "tags": [
-            "requisition-controller"
-          ],
-          "parameters": [
-            {
-              "name": "x-client-username",
-              "in": "header",
-              "description": "Username",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "x-client-ref",
-              "in": "header",
-              "description": "Comma-separated roles",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            }
-          ],
+          "tags": ["requisition-controller"],
+          "parameters": [],
           "source_spec": "API Documentation"
         }
       }
@@ -297,7 +140,7 @@
     {
       "id": "get_requisition_info_with_initiator",
       "name": "find_requisition_initiator_name_and_contact_info_by_requisition_no",
-      "description": "Find requisition initiator name and contact info by requisition no\n\nParameters:\n  - reqNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "description": "Find requisition initiator name and contact info by requisition no\n\nParameters:\n  - reqNo [query] (required)",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -310,37 +153,9 @@
         "_swagger_metadata": {
           "operation_id": "getRequisitionInfoWithInitiator",
           "path": "/api/v1/requisition/initiator-info",
-          "tags": [
-            "requisition-controller"
-          ],
+          "tags": ["requisition-controller"],
           "parameters": [
-            {
-              "name": "reqNo",
-              "in": "query",
-              "required": true,
-              "schema": {
-                "type": "string"
-              },
-              "example": "REQ20250010638"
-            },
-            {
-              "name": "x-client-username",
-              "in": "header",
-              "description": "Username",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "x-client-ref",
-              "in": "header",
-              "description": "Comma-separated roles",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            }
+            {"name": "reqNo", "in": "query", "required": true, "schema": {"type": "string"}, "example": "REQ20250010638"}
           ],
           "source_spec": "API Documentation"
         }
@@ -349,7 +164,7 @@
     {
       "id": "get_purchase_order_info",
       "name": "find_purchase_order_by_purchase_order_no",
-      "description": "Find purchase order by purchase order no\n\nParameters:\n  - purchaseOrderNo [query] (required)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "description": "Find purchase order by purchase order no\n\nParameters:\n  - purchaseOrderNo [query] (required)",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -362,37 +177,9 @@
         "_swagger_metadata": {
           "operation_id": "getPurchaseOrderInfo",
           "path": "/api/v1/purchase-order",
-          "tags": [
-            "purchase-order-controller"
-          ],
+          "tags": ["purchase-order-controller"],
           "parameters": [
-            {
-              "name": "purchaseOrderNo",
-              "in": "query",
-              "required": true,
-              "schema": {
-                "type": "string"
-              },
-              "example": "BPD/2025/FO-5109"
-            },
-            {
-              "name": "x-client-username",
-              "in": "header",
-              "description": "Username",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "x-client-ref",
-              "in": "header",
-              "description": "Comma-separated roles",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            }
+            {"name": "purchaseOrderNo", "in": "query", "required": true, "schema": {"type": "string"}, "example": "BPD/2025/FO-5109"}
           ],
           "source_spec": "API Documentation"
         }
@@ -401,7 +188,7 @@
     {
       "id": "get_self_purchase_order_info",
       "name": "find_lastest_max_10_purchase_order_of_self",
-      "description": "Find lastest(max 10) Purchase Order of self\n\nParameters:\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "description": "Find lastest(max 10) Purchase Order of self",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -414,29 +201,8 @@
         "_swagger_metadata": {
           "operation_id": "getSelfPurchaseOrderInfo",
           "path": "/api/v1/purchase-order/self",
-          "tags": [
-            "purchase-order-controller"
-          ],
-          "parameters": [
-            {
-              "name": "x-client-username",
-              "in": "header",
-              "description": "Username",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "x-client-ref",
-              "in": "header",
-              "description": "Comma-separated roles",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            }
-          ],
+          "tags": ["purchase-order-controller"],
+          "parameters": [],
           "source_spec": "API Documentation"
         }
       }
@@ -444,7 +210,7 @@
     {
       "id": "get_all_framework_agreement_no_by_item",
       "name": "find_lastest_max_10_framework_agreement_by_item_code_or_item_name",
-      "description": "Find lastest(max 10) Framework Agreement by item code or item name\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "description": "Find lastest(max 10) Framework Agreement by item code or item name\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -457,46 +223,10 @@
         "_swagger_metadata": {
           "operation_id": "getAllFrameworkAgreementNoByItem",
           "path": "/api/v1/framework-agreement/item-wise",
-          "tags": [
-            "framework-agreement-controller"
-          ],
+          "tags": ["framework-agreement-controller"],
           "parameters": [
-            {
-              "name": "itemCode",
-              "in": "query",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "itemName",
-              "in": "query",
-              "required": false,
-              "schema": {
-                "type": "string",
-                "default": ""
-              },
-              "example": "Controller"
-            },
-            {
-              "name": "x-client-username",
-              "in": "header",
-              "description": "Username",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "x-client-ref",
-              "in": "header",
-              "description": "Comma-separated roles",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            }
+            {"name": "itemCode", "in": "query", "required": false, "schema": {"type": "string"}},
+            {"name": "itemName", "in": "query", "required": false, "schema": {"type": "string", "default": ""}, "example": "Controller"}
           ],
           "source_spec": "API Documentation"
         }
@@ -505,7 +235,7 @@
     {
       "id": "get_total_framework_agreement",
       "name": "total_active_framework_agreement",
-      "description": "Total active framework agreement\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "description": "Total active framework agreement count",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -518,47 +248,8 @@
         "_swagger_metadata": {
           "operation_id": "getTotalFrameworkAgreement",
           "path": "/api/v1/framework-agreement/count",
-          "tags": [
-            "framework-agreement-controller"
-          ],
-          "parameters": [
-            {
-              "name": "itemCode",
-              "in": "query",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "itemName",
-              "in": "query",
-              "required": false,
-              "schema": {
-                "type": "string",
-                "default": ""
-              },
-              "example": "Controller"
-            },
-            {
-              "name": "x-client-username",
-              "in": "header",
-              "description": "Username",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "x-client-ref",
-              "in": "header",
-              "description": "Comma-separated roles",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            }
-          ],
+          "tags": ["framework-agreement-controller"],
+          "parameters": [],
           "source_spec": "API Documentation"
         }
       }
@@ -566,7 +257,7 @@
     {
       "id": "get_framework_agreement_with_brand_by_item",
       "name": "find_lastest_max_10_framework_agreement_with_brands_by_item_code_or_item_name",
-      "description": "Find lastest(max 10) Framework Agreement with brands by item code or item name\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)\n  - x-client-username [header] (optional): Username\n  - x-client-ref [header] (optional): Comma-separated roles",
+      "description": "Find lastest(max 10) Framework Agreement with brands by item code or item name\n\nParameters:\n  - itemCode [query] (optional)\n  - itemName [query] (optional)",
       "entrypoint": "src.tools.api_tool_executor:execute_api_tool",
       "enabled": true,
       "settings": {
@@ -579,46 +270,10 @@
         "_swagger_metadata": {
           "operation_id": "getFrameworkAgreementWithBrandByItem",
           "path": "/api/v1/framework-agreement/brand-info",
-          "tags": [
-            "framework-agreement-controller"
-          ],
+          "tags": ["framework-agreement-controller"],
           "parameters": [
-            {
-              "name": "itemCode",
-              "in": "query",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "itemName",
-              "in": "query",
-              "required": false,
-              "schema": {
-                "type": "string",
-                "default": ""
-              },
-              "example": "Controller"
-            },
-            {
-              "name": "x-client-username",
-              "in": "header",
-              "description": "Username",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            },
-            {
-              "name": "x-client-ref",
-              "in": "header",
-              "description": "Comma-separated roles",
-              "required": false,
-              "schema": {
-                "type": "string"
-              }
-            }
+            {"name": "itemCode", "in": "query", "required": false, "schema": {"type": "string"}},
+            {"name": "itemName", "in": "query", "required": false, "schema": {"type": "string", "default": ""}, "example": "Controller"}
           ],
           "source_spec": "API Documentation"
         }

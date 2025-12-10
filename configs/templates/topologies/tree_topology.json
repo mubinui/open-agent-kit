@@ -1,0 +1,185 @@
+{
+  "_comment": "Tree Topology Template - One root agent spawning multiple parallel branches",
+  "id": "tree_template",
+  "name": "Tree Topology Template",
+  "description": "A tree workflow where a coordinator agent spawns multiple parallel research agents, then aggregates results",
+  "version": "2.0",
+  "topology": {
+    "type": "tree",
+    "nodes": [
+      {
+        "id": "coordinator",
+        "agent_id": "reasoning_agent",
+        "description": "Coordinates research by breaking down the query into subtasks",
+        "input_transform": null,
+        "output_transform": ".research_plan",
+        "config_override": {
+          "llm_config": {
+            "temperature": 0.5,
+            "max_tokens": 1000
+          },
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["topics", "strategy"],
+                "properties": {
+                  "topics": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "strategy": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "researcher_1",
+        "agent_id": "knowledge_agent",
+        "description": "Researches first topic in parallel",
+        "input_transform": ".research_plan.topics[0]",
+        "output_transform": ".findings",
+        "config_override": {
+          "tools": ["rag_query", "web_search"]
+        }
+      },
+      {
+        "id": "researcher_2",
+        "agent_id": "knowledge_agent",
+        "description": "Researches second topic in parallel",
+        "input_transform": ".research_plan.topics[1]",
+        "output_transform": ".findings",
+        "config_override": {
+          "tools": ["rag_query", "web_search"]
+        }
+      },
+      {
+        "id": "researcher_3",
+        "agent_id": "knowledge_agent",
+        "description": "Researches third topic in parallel",
+        "input_transform": ".research_plan.topics[2]",
+        "output_transform": ".findings",
+        "config_override": {
+          "tools": ["rag_query", "web_search"]
+        }
+      },
+      {
+        "id": "aggregator",
+        "agent_id": "response_agent",
+        "description": "Aggregates all research findings into comprehensive response",
+        "input_transform": null,
+        "output_transform": null,
+        "config_override": {
+          "llm_config": {
+            "temperature": 0.7,
+            "max_tokens": 2000
+          },
+          "system_message": "You are a synthesis agent. Combine multiple research findings into a coherent, comprehensive response. Identify common themes, resolve conflicts, and provide a balanced view."
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from_node": "coordinator",
+        "to_node": "researcher_1",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["research_plan.topics[0]", "research_plan.strategy"]
+        }
+      },
+      {
+        "from_node": "coordinator",
+        "to_node": "researcher_2",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["research_plan.topics[1]", "research_plan.strategy"]
+        }
+      },
+      {
+        "from_node": "coordinator",
+        "to_node": "researcher_3",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["research_plan.topics[2]", "research_plan.strategy"]
+        }
+      },
+      {
+        "from_node": "researcher_1",
+        "to_node": "aggregator",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {
+          "include_system_messages": false
+        }
+      },
+      {
+        "from_node": "researcher_2",
+        "to_node": "aggregator",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {
+          "include_system_messages": false
+        }
+      },
+      {
+        "from_node": "researcher_3",
+        "to_node": "aggregator",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {
+          "include_system_messages": false
+        }
+      }
+    ],
+    "entry_node": "coordinator",
+    "termination_conditions": [
+      {
+        "type": "agent_completion",
+        "agent_id": "aggregator"
+      }
+    ]
+  },
+  "execution_strategy": "parallel",
+  "strategy_config": {
+    "max_concurrent": 3,
+    "wait_for_all": true,
+    "timeout_per_agent": 180,
+    "parallel_branches": ["researcher_1", "researcher_2", "researcher_3"]
+  },
+  "cache_config": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 7200
+    },
+    "agent_result": {
+      "enabled": true,
+      "ttl": 3600
+    }
+  },
+  "resource_limits": {
+    "max_concurrent_executions": 2,
+    "max_execution_time": 600,
+    "max_agent_calls": 20,
+    "max_context_size": 100000
+  },
+  "retry_strategy": {
+    "max_retries": 3,
+    "backoff_type": "exponential",
+    "backoff_factor": 2.0,
+    "initial_delay": 2.0,
+    "retry_on": ["timeout", "rate_limit", "temporary_failure"]
+  },
+  "metadata": {
+    "use_case": "parallel_research",
+    "complexity": "medium",
+    "estimated_duration": "60-120s",
+    "parallelization": "high"
+  },
+  "enabled": true
+}

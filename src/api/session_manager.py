@@ -11,12 +11,16 @@ from src.config.registries import get_prompt_registry, get_provider_registry
 from src.config.settings import get_settings
 from src.config.tool_registry import get_tool_registry
 from src.config.workflow_models import ConversationPattern, WorkflowConfig
+from src.config.topology_models import TopologyType
 from src.config.workflow_registry import get_workflow_registry, WorkflowRegistry
+from src.config.execution_models import ExecutionConfig
 from src.factory.agent_factory import AgentFactory
 from src.memory.inmemory import InMemoryConversationStore
 from src.memory.models import ConversationState, MessageRole
 from src.memory.store import ConversationStore
 from src.patterns.conversation_engine import ConversationPatternEngine
+from src.patterns.execution_engine import ExecutionEngine, ExecutionStatus
+from src.patterns.topology_engine import WorkflowGraph
 
 logger = get_logger(__name__)
 
@@ -37,6 +41,7 @@ class SessionManager:
         conversation_store: Optional[ConversationStore] = None,
         agent_factory: Optional[AgentFactory] = None,
         workflow_registry: Optional[WorkflowRegistry] = None,
+        execution_engine: Optional[ExecutionEngine] = None,
     ) -> None:
         """
         Initialize the session manager.
@@ -45,6 +50,7 @@ class SessionManager:
             conversation_store: Store for persisting conversation state (default store, can be overridden per workflow)
             agent_factory: Factory for creating agents
             workflow_registry: Registry for workflow configurations
+            execution_engine: Optional execution engine for topology-based workflows
         """
         self.default_conversation_store = conversation_store or InMemoryConversationStore()
         self._custom_store_provided = conversation_store is not None
@@ -64,6 +70,16 @@ class SessionManager:
         self.agent_factory = agent_factory
         self.workflow_registry = workflow_registry or get_workflow_registry()
         self.pattern_engine = ConversationPatternEngine()
+        
+        # Initialize execution engine for topology-based workflows
+        if execution_engine is None:
+            # Create default execution config from settings
+            execution_config = ExecutionConfig()
+            execution_engine = ExecutionEngine(
+                config=execution_config,
+                agent_factory=agent_factory,
+            )
+        self.execution_engine = execution_engine
         
         # Cache for active sessions and their agents
         self._session_agents: Dict[UUID, Dict[str, ConversableAgent]] = {}
@@ -576,7 +592,7 @@ class SessionManager:
         max_turns: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
-        Execute a workflow based on its pattern.
+        Execute a workflow based on its pattern or topology.
 
         Args:
             session_id: Session identifier
@@ -591,6 +607,13 @@ class SessionManager:
         Raises:
             ValueError: If workflow execution fails
         """
+        # Check if workflow has topology configuration (new execution engine)
+        if hasattr(workflow, 'topology') and workflow.topology is not None:
+            return await self._execute_topology_workflow(
+                session_id, workflow, message, max_turns
+            )
+        
+        # Fall back to pattern-based execution (legacy)
         pattern = workflow.pattern
 
         if pattern == ConversationPattern.TWO_AGENT:
@@ -609,8 +632,97 @@ class SessionManager:
             return await self._execute_nested_workflow(
                 workflow, agents, message, max_turns
             )
+        elif pattern == ConversationPattern.SELECTOR:
+            return await self._execute_selector_workflow(
+                workflow, agents, message, max_turns
+            )
         else:
             raise ValueError(f"Unsupported conversation pattern: {pattern}")
+
+    async def _execute_topology_workflow(
+        self,
+        session_id: UUID,
+        workflow: WorkflowConfig,
+        message: str,
+        max_turns: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Execute a workflow using the topology-based execution engine.
+        
+        Args:
+            session_id: Session identifier
+            workflow: Workflow configuration with topology
+            message: User message
+            max_turns: Optional override for max turns
+            
+        Returns:
+            Dictionary containing response and metadata
+            
+        Raises:
+            ValueError: If workflow execution fails
+        """
+        # Ensure execution engine is started
+        if not self.execution_engine._started:
+            await self.execution_engine.start()
+        
+        # Create workflow graph from topology configuration
+        workflow_graph = WorkflowGraph(workflow.topology)
+        
+        # Build context from session metadata
+        context = {
+            "workflow_id": workflow.id,
+            "session_id": str(session_id),
+            "max_turns": max_turns,
+        }
+        
+        # Execute workflow using execution engine
+        result = await self.execution_engine.execute_workflow(
+            workflow_id=workflow.id,
+            session_id=session_id,
+            message=message,
+            context=context,
+            workflow_graph=workflow_graph,
+            timeout=workflow.topology.resource_limits.max_execution_time if hasattr(workflow.topology, 'resource_limits') else None,
+        )
+        
+        # Convert ExecutionResult to response format
+        response_dict = {
+            "response": result.final_response,
+            "status": result.status.value,
+            "execution_time": result.execution_time,
+            "agent_results": {
+                node_id: {
+                    "agent_id": agent_result.agent_id,
+                    "status": agent_result.status.value,
+                    "output": agent_result.output,
+                    "execution_time": agent_result.execution_time,
+                    "cache_hit": agent_result.cache_hit,
+                    "error": agent_result.error,
+                }
+                for node_id, agent_result in result.agent_results.items()
+            },
+            "pattern": "topology",
+            "topology_type": workflow.topology.type.value,
+            "metadata": result.metadata,
+        }
+        
+        # Add error details if execution failed
+        if result.status in [ExecutionStatus.FAILURE, ExecutionStatus.TIMEOUT]:
+            response_dict["error"] = {
+                "type": result.status.value,
+                "message": result.final_response,
+                "agent_errors": [
+                    {
+                        "node_id": node_id,
+                        "agent_id": agent_result.agent_id,
+                        "error": agent_result.error,
+                    }
+                    for node_id, agent_result in result.agent_results.items()
+                    if agent_result.error
+                ],
+            }
+        
+        return response_dict
 
     async def _execute_two_agent_workflow(
         self,
@@ -882,6 +994,289 @@ class SessionManager:
             "pattern": "nested",
             "metadata": {},
         }
+
+    async def _execute_selector_workflow(
+        self,
+        workflow: WorkflowConfig,
+        agents: Dict[str, ConversableAgent],
+        message: str,
+        max_turns: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Execute a selector (router) workflow.
+        
+        The selector pattern uses a routing agent to analyze user intent
+        and route queries to specialized domain agents.
+        
+        Flow:
+        1. Send message to selector agent to get routing decision
+        2. Parse the JSON routing decision
+        3. Route to the appropriate domain agent
+        4. Return the domain agent's response
+        
+        Args:
+            workflow: Workflow configuration with selector_config
+            agents: Dictionary of agent instances
+            message: User message
+            max_turns: Optional override for max turns
+            
+        Returns:
+            Dictionary containing response and metadata
+        """
+        import json
+        import re
+        
+        if not workflow.selector_config:
+            raise ValueError("Selector workflow missing selector_config")
+        
+        selector_config = workflow.selector_config
+        routing_agents = selector_config.routing_agents
+        default_agent_id = selector_config.default_agent
+        
+        # Get the selector agent
+        selector_agent = agents.get(workflow.entry_agent_id)
+        if selector_agent is None:
+            raise ValueError(f"Selector agent not found: {workflow.entry_agent_id}")
+        
+        logger.info(
+            "Executing selector workflow",
+            selector_agent=workflow.entry_agent_id,
+            routing_agents=list(routing_agents.keys()),
+        )
+        
+        # Step 1: Get routing decision from selector agent
+        # Create a user proxy to interact with the selector
+        from autogen.agentchat import ConversableAgent as AutogenAgent
+        
+        user_proxy = AutogenAgent(
+            name="UserProxy",
+            llm_config=False,
+            human_input_mode="NEVER",
+            max_consecutive_auto_reply=0,
+        )
+        
+        # Execute chat with selector to get routing decision
+        turns = max_turns if max_turns is not None else 2
+        
+        selector_result = self.pattern_engine.execute_two_agent_chat(
+            sender=user_proxy,
+            recipient=selector_agent,
+            message=message,
+            max_turns=turns,
+            summary_method="last_msg",
+        )
+        
+        # Extract selector's response - look for the selector agent's response (not user message)
+        selector_response = ""
+        if hasattr(selector_result, 'chat_history') and selector_result.chat_history:
+            # Log chat history for debugging
+            logger.debug(
+                "Selector chat history",
+                history_count=len(selector_result.chat_history),
+                messages=[
+                    {"name": m.get("name"), "role": m.get("role"), "content_preview": m.get("content", "")[:100]}
+                    for m in selector_result.chat_history[:5]
+                ]
+            )
+            
+            # Find the selector agent's response (skip user messages)
+            for msg in selector_result.chat_history:
+                msg_name = msg.get('name', '')
+                msg_role = msg.get('role', '')
+                content = msg.get('content', '')
+                
+                # Skip user/proxy messages
+                if msg_name == 'UserProxy' or msg_role == 'user':
+                    continue
+                
+                # Look for selector agent's response
+                if (msg_name == selector_agent.name or msg_role == 'assistant') and content:
+                    # Check if content looks like JSON (routing decision)
+                    if '{' in content and 'domain' in content:
+                        selector_response = content
+                        break
+                    # Otherwise keep looking but save this as fallback
+                    if not selector_response:
+                        selector_response = content
+        
+        # Fallback to summary if no response found
+        if not selector_response:
+            selector_response = getattr(selector_result, 'summary', '') or ''
+        
+        logger.debug(
+            "Selector response received",
+            response_preview=selector_response[:200] if selector_response else "EMPTY",
+        )
+        
+        # Step 2: Parse routing decision
+        routing_decision = self._parse_selector_routing_decision(selector_response)
+        
+        if not routing_decision:
+            logger.warning(
+                "Could not parse routing decision, using default agent",
+                selector_response=selector_response[:200],
+            )
+            routing_decision = {"domain": "general", "intent": "general_query"}
+        
+        # Check if clarification is needed
+        if routing_decision.get('requires_clarification'):
+            clarification_prompt = routing_decision.get('clarification_prompt', selector_response)
+            return {
+                "response": clarification_prompt,
+                "cost": getattr(selector_result, 'cost', {}),
+                "pattern": "selector",
+                "routing_decision": routing_decision,
+                "metadata": {"requires_clarification": True},
+            }
+        
+        # Step 3: Route to domain agent
+        domain = routing_decision.get('domain', 'general')
+        target_agent_id = routing_agents.get(domain, default_agent_id)
+        
+        logger.info(
+            "Routing to domain agent",
+            domain=domain,
+            target_agent=target_agent_id,
+            intent=routing_decision.get('intent'),
+        )
+        
+        target_agent = agents.get(target_agent_id)
+        if target_agent is None:
+            logger.warning(
+                "Target agent not found, using selector response",
+                target_agent_id=target_agent_id,
+            )
+            return {
+                "response": selector_response,
+                "cost": getattr(selector_result, 'cost', {}),
+                "pattern": "selector",
+                "routing_decision": routing_decision,
+                "metadata": {"agent_not_found": target_agent_id},
+            }
+        
+        # Step 4: Execute domain agent
+        # Create a new user proxy for the domain agent interaction
+        domain_user_proxy = AutogenAgent(
+            name="UserProxy",
+            llm_config=False,
+            human_input_mode="NEVER",
+            max_consecutive_auto_reply=10,
+        )
+        
+        # Register tools for the domain agent if it has any
+        from src.config.loader import load_agents_config
+        agents_config = load_agents_config()
+        target_agent_config = agents_config.get_agent(target_agent_id)
+        
+        if target_agent_config and target_agent_config.tools:
+            tool_registry = self.agent_factory.tool_registry
+            if tool_registry:
+                for tool_id in target_agent_config.tools:
+                    try:
+                        tool_registry.register_tool_with_agents(
+                            tool_id=tool_id,
+                            caller=target_agent,
+                            executor=domain_user_proxy,
+                        )
+                        logger.debug(
+                            "Registered tool for selector workflow",
+                            tool_id=tool_id,
+                            caller=target_agent.name,
+                            executor=domain_user_proxy.name,
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to register tool",
+                            tool_id=tool_id,
+                            error=str(e),
+                        )
+        
+        # Execute chat with domain agent
+        domain_turns = max_turns if max_turns is not None else workflow.max_turns
+        
+        domain_result = self.pattern_engine.execute_two_agent_chat(
+            sender=domain_user_proxy,
+            recipient=target_agent,
+            message=message,
+            max_turns=domain_turns,
+            summary_method=workflow.summary_method.value,
+        )
+        
+        # Extract domain agent's response
+        response_text = self._extract_response_from_chat_result(domain_result, target_agent)
+        
+        # Combine costs
+        total_cost = {}
+        for cost_dict in [getattr(selector_result, 'cost', {}), getattr(domain_result, 'cost', {})]:
+            if isinstance(cost_dict, dict):
+                for key, value in cost_dict.items():
+                    if isinstance(value, (int, float)):
+                        total_cost[key] = total_cost.get(key, 0) + value
+        
+        return {
+            "response": response_text,
+            "cost": total_cost,
+            "pattern": "selector",
+            "routing_decision": routing_decision,
+            "routed_to": target_agent_id,
+            "metadata": {
+                "domain": domain,
+                "intent": routing_decision.get('intent'),
+            },
+        }
+
+    def _parse_selector_routing_decision(self, response: str) -> Optional[Dict[str, Any]]:
+        """
+        Parse routing decision from selector agent response.
+        
+        Args:
+            response: Selector agent's response (should contain JSON)
+            
+        Returns:
+            Parsed routing decision dict or None
+        """
+        import json
+        import re
+        
+        if not response:
+            return None
+        
+        # Try direct JSON parse
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            pass
+        
+        # Try to find JSON object in the response
+        # Match the outermost JSON object
+        json_patterns = [
+            r'\{[^{}]*"domain"[^{}]*\}',  # Simple object with domain
+            r'\{.*?"domain".*?\}',  # More permissive
+            r'```json\s*(\{.*?\})\s*```',  # JSON in code block
+            r'```\s*(\{.*?\})\s*```',  # JSON in generic code block
+        ]
+        
+        for pattern in json_patterns:
+            match = re.search(pattern, response, re.DOTALL)
+            if match:
+                try:
+                    json_str = match.group(1) if match.lastindex else match.group()
+                    return json.loads(json_str)
+                except (json.JSONDecodeError, IndexError):
+                    continue
+        
+        # Try to find any JSON-like structure
+        try:
+            # Find the first { and last }
+            start = response.find('{')
+            end = response.rfind('}')
+            if start != -1 and end != -1 and end > start:
+                json_str = response[start:end + 1]
+                return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
+        
+        return None
 
     def _extract_response_from_chat_result(
         self,

@@ -1,0 +1,108 @@
+{
+  "_comment": "Sequential Topology Template - Linear chain of agents executing in order",
+  "id": "sequential_template",
+  "name": "Sequential Workflow Template",
+  "description": "A simple sequential workflow where agents execute one after another in strict order",
+  "version": "2.0",
+  "topology": {
+    "type": "sequential",
+    "nodes": [
+      {
+        "id": "analyzer",
+        "agent_id": "reasoning_agent",
+        "description": "Analyzes user input and determines requirements",
+        "input_transform": null,
+        "output_transform": ".analysis",
+        "config_override": {
+          "llm_config": {
+            "temperature": 0.3
+          }
+        }
+      },
+      {
+        "id": "processor",
+        "agent_id": "knowledge_agent",
+        "description": "Processes the analysis and retrieves relevant information",
+        "input_transform": ".analysis",
+        "output_transform": ".knowledge",
+        "config_override": null
+      },
+      {
+        "id": "synthesizer",
+        "agent_id": "response_agent",
+        "description": "Synthesizes final response from processed information",
+        "input_transform": ".knowledge",
+        "output_transform": null,
+        "config_override": {
+          "llm_config": {
+            "temperature": 0.7,
+            "max_tokens": 1500
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from_node": "analyzer",
+        "to_node": "processor",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["analysis", "metadata.confidence"]
+        }
+      },
+      {
+        "from_node": "processor",
+        "to_node": "synthesizer",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {
+          "include_system_messages": false,
+          "include_tool_calls": true
+        }
+      }
+    ],
+    "entry_node": "analyzer",
+    "termination_conditions": [
+      {
+        "type": "max_iterations",
+        "value": 1
+      },
+      {
+        "type": "agent_completion",
+        "agent_id": "synthesizer"
+      }
+    ]
+  },
+  "execution_strategy": "sequential",
+  "strategy_config": {
+    "wait_for_completion": true,
+    "fail_fast": true,
+    "preserve_order": true
+  },
+  "cache_config": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 3600
+    }
+  },
+  "resource_limits": {
+    "max_concurrent_executions": 3,
+    "max_execution_time": 300,
+    "max_agent_calls": 10,
+    "max_context_size": 50000
+  },
+  "retry_strategy": {
+    "max_retries": 2,
+    "backoff_type": "exponential",
+    "backoff_factor": 2.0,
+    "initial_delay": 1.0,
+    "retry_on": ["timeout", "rate_limit"]
+  },
+  "metadata": {
+    "use_case": "sequential_processing",
+    "complexity": "simple",
+    "estimated_duration": "30-60s"
+  },
+  "enabled": true
+}

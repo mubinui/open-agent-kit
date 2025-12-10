@@ -37,253 +37,7 @@
       "workflow_type": "sequential",
       "persistence": "mongo_only",
       "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z",
-      "steps": null,
-      "group_chat": null,
-      "nodes": null,
-      "connections": null
-    },
-    {
-      "id": "sequential_research",
-      "name": "Sequential Research Workflow",
-      "description": "Multi-step research workflow: reasoning -> knowledge retrieval -> response generation",
-      "pattern": "sequential",
-      "entry_agent_id": "reasoning_agent",
-      "enabled": true,
-      "steps": [
-        {
-          "sender_id": "reasoning_agent",
-          "recipient_id": "user_proxy",
-          "message": "Analyze the user's query and determine the information needed",
-          "max_turns": 3,
-          "summary_method": "last_msg",
-          "carryover": false,
-          "clear_history": false
-        },
-        {
-          "sender_id": "knowledge_agent",
-          "recipient_id": "user_proxy",
-          "max_turns": 5,
-          "summary_method": "reflection_with_llm",
-          "carryover": true,
-          "clear_history": false
-        },
-        {
-          "sender_id": "response_agent",
-          "recipient_id": "user_proxy",
-          "message": "Generate a comprehensive response based on the retrieved knowledge",
-          "max_turns": 3,
-          "summary_method": "last_msg",
-          "carryover": true,
-          "clear_history": false
-        }
-      ],
-      "metadata": {
-        "use_case": "research_and_analysis",
-        "complexity": "medium"
-      },
-      "workflow_type": "sequential",
-      "persistence": "mongo_only",
-      "version": 1,
       "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "group_brainstorm",
-      "name": "Group Brainstorming",
-      "description": "Multiple agents collaborate to brainstorm ideas and solutions",
-      "pattern": "group_chat",
-      "entry_agent_id": "facilitator",
-      "enabled": true,
-      "group_chat": {
-        "agents": [
-          "facilitator",
-          "creative_agent",
-          "analytical_agent",
-          "critic_agent"
-        ],
-        "max_round": 15,
-        "speaker_selection_method": "auto",
-        "allowed_transitions": null,
-        "speaker_transitions_type": null,
-        "send_introductions": true,
-        "admin_name": "BrainstormManager",
-        "select_speaker_message_template": null,
-        "select_speaker_auto_verbose": false
-      },
-      "metadata": {
-        "use_case": "creative_problem_solving",
-        "complexity": "high"
-      },
-      "workflow_type": "tree",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "constrained_group_chat",
-      "name": "Constrained Group Discussion",
-      "description": "Group chat with controlled speaker transitions for structured discussions",
-      "pattern": "group_chat",
-      "entry_agent_id": "moderator",
-      "enabled": true,
-      "group_chat": {
-        "agents": [
-          "moderator",
-          "expert_1",
-          "expert_2",
-          "summarizer"
-        ],
-        "max_round": 20,
-        "speaker_selection_method": "auto",
-        "allowed_transitions": {
-          "moderator": [
-            "expert_1",
-            "expert_2",
-            "summarizer"
-          ],
-          "expert_1": [
-            "expert_2",
-            "moderator"
-          ],
-          "expert_2": [
-            "expert_1",
-            "moderator"
-          ],
-          "summarizer": [
-            "moderator"
-          ]
-        },
-        "speaker_transitions_type": "allowed",
-        "send_introductions": false,
-        "admin_name": "DiscussionManager",
-        "select_speaker_message_template": null,
-        "select_speaker_auto_verbose": false
-      },
-      "metadata": {
-        "use_case": "structured_discussion",
-        "complexity": "high"
-      },
-      "workflow_type": "tree",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "round_robin_review",
-      "name": "Round Robin Code Review",
-      "description": "Agents take turns reviewing code in a predictable order",
-      "pattern": "group_chat",
-      "entry_agent_id": "code_author",
-      "enabled": true,
-      "group_chat": {
-        "agents": [
-          "code_author",
-          "security_reviewer",
-          "performance_reviewer",
-          "style_reviewer"
-        ],
-        "max_round": 12,
-        "speaker_selection_method": "round_robin",
-        "allowed_transitions": null,
-        "speaker_transitions_type": null,
-        "send_introductions": true,
-        "admin_name": "ReviewManager",
-        "select_speaker_message_template": null,
-        "select_speaker_auto_verbose": false
-      },
-      "metadata": {
-        "use_case": "code_review",
-        "complexity": "medium"
-      },
-      "workflow_type": "sequential",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "nested_research_assistant",
-      "name": "Research Assistant with Nested Verification",
-      "description": "Assistant that triggers nested fact-checking conversations when needed",
-      "pattern": "nested",
-      "entry_agent_id": "research_assistant",
-      "enabled": false,
-      "nested_chats": [
-        {
-          "trigger_agent_id": "research_assistant",
-          "nested_chats": [
-            {
-              "recipient": "fact_checker",
-              "message": "Verify the accuracy of the following information",
-              "max_turns": 3,
-              "summary_method": "last_msg"
-            },
-            {
-              "recipient": "source_validator",
-              "message": "Validate the credibility of sources",
-              "max_turns": 2,
-              "summary_method": "last_msg"
-            }
-          ],
-          "trigger_condition": "fact check",
-          "position": 2
-        }
-      ],
-      "metadata": {
-        "use_case": "research_with_verification",
-        "complexity": "high",
-        "note": "Disabled by default - requires proper nested chat setup"
-      },
-      "workflow_type": "custom",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "customer_support_chatbot",
-      "name": "Customer Support Chatbot",
-      "description": "A chatbot workflow for customer support with short-lived sessions",
-      "pattern": "sequential",
-      "entry_agent_id": "code_assistant",
-      "recipient_agent_id": "user_proxy",
-      "max_turns": 20,
-      "summary_method": "last_msg",
-      "enabled": true,
-      "metadata": {
-        "use_case": "customer_support",
-        "complexity": "simple",
-        "session_ttl": "24h"
-      },
-      "workflow_type": "chatbot",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z",
-      "steps": null,
-      "group_chat": null,
-      "nodes": null,
-      "connections": null
-    },
-    {
-      "id": "python_coder_pro",
-      "name": "SanzarAgent",
-      "description": "This is sanzar agent",
-      "pattern": "two_agent",
-      "entry_agent_id": "user_proxy",
-      "recipient_agent_id": "python_coder",
-      "max_turns": 10,
-      "summary_method": "last_msg",
-      "enabled": true,
-      "metadata": {
-        "use_case": "python_coding",
-        "complexity": "simple"
-      },
-      "workflow_type": "sequential",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-11-26T00:00:00Z",
-      "steps": null,
-      "group_chat": null,
-      "nodes": null,
-      "connections": null
     },
     {
       "id": "rag_qa_assistant",
@@ -298,56 +52,6 @@
       "metadata": {
         "use_case": "knowledge_base_qa",
         "complexity": "simple",
-        "vector_db": "qdrant",
-        "collection": "knowledge_base"
-      },
-      "workflow_type": "sequential",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z",
-      "steps": null,
-      "group_chat": null,
-      "nodes": null,
-      "connections": null
-    },
-    {
-      "id": "rag_research_workflow",
-      "name": "RAG Research Workflow",
-      "description": "Multi-step research workflow using RAG with Qdrant: reasoning -> RAG retrieval -> response generation",
-      "pattern": "sequential",
-      "entry_agent_id": "reasoning_agent",
-      "enabled": true,
-      "steps": [
-        {
-          "sender_id": "reasoning_agent",
-          "recipient_id": "user_proxy",
-          "message": "Analyze the user's query and determine what information is needed from the knowledge base",
-          "max_turns": 3,
-          "summary_method": "last_msg",
-          "carryover": false,
-          "clear_history": false
-        },
-        {
-          "sender_id": "rag_knowledge_agent",
-          "recipient_id": "user_proxy",
-          "max_turns": 5,
-          "summary_method": "reflection_with_llm",
-          "carryover": true,
-          "clear_history": false
-        },
-        {
-          "sender_id": "response_agent",
-          "recipient_id": "user_proxy",
-          "message": "Generate a comprehensive, well-structured response using the retrieved context",
-          "max_turns": 3,
-          "summary_method": "last_msg",
-          "carryover": true,
-          "clear_history": false
-        }
-      ],
-      "metadata": {
-        "use_case": "research_and_analysis",
-        "complexity": "medium",
         "vector_db": "qdrant",
         "collection": "knowledge_base"
       },
@@ -374,11 +78,34 @@
       "workflow_type": "sequential",
       "persistence": "mongo_only",
       "version": 1,
-      "last_updated": "2024-12-08T00:00:00Z",
-      "steps": null,
-      "group_chat": null,
-      "nodes": null,
-      "connections": null
+      "last_updated": "2024-12-08T00:00:00Z"
+    },
+    {
+      "id": "procurement_chatbot",
+      "name": "Procurement Chatbot",
+      "description": "Multi-agent chatbot for procurement queries. Routes to specialized agents for requisitions, purchase orders, and framework agreements.",
+      "pattern": "selector",
+      "entry_agent_id": "selector_agent",
+      "max_turns": 10,
+      "summary_method": "last_msg",
+      "enabled": true,
+      "selector_config": {
+        "routing_agents": {
+          "requisition": "requisition_domain_agent",
+          "purchase_order": "purchase_order_agent",
+          "framework_agreement": "framework_agreement_agent"
+        },
+        "default_agent": "selector_agent",
+        "max_routing_attempts": 3
+      },
+      "metadata": {
+        "use_case": "procurement",
+        "complexity": "medium"
+      },
+      "workflow_type": "chatbot",
+      "persistence": "mongo_only",
+      "version": 1,
+      "last_updated": "2024-12-10T00:00:00Z"
     }
   ]
 }

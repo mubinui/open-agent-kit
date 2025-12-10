@@ -1,0 +1,150 @@
+{
+  "_comment": "Minimal Agent Configuration - Bare minimum required fields",
+  "id": "minimal_assistant",
+  "type": "conversable",
+  "name": "MinimalAssistant",
+  "system_message": "You are a helpful AI assistant. Answer questions clearly and concisely.",
+  "llm_config": {
+    "provider_id": "openrouter",
+    "model": "openai/gpt-oss-20b",
+    "temperature": 0.7
+  },
+  "human_input_mode": "NEVER",
+  "code_execution_config": false,
+  "tools": [],
+  "max_consecutive_auto_reply": 10,
+  "description": "Minimal agent configuration with only required fields",
+  "version": 1,
+  "notes": [
+    "This is the absolute minimum configuration required for an agent",
+    "All optional fields use system defaults",
+    "No behavior constraints or validation",
+    "No cache overrides",
+    "No resource limits beyond defaults"
+  ],
+  "required_fields": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the agent",
+      "example": "minimal_assistant"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["conversable", "retrieve_user_proxy"],
+      "description": "Agent type",
+      "example": "conversable"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name for the agent",
+      "example": "MinimalAssistant"
+    },
+    "system_message": {
+      "type": "string",
+      "description": "System prompt defining agent behavior",
+      "example": "You are a helpful AI assistant."
+    },
+    "llm_config": {
+      "type": "object",
+      "required": ["provider_id", "model"],
+      "description": "LLM configuration",
+      "example": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b"
+      }
+    }
+  },
+  "optional_fields": {
+    "temperature": {
+      "type": "number",
+      "default": 0.7,
+      "range": [0.0, 2.0],
+      "description": "Sampling temperature"
+    },
+    "max_tokens": {
+      "type": "number",
+      "default": 1000,
+      "description": "Maximum response tokens"
+    },
+    "cache_seed": {
+      "type": "number",
+      "default": null,
+      "description": "Seed for response caching"
+    },
+    "timeout": {
+      "type": "number",
+      "default": 120,
+      "description": "Request timeout in seconds"
+    },
+    "human_input_mode": {
+      "type": "string",
+      "enum": ["NEVER", "TERMINATE", "ALWAYS"],
+      "default": "NEVER",
+      "description": "When to request human input"
+    },
+    "code_execution_config": {
+      "type": "boolean|object",
+      "default": false,
+      "description": "Code execution settings"
+    },
+    "tools": {
+      "type": "array",
+      "default": [],
+      "description": "List of tool IDs"
+    },
+    "max_consecutive_auto_reply": {
+      "type": "number",
+      "default": 10,
+      "description": "Max auto-replies before stopping"
+    },
+    "behavior": {
+      "type": "object",
+      "default": null,
+      "description": "Output format and validation rules"
+    },
+    "cache_override": {
+      "type": "object",
+      "default": null,
+      "description": "Agent-specific cache settings"
+    },
+    "resource_limits": {
+      "type": "object",
+      "default": null,
+      "description": "Agent-specific resource limits"
+    }
+  },
+  "expansion_examples": {
+    "add_tools": {
+      "tools": ["calculator", "web_search"],
+      "description": "Add tools for the agent to use"
+    },
+    "add_behavior": {
+      "behavior": {
+        "output_format": {
+          "type": "json"
+        }
+      },
+      "description": "Add output format constraints"
+    },
+    "add_cache": {
+      "cache_override": {
+        "llm_response": {
+          "ttl": 3600
+        }
+      },
+      "description": "Override cache settings"
+    },
+    "add_limits": {
+      "resource_limits": {
+        "timeout": 60,
+        "max_retries": 3
+      },
+      "description": "Add resource limits"
+    }
+  },
+  "metadata": {
+    "use_case": "simple_assistant",
+    "complexity": "minimal",
+    "configuration_level": "basic"
+  }
+}

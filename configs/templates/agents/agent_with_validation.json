@@ -1,0 +1,101 @@
+{
+  "_comment": "Agent with Output Validation - Demonstrates comprehensive output validation configuration",
+  "id": "validated_code_generator",
+  "type": "conversable",
+  "name": "ValidatedCodeGenerator",
+  "system_message": "You are a code generator that produces Python code. Always return valid, well-formatted Python code with proper error handling.",
+  "llm_config": {
+    "provider_id": "openrouter",
+    "model": "openai/gpt-oss-20b",
+    "temperature": 0.3,
+    "max_tokens": 2000,
+    "cache_seed": 42,
+    "timeout": 120
+  },
+  "human_input_mode": "NEVER",
+  "code_execution_config": false,
+  "tools": [],
+  "max_consecutive_auto_reply": 10,
+  "behavior": {
+    "output_format": {
+      "type": "code",
+      "language": "python",
+      "include_explanation": true,
+      "format_template": "```python\n{code}\n```\n\n**Explanation:**\n{explanation}",
+      "validation": {
+        "syntax_check": true,
+        "style_check": false,
+        "security_scan": true
+      }
+    },
+    "constraints": {
+      "max_output_length": 5000,
+      "min_output_length": 50,
+      "forbidden_patterns": [
+        "eval\\(",
+        "exec\\(",
+        "import os",
+        "__import__",
+        "compile\\("
+      ],
+      "required_patterns": [
+        "^```python"
+      ],
+      "timeout": 120
+    },
+    "validation": {
+      "syntax_check": true,
+      "security_scan": true,
+      "custom_validators": [
+        "check_imports",
+        "verify_error_handling",
+        "check_docstrings"
+      ],
+      "on_validation_failure": "retry",
+      "max_validation_retries": 2
+    }
+  },
+  "description": "Code generator with comprehensive output validation",
+  "version": 1,
+  "validation_rules": {
+    "syntax_check": {
+      "description": "Validate Python syntax using ast.parse",
+      "enabled": true,
+      "error_message": "Generated code has syntax errors"
+    },
+    "security_scan": {
+      "description": "Scan for dangerous patterns and imports",
+      "enabled": true,
+      "forbidden_imports": ["os", "subprocess", "sys"],
+      "forbidden_functions": ["eval", "exec", "compile", "__import__"],
+      "error_message": "Generated code contains security violations"
+    },
+    "check_imports": {
+      "description": "Verify all imports are from allowed list",
+      "allowed_imports": ["math", "datetime", "json", "re", "typing"],
+      "error_message": "Code uses disallowed imports"
+    },
+    "verify_error_handling": {
+      "description": "Ensure code has proper try-except blocks",
+      "require_error_handling": true,
+      "error_message": "Code lacks proper error handling"
+    },
+    "check_docstrings": {
+      "description": "Verify functions have docstrings",
+      "require_docstrings": true,
+      "error_message": "Functions missing docstrings"
+    }
+  },
+  "output_examples": {
+    "valid_output": "```python\ndef calculate_sum(numbers: list) -> int:\n    \"\"\"Calculate sum of numbers.\"\"\"\n    try:\n        return sum(numbers)\n    except TypeError:\n        return 0\n```\n\n**Explanation:**\nThis function safely calculates the sum of a list of numbers with error handling.",
+    "invalid_output_1": "eval('1+1')",
+    "invalid_reason_1": "Contains forbidden pattern 'eval('",
+    "invalid_output_2": "import os\nos.system('ls')",
+    "invalid_reason_2": "Contains forbidden import 'os'"
+  },
+  "metadata": {
+    "use_case": "safe_code_generation",
+    "security_level": "high",
+    "validation_strictness": "strict"
+  }
+}

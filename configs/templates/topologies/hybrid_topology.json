@@ -1,0 +1,176 @@
+{
+  "_comment": "Hybrid Topology Template - Mix of sequential and parallel execution",
+  "id": "hybrid_template",
+  "name": "Hybrid Topology Template",
+  "description": "A hybrid workflow that combines sequential and parallel execution, automatically optimizing based on dependencies",
+  "version": "2.0",
+  "topology": {
+    "type": "hybrid",
+    "nodes": [
+      {
+        "id": "planner",
+        "agent_id": "reasoning_agent",
+        "description": "Plans the execution strategy",
+        "input_transform": null,
+        "output_transform": ".plan",
+        "config_override": null
+      },
+      {
+        "id": "data_collector_1",
+        "agent_id": "knowledge_agent",
+        "description": "Collects data from source 1 (parallel)",
+        "input_transform": ".plan.sources[0]",
+        "output_transform": ".data",
+        "config_override": null
+      },
+      {
+        "id": "data_collector_2",
+        "agent_id": "knowledge_agent",
+        "description": "Collects data from source 2 (parallel)",
+        "input_transform": ".plan.sources[1]",
+        "output_transform": ".data",
+        "config_override": null
+      },
+      {
+        "id": "validator",
+        "agent_id": "reasoning_agent",
+        "description": "Validates collected data (sequential after collection)",
+        "input_transform": null,
+        "output_transform": ".validation",
+        "config_override": null
+      },
+      {
+        "id": "processor_1",
+        "agent_id": "response_agent",
+        "description": "Processes validated data (parallel)",
+        "input_transform": ".validation.data[0]",
+        "output_transform": ".processed",
+        "config_override": null
+      },
+      {
+        "id": "processor_2",
+        "agent_id": "response_agent",
+        "description": "Processes validated data (parallel)",
+        "input_transform": ".validation.data[1]",
+        "output_transform": ".processed",
+        "config_override": null
+      },
+      {
+        "id": "synthesizer",
+        "agent_id": "response_agent",
+        "description": "Synthesizes final result (sequential after processing)",
+        "input_transform": null,
+        "output_transform": null,
+        "config_override": null
+      }
+    ],
+    "edges": [
+      {
+        "from_node": "planner",
+        "to_node": "data_collector_1",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["plan.sources[0]"]
+        }
+      },
+      {
+        "from_node": "planner",
+        "to_node": "data_collector_2",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["plan.sources[1]"]
+        }
+      },
+      {
+        "from_node": "data_collector_1",
+        "to_node": "validator",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "data_collector_2",
+        "to_node": "validator",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "validator",
+        "to_node": "processor_1",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["validation.data[0]"]
+        }
+      },
+      {
+        "from_node": "validator",
+        "to_node": "processor_2",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["validation.data[1]"]
+        }
+      },
+      {
+        "from_node": "processor_1",
+        "to_node": "synthesizer",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "processor_2",
+        "to_node": "synthesizer",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      }
+    ],
+    "entry_node": "planner",
+    "termination_conditions": [
+      {
+        "type": "agent_completion",
+        "agent_id": "synthesizer"
+      }
+    ]
+  },
+  "execution_strategy": "hybrid",
+  "strategy_config": {
+    "max_concurrent": 4,
+    "dependency_resolution": "automatic",
+    "optimization_level": "balanced",
+    "parallel_stages": [
+      ["data_collector_1", "data_collector_2"],
+      ["processor_1", "processor_2"]
+    ]
+  },
+  "cache_config": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 3600
+    }
+  },
+  "resource_limits": {
+    "max_concurrent_executions": 3,
+    "max_execution_time": 400,
+    "max_agent_calls": 15,
+    "max_context_size": 80000
+  },
+  "retry_strategy": {
+    "max_retries": 2,
+    "backoff_type": "exponential",
+    "backoff_factor": 2.0,
+    "initial_delay": 1.0,
+    "retry_on": ["timeout", "rate_limit"]
+  },
+  "metadata": {
+    "use_case": "optimized_workflow",
+    "complexity": "medium",
+    "estimated_duration": "60-90s"
+  },
+  "enabled": true
+}

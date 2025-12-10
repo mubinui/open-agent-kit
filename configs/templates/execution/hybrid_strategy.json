@@ -1,0 +1,158 @@
+{
+  "_comment": "Hybrid Execution Strategy - Automatically parallelize independent branches while respecting dependencies",
+  "execution_strategy": "hybrid",
+  "strategy_config": {
+    "max_concurrent": 10,
+    "dependency_resolution": "automatic",
+    "optimization_level": "balanced",
+    "timeout_per_agent": 180,
+    "cycle_detection": true,
+    "max_cycle_iterations": 5,
+    "adaptive_concurrency": true
+  },
+  "description": "Hybrid execution automatically analyzes the workflow graph and parallelizes independent branches while maintaining dependencies.",
+  "use_cases": [
+    "Complex real-world workflows",
+    "Workflows with mixed dependencies",
+    "Production systems requiring optimization",
+    "Workflows where manual optimization is difficult"
+  ],
+  "advantages": [
+    "Automatic optimization",
+    "Balances latency and resource usage",
+    "Handles complex dependencies",
+    "Adapts to workflow structure"
+  ],
+  "disadvantages": [
+    "More complex implementation",
+    "Harder to predict exact execution order",
+    "Requires dependency analysis overhead",
+    "May not be optimal for all cases"
+  ],
+  "configuration_options": {
+    "max_concurrent": {
+      "type": "number",
+      "default": 10,
+      "description": "Maximum number of agents to run concurrently across all stages"
+    },
+    "dependency_resolution": {
+      "type": "string",
+      "enum": ["automatic", "manual"],
+      "default": "automatic",
+      "description": "How to resolve agent dependencies (automatic = analyze graph, manual = use specified stages)"
+    },
+    "optimization_level": {
+      "type": "string",
+      "enum": ["latency", "balanced", "resource"],
+      "default": "balanced",
+      "description": "Optimization goal: latency (max parallelism), balanced (moderate), resource (conservative)"
+    },
+    "timeout_per_agent": {
+      "type": "number",
+      "default": 180,
+      "description": "Timeout in seconds for each agent execution"
+    },
+    "cycle_detection": {
+      "type": "boolean",
+      "default": true,
+      "description": "Detect and handle cycles in the workflow graph"
+    },
+    "max_cycle_iterations": {
+      "type": "number",
+      "default": 5,
+      "description": "Maximum iterations for cyclic workflows"
+    },
+    "adaptive_concurrency": {
+      "type": "boolean",
+      "default": true,
+      "description": "Dynamically adjust concurrency based on system load"
+    }
+  },
+  "optimization_levels": {
+    "latency": {
+      "description": "Maximize parallelism to minimize total execution time",
+      "max_concurrent": "unlimited",
+      "resource_usage": "high",
+      "use_when": "Low latency is critical and resources are abundant"
+    },
+    "balanced": {
+      "description": "Balance between latency and resource usage",
+      "max_concurrent": "moderate",
+      "resource_usage": "medium",
+      "use_when": "General purpose workflows in production"
+    },
+    "resource": {
+      "description": "Minimize resource usage, accept higher latency",
+      "max_concurrent": "limited",
+      "resource_usage": "low",
+      "use_when": "Resource-constrained environments or cost optimization"
+    }
+  },
+  "example_workflow": {
+    "topology": {
+      "nodes": ["planner", "collector_1", "collector_2", "validator", "processor_1", "processor_2", "synthesizer"],
+      "edges": [
+        {"from": "planner", "to": "collector_1"},
+        {"from": "planner", "to": "collector_2"},
+        {"from": "collector_1", "to": "validator"},
+        {"from": "collector_2", "to": "validator"},
+        {"from": "validator", "to": "processor_1"},
+        {"from": "validator", "to": "processor_2"},
+        {"from": "processor_1", "to": "synthesizer"},
+        {"from": "processor_2", "to": "synthesizer"}
+      ]
+    },
+    "automatic_stages": [
+      {
+        "stage": 1,
+        "agents": ["planner"],
+        "parallel": false,
+        "reason": "Entry node"
+      },
+      {
+        "stage": 2,
+        "agents": ["collector_1", "collector_2"],
+        "parallel": true,
+        "reason": "Independent branches from planner"
+      },
+      {
+        "stage": 3,
+        "agents": ["validator"],
+        "parallel": false,
+        "reason": "Depends on both collectors"
+      },
+      {
+        "stage": 4,
+        "agents": ["processor_1", "processor_2"],
+        "parallel": true,
+        "reason": "Independent branches from validator"
+      },
+      {
+        "stage": 5,
+        "agents": ["synthesizer"],
+        "parallel": false,
+        "reason": "Depends on both processors"
+      }
+    ],
+    "total_time": "time(planner) + max(time(collector_1), time(collector_2)) + time(validator) + max(time(processor_1), time(processor_2)) + time(synthesizer)"
+  },
+  "dependency_analysis": {
+    "description": "The hybrid strategy performs topological sort to identify execution stages",
+    "algorithm": "Modified Kahn's algorithm with parallel stage detection",
+    "steps": [
+      "1. Build dependency graph from edges",
+      "2. Identify nodes with no dependencies (stage 1)",
+      "3. For each stage, identify nodes whose dependencies are satisfied",
+      "4. Group independent nodes into parallel execution stages",
+      "5. Repeat until all nodes are scheduled"
+    ]
+  },
+  "best_practices": [
+    "Let the system auto-detect dependencies (use automatic mode)",
+    "Set max_concurrent based on available resources",
+    "Use 'balanced' optimization for most workflows",
+    "Monitor execution to identify bottlenecks",
+    "Add explicit dependencies if auto-detection is incorrect",
+    "Use cycle detection for workflows with feedback loops"
+  ]
+}

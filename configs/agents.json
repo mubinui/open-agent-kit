@@ -2,142 +2,6 @@
   "version": "1.0",
   "agents": [
     {
-      "id": "reasoning_agent",
-      "type": "conversable",
-      "name": "ReasoningAgent",
-      "system_message": "You are a reasoning agent that analyzes user intent and creates execution plans.\n\nYour responsibilities:\n1. Detect the user's intent from their message\n2. Determine if knowledge retrieval is needed\n3. Create a clear plan for how to respond\n\nRespond in JSON format with:\n{\n    \"intent\": \"information_request|assistance_request|greeting|general_query\",\n    \"requires_knowledge\": true|false,\n    \"plan\": \"Brief description of how to handle this request\"\n}",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
-        "temperature": 0.7,
-        "max_tokens": 500,
-        "cache_seed": 42,
-        "timeout": 120
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": [],
-      "max_consecutive_auto_reply": 10,
-      "description": "Analyzes user intent and creates execution plans",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z",
-      "retrieve_config": null
-    },
-    {
-      "id": "knowledge_agent",
-      "type": "conversable",
-      "name": "KnowledgeAgent",
-      "system_message": "You are a knowledge retrieval agent. Use the rag_query tool to search the knowledge base and retrieve relevant information to answer questions. Always cite the sources you find.",
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "max_consecutive_auto_reply": 5,
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
-        "temperature": 0.3,
-        "max_tokens": 2000,
-        "timeout": 120
-      },
-      "tools": [
-        "rag_query",
-        "rag_list_files"
-      ],
-      "description": "Retrieves relevant information from knowledge base using RAG pipeline",
-      "version": 2,
-      "last_updated": "2024-12-07T00:00:00Z",
-      "retrieve_config": null
-    },
-    {
-      "id": "response_agent",
-      "type": "conversable",
-      "name": "ResponseAgent",
-      "system_message": "You are a helpful AI assistant that generates clear, accurate, and friendly responses to user queries. Use the provided context and conversation history to craft appropriate responses.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
-        "temperature": 0.7,
-        "max_tokens": 1000,
-        "cache_seed": 42,
-        "timeout": 120
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": [],
-      "max_consecutive_auto_reply": 10,
-      "description": "Generates final user-facing responses",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "code_assistant",
-      "type": "conversable",
-      "name": "CodeAssistant",
-      "system_message": "You are a code assistant that helps users write, debug, and understand code. You can execute Python code to demonstrate concepts.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
-        "temperature": 0.3,
-        "max_tokens": 2000,
-        "cache_seed": 42,
-        "timeout": 180
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": {
-        "work_dir": "coding",
-        "use_docker": false
-      },
-      "tools": [
-        "calculator"
-      ],
-      "max_consecutive_auto_reply": 15,
-      "description": "Assists with coding tasks and can execute code",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "test_agent",
-      "type": "conversable",
-      "name": "TestAgent",
-      "system_message": "You are a test agent",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
-        "temperature": 0.7
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": [],
-      "max_consecutive_auto_reply": 10,
-      "retrieve_config": null,
-      "description": null,
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "search_assistant",
-      "type": "conversable",
-      "name": "SearchAssistant",
-      "system_message": "You are a helpful search assistant that can search the web for current information. When a user asks a question, use the web_search tool to find relevant information and provide a clear, concise answer based on the search results. Always cite your sources and be honest if you cannot find the information.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
-        "temperature": 0.7,
-        "max_tokens": 1500,
-        "cache_seed": 42,
-        "timeout": 120
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": [
-        "web_search"
-      ],
-      "max_consecutive_auto_reply": 5,
-      "description": "An assistant that searches the web to answer questions",
-      "version": 1,
-      "last_updated": "2024-11-26T00:00:00Z",
-      "retrieve_config": null
-    },
-    {
       "id": "user_proxy",
       "type": "conversable",
       "name": "UserProxy",
@@ -158,10 +22,9 @@
       "system_message": "You are a helpful AI assistant. Answer questions clearly and concisely.",
       "llm_config": {
         "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "model": "openai/gpt-oss-20b",
         "temperature": 0.7,
         "max_tokens": 1000,
-        "cache_seed": 42,
         "timeout": 120
       },
       "human_input_mode": "NEVER",
@@ -173,171 +36,50 @@
       "last_updated": "2024-11-26T00:00:00Z"
     },
     {
-      "id": "python_coder",
+      "id": "search_assistant",
       "type": "conversable",
-      "name": "DeveloperPyMax",
-      "system_message": "You Are A python Programmer . You will just return python snippet.",
+      "name": "SearchAssistant",
+      "system_message": "You are a helpful search assistant that can search the web for current information. When a user asks a question, use the web_search tool to find relevant information and provide a clear, concise answer based on the search results. Always cite your sources and be honest if you cannot find the information.",
       "llm_config": {
         "provider_id": "openrouter",
         "model": "openai/gpt-oss-20b",
         "temperature": 0.7,
-        "max_tokens": 1000,
-        "timeout": 120,
-        "cache_seed": 42
+        "max_tokens": 1500,
+        "timeout": 120
       },
       "human_input_mode": "NEVER",
       "code_execution_config": false,
-      "tools": [
-        "web_search"
-      ],
-      "max_consecutive_auto_reply": 10,
-      "retrieve_config": null,
-      "description": null
-    },
-    {
-      "id": "facilitator",
-      "type": "conversable",
-      "name": "Facilitator",
-      "system_message": "You are a facilitator agent that guides brainstorming sessions. Your role is to introduce topics, keep discussions on track, summarize key points, and ensure all participants contribute. Be encouraging and help synthesize ideas from different perspectives.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
-        "temperature": 0.7,
-        "max_tokens": 1000,
-        "timeout": 120,
-        "cache_seed": 42
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": [],
-      "max_consecutive_auto_reply": 10,
-      "description": "Facilitates and guides brainstorming sessions",
+      "tools": ["web_search"],
+      "max_consecutive_auto_reply": 5,
+      "description": "An assistant that searches the web to answer questions",
       "version": 1,
-      "last_updated": "2024-11-27T00:00:00Z",
-      "retrieve_config": null
+      "last_updated": "2024-11-26T00:00:00Z"
     },
     {
-      "id": "creative_agent",
-      "type": "conversable",
-      "name": "CreativeAgent",
-      "system_message": "You are a creative agent that generates innovative and unconventional ideas. Think outside the box, propose novel solutions, and don't be afraid to suggest bold or unusual approaches. Your goal is to expand the solution space with creative possibilities.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
-        "temperature": 0.9,
-        "max_tokens": 1000,
-        "timeout": 120,
-        "cache_seed": 42
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": [],
-      "max_consecutive_auto_reply": 10,
-      "description": "Generates creative and innovative ideas",
-      "version": 1,
-      "last_updated": "2024-11-27T00:00:00Z"
-    },
-    {
-      "id": "analytical_agent",
-      "type": "conversable",
-      "name": "AnalyticalAgent",
-      "system_message": "You are an analytical agent that evaluates ideas based on logic, feasibility, and data. Assess proposals for their practical implementation, identify potential challenges, and provide structured analysis. Focus on facts, metrics, and evidence-based reasoning.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
-        "temperature": 0.5,
-        "max_tokens": 1000,
-        "timeout": 120,
-        "cache_seed": 42
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": [],
-      "max_consecutive_auto_reply": 10,
-      "description": "Provides analytical evaluation of ideas",
-      "version": 1,
-      "last_updated": "2024-11-27T00:00:00Z"
-    },
-    {
-      "id": "critic_agent",
-      "type": "conversable",
-      "name": "CriticAgent",
-      "system_message": "You are a critic agent that provides constructive criticism and identifies weaknesses in proposals. Point out potential flaws, risks, and areas for improvement. Be respectful but thorough in your critique to help strengthen ideas before implementation.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
-        "temperature": 0.6,
-        "max_tokens": 1000,
-        "timeout": 120,
-        "cache_seed": 42
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": [],
-      "max_consecutive_auto_reply": 10,
-      "description": "Provides constructive criticism to strengthen ideas",
-      "version": 1,
-      "last_updated": "2024-11-27T00:00:00Z"
-    },
-    {
-      "_comment": "RAG Assistant - Requires: 1) QDRANT_URL (vector DB), 2) RAG_PIPELINE_BASE_URL (http://10.42.65.199:8000 - remote service), 3) RAG_PIPELINE_ENABLED=true. See docs/RAG_SETUP.md",
       "id": "rag_assistant",
       "type": "conversable",
       "name": "RAGAssistant",
       "system_message": "You are a helpful AI assistant with access to a knowledge base through RAG (Retrieval-Augmented Generation). When users ask questions, you can search the knowledge base to find relevant information and provide accurate, contextual answers. Use the rag_query tool to retrieve relevant documents before answering questions.",
       "llm_config": {
         "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b@preset/procurement-automation",
+        "model": "openai/gpt-oss-20b",
         "temperature": 0.7,
         "max_tokens": 1500,
-        "timeout": 120,
-        "cache_seed": 42
+        "timeout": 120
       },
       "human_input_mode": "NEVER",
       "code_execution_config": false,
-      "tools": [
-        "rag_query",
-        "rag_list_files",
-        "rag_get_stats"
-      ],
+      "tools": ["rag_query", "rag_list_files", "rag_get_stats"],
       "max_consecutive_auto_reply": 10,
       "description": "RAG-enabled assistant with knowledge base access via Qdrant",
       "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z",
-      "retrieve_config": null
+      "last_updated": "2024-12-03T00:00:00Z"
     },
     {
-      "_comment": "RAG Knowledge Agent - Uses remote RAG Pipeline service for retrieval. Set RAG_PIPELINE_BASE_URL env var.",
-      "id": "rag_knowledge_agent",
-      "type": "conversable",
-      "name": "RAGKnowledgeAgent",
-      "system_message": "You are a RAG-powered knowledge agent. Use the rag_query tool to search the knowledge base collection and retrieve relevant documents. Summarize and cite the information you find.",
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "max_consecutive_auto_reply": 5,
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
-        "temperature": 0.3,
-        "max_tokens": 2000,
-        "timeout": 120
-      },
-      "tools": [
-        "rag_query",
-        "rag_list_files",
-        "rag_get_stats"
-      ],
-      "description": "Retrieves information from RAG pipeline service",
-      "version": 2,
-      "last_updated": "2024-12-07T00:00:00Z",
-      "retrieve_config": null
-    },
-    {
-      "_comment": "Requisition Agent - Queries the Requisition API service for procurement data",
       "id": "requisition_agent",
       "type": "conversable",
       "name": "RequisitionAgent",
-      "system_message": "You are a requisition assistant that helps users query and understand procurement requisitions. Use the get_requisition tool to fetch requisition details by requisition number. When users ask about a specific requisition, extract the requisition number (format: REQ followed by numbers, e.g., REQ20250010638) and use the tool to fetch details. Present the information clearly and answer any follow-up questions about the requisition data. It can also find the Total framework agreement count by calling Total Active framework Aggrement tool ",
+      "system_message": "You are a requisition assistant that helps users query and understand procurement requisitions. Use the get_requisition_info tool to fetch requisition details by requisition number. When users ask about a specific requisition, extract the requisition number (format: REQ followed by numbers, e.g., REQ20250010638) and use the tool to fetch details. Present the information clearly and answer any follow-up questions about the requisition data.",
       "human_input_mode": "NEVER",
       "code_execution_config": false,
       "max_consecutive_auto_reply": 5,
@@ -348,14 +90,95 @@
         "max_tokens": 2000,
         "timeout": 120
       },
-      "tools": [
-        "get_requisition",
-        "search_requisitions"
-      ],
+      "tools": ["get_requisition_info", "get_self_requisition_info"],
       "description": "Queries requisition data from the Requisition API",
       "version": 1,
-      "last_updated": "2024-12-08T00:00:00Z",
-      "retrieve_config": null
+      "last_updated": "2024-12-08T00:00:00Z"
+    },
+    {
+      "_comment": "Selector Agent - Routes queries to specialized domain agents",
+      "id": "selector_agent",
+      "type": "conversable",
+      "name": "SelectorAgent",
+      "system_message": "You are a procurement assistant router. Your job is to analyze user queries and determine which specialized agent should handle them.\n\nAnalyze the user's query and classify it into one of these domains:\n- requisition: Questions about requisitions, PR status, requisition numbers (REQ...), initiator info, latest requisitions\n- purchase_order: Questions about purchase orders, PO status, PO numbers, order approval, latest POs\n- framework_agreement: Questions about framework agreements (FA), item availability under FA, active FA count, brands, specifications, MOQ\n- general: General questions not related to procurement\n\nRespond ONLY with a JSON object in this exact format:\n{\n  \"domain\": \"requisition|purchase_order|framework_agreement|general\",\n  \"intent\": \"check_status|show_latest|get_initiator|get_details|check_availability|get_count|get_brands|get_specs|get_moq|is_approved|general_query\",\n  \"parameters\": {\"requisition_no\": \"REQ...\", \"po_no\": \"...\", \"item_code\": \"...\", \"item_name\": \"...\"},\n  \"requires_clarification\": false,\n  \"clarification_prompt\": null\n}\n\nIf a required parameter is missing (e.g., requisition number for status check), set requires_clarification to true and provide a clarification_prompt.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b",
+        "temperature": 0.3,
+        "max_tokens": 500,
+        "timeout": 120
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 3,
+      "description": "Routes procurement queries to specialized domain agents",
+      "is_selector": true,
+      "version": 1,
+      "last_updated": "2024-12-10T00:00:00Z"
+    },
+    {
+      "_comment": "Requisition Domain Agent - Handles all requisition-related queries",
+      "id": "requisition_domain_agent",
+      "type": "conversable",
+      "name": "RequisitionDomainAgent",
+      "system_message": "You are a requisition specialist assistant. You help users with all requisition-related queries.\n\nYou have access to these tools:\n- find_requisition_by_requisition_no: Get details of a specific requisition by its number (REQ...)\n- find_latest_max_10_requisitions_of_myself: Get the user's latest requisitions (up to 10)\n- find_requisition_initiator_name_and_contact_info_by_requisition_no: Get initiator contact details for a requisition\n\nWhen responding:\n1. If the user asks about a specific requisition, use find_requisition_by_requisition_no with the reqNo parameter\n2. If the user asks to see their latest requisitions, use find_latest_max_10_requisitions_of_myself\n3. If the user asks about the initiator/creator of a requisition, use find_requisition_initiator_name_and_contact_info_by_requisition_no\n4. Present results in a clear, natural language format\n5. If no data is found, inform the user politely\n\nAlways extract the requisition number from the user's query if present (format: REQ followed by numbers).",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b",
+        "temperature": 0.3,
+        "max_tokens": 2000,
+        "timeout": 120
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": ["get_requisition_info", "get_self_requisition_info", "get_requisition_info_with_initiator"],
+      "max_consecutive_auto_reply": 5,
+      "description": "Handles requisition queries including status, details, and initiator info",
+      "version": 1,
+      "last_updated": "2024-12-10T00:00:00Z"
+    },
+    {
+      "_comment": "Purchase Order Agent - Handles all PO-related queries",
+      "id": "purchase_order_agent",
+      "type": "conversable",
+      "name": "PurchaseOrderAgent",
+      "system_message": "You are a purchase order specialist assistant. You help users with all purchase order-related queries.\n\nYou have access to these tools:\n- find_purchase_order_by_purchase_order_no: Get details of a specific purchase order by its number\n- find_lastest_max_10_purchase_order_of_self: Get the user's latest purchase orders (up to 10)\n\nWhen responding:\n1. If the user asks about a specific PO, use find_purchase_order_by_purchase_order_no with the purchaseOrderNo parameter\n2. If the user asks to see their latest POs, use find_lastest_max_10_purchase_order_of_self\n3. If the user asks 'Is my order approved?', check the status field and respond with yes/no\n4. Present results in a clear, natural language format including: PO number, status, total amount, supplier name, date\n5. If no data is found, inform the user politely",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b",
+        "temperature": 0.3,
+        "max_tokens": 2000,
+        "timeout": 120
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": ["get_purchase_order_info", "get_self_purchase_order_info"],
+      "max_consecutive_auto_reply": 5,
+      "description": "Handles purchase order queries including status and order details",
+      "version": 1,
+      "last_updated": "2024-12-10T00:00:00Z"
+    },
+    {
+      "_comment": "Framework Agreement Agent - Handles all FA-related queries",
+      "id": "framework_agreement_agent",
+      "type": "conversable",
+      "name": "FrameworkAgreementAgent",
+      "system_message": "You are a framework agreement specialist assistant. You help users with all framework agreement-related queries.\n\nYou have access to these tools:\n- find_lastest_max_10_framework_agreement_by_item_code_or_item_name: Find FAs for a specific item\n- total_active_framework_agreement: Get the count of active framework agreements\n- find_lastest_max_10_framework_agreement_with_brands_by_item_code_or_item_name: Get FA details with brand and specification info\n\nWhen responding:\n1. If the user asks if an item is under FA, use find_lastest_max_10_framework_agreement_by_item_code_or_item_name\n2. If the user asks how many FAs are active, use total_active_framework_agreement\n3. If the user asks about brands or specifications, use find_lastest_max_10_framework_agreement_with_brands_by_item_code_or_item_name\n4. If the user asks about MOQ (minimum order quantity), use find_lastest_max_10_framework_agreement_by_item_code_or_item_name and extract the minimumOrderQuantity field\n5. Present results including: FA number, item name, item code, agreement end date, MOQ, specifications\n6. If no FA exists for an item, clearly state 'No framework agreement is available for this item'",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-oss-20b",
+        "temperature": 0.3,
+        "max_tokens": 2000,
+        "timeout": 120
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": ["get_all_framework_agreement_no_by_item", "get_total_framework_agreement", "get_framework_agreement_with_brand_by_item"],
+      "max_consecutive_auto_reply": 5,
+      "description": "Handles framework agreement queries including availability, brands, and specifications",
+      "version": 1,
+      "last_updated": "2024-12-10T00:00:00Z"
     }
   ]
 }

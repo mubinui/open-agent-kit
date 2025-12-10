@@ -72,6 +72,16 @@ class TelemetryConfig(BaseSettings):
     enable_telemetry: bool = Field(default=True, alias="ENABLE_TELEMETRY")
     enable_metrics: bool = Field(default=True, alias="ENABLE_METRICS")
     prometheus_port: int = Field(default=9090, alias="PROMETHEUS_PORT")
+    
+    # Debug mode configuration
+    debug_mode: bool = Field(default=False, alias="DEBUG_MODE")
+    log_llm_prompts: bool = Field(default=False, alias="LOG_LLM_PROMPTS")
+    log_llm_responses: bool = Field(default=False, alias="LOG_LLM_RESPONSES")
+    log_agent_state: bool = Field(default=False, alias="LOG_AGENT_STATE")
+    
+    # Tracing configuration
+    enable_tracing: bool = Field(default=True, alias="ENABLE_TRACING")
+    trace_sampling_rate: float = Field(default=1.0, alias="TRACE_SAMPLING_RATE")
 
 
 class SecurityConfig(BaseSettings):

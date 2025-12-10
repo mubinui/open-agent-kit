@@ -1,0 +1,308 @@
+{
+  "_comment": "Complete Customer Support Workflow - Graph topology with routing and escalation",
+  "id": "complete_customer_support",
+  "name": "Intelligent Customer Support Workflow",
+  "description": "A complete customer support workflow with intelligent routing, knowledge base lookup, and escalation paths",
+  "version": "2.0",
+  "topology": {
+    "type": "graph",
+    "nodes": [
+      {
+        "id": "intake_classifier",
+        "agent_id": "reasoning_agent",
+        "description": "Classifies customer inquiry and determines routing",
+        "input_transform": null,
+        "output_transform": ".classification",
+        "config_override": {
+          "system_message": "You are a customer support classifier. Analyze the customer's message and classify it into: 'simple_faq', 'technical_issue', 'billing_question', or 'complex_issue'. Also extract urgency level. Return JSON.",
+          "llm_config": {
+            "temperature": 0.2,
+            "max_tokens": 500
+          },
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["category", "urgency", "keywords"],
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "enum": ["simple_faq", "technical_issue", "billing_question", "complex_issue"]
+                  },
+                  "urgency": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "critical"]
+                  },
+                  "keywords": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "faq_handler",
+        "agent_id": "knowledge_agent",
+        "description": "Handles simple FAQ questions",
+        "input_transform": null,
+        "output_transform": ".response",
+        "config_override": {
+          "system_message": "You are a FAQ assistant. Search the knowledge base for answers to common questions. Provide clear, concise answers with links to documentation.",
+          "tools": ["rag_query"],
+          "llm_config": {
+            "temperature": 0.3,
+            "max_tokens": 800
+          }
+        }
+      },
+      {
+        "id": "technical_support",
+        "agent_id": "code_assistant",
+        "description": "Handles technical issues",
+        "input_transform": null,
+        "output_transform": ".solution",
+        "config_override": {
+          "system_message": "You are a technical support specialist. Diagnose technical issues, provide step-by-step solutions, and suggest troubleshooting steps. Be clear and patient.",
+          "tools": ["rag_query", "web_search"],
+          "llm_config": {
+            "temperature": 0.4,
+            "max_tokens": 1500
+          }
+        }
+      },
+      {
+        "id": "billing_support",
+        "agent_id": "response_agent",
+        "description": "Handles billing questions",
+        "input_transform": null,
+        "output_transform": ".response",
+        "config_override": {
+          "system_message": "You are a billing support specialist. Answer questions about invoices, payments, subscriptions, and refunds. Be empathetic and clear about policies.",
+          "llm_config": {
+            "temperature": 0.3,
+            "max_tokens": 1000
+          }
+        }
+      },
+      {
+        "id": "satisfaction_checker",
+        "agent_id": "reasoning_agent",
+        "description": "Checks if customer is satisfied with response",
+        "input_transform": null,
+        "output_transform": ".satisfaction",
+        "config_override": {
+          "system_message": "You are a satisfaction checker. Analyze if the response adequately addresses the customer's issue. Return JSON with 'satisfied' boolean and 'reason' string.",
+          "llm_config": {
+            "temperature": 0.2,
+            "max_tokens": 300
+          },
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["satisfied", "reason"],
+                "properties": {
+                  "satisfied": {"type": "boolean"},
+                  "reason": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "escalation_handler",
+        "agent_id": "response_agent",
+        "description": "Handles escalated complex issues",
+        "input_transform": null,
+        "output_transform": ".escalation",
+        "config_override": {
+          "system_message": "You are a senior support specialist. Handle complex issues that require escalation. Provide detailed analysis, gather necessary information, and create escalation tickets. Be thorough and professional.",
+          "llm_config": {
+            "temperature": 0.4,
+            "max_tokens": 2000
+          }
+        }
+      },
+      {
+        "id": "response_formatter",
+        "agent_id": "response_agent",
+        "description": "Formats final response to customer",
+        "input_transform": null,
+        "output_transform": null,
+        "config_override": {
+          "system_message": "You are a customer communication specialist. Format the support response in a friendly, professional manner. Include: greeting, solution/answer, next steps, and closing. Use markdown formatting.",
+          "llm_config": {
+            "temperature": 0.6,
+            "max_tokens": 1200
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from_node": "intake_classifier",
+        "to_node": "faq_handler",
+        "condition": ".classification.category == \"simple_faq\"",
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["classification.keywords"]
+        }
+      },
+      {
+        "from_node": "intake_classifier",
+        "to_node": "technical_support",
+        "condition": ".classification.category == \"technical_issue\"",
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "intake_classifier",
+        "to_node": "billing_support",
+        "condition": ".classification.category == \"billing_question\"",
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "intake_classifier",
+        "to_node": "escalation_handler",
+        "condition": ".classification.category == \"complex_issue\" or .classification.urgency == \"critical\"",
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "faq_handler",
+        "to_node": "satisfaction_checker",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "technical_support",
+        "to_node": "satisfaction_checker",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "billing_support",
+        "to_node": "satisfaction_checker",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "satisfaction_checker",
+        "to_node": "response_formatter",
+        "condition": ".satisfaction.satisfied == true",
+        "context_strategy": "full",
+        "context_config": {}
+      },
+      {
+        "from_node": "satisfaction_checker",
+        "to_node": "escalation_handler",
+        "condition": ".satisfaction.satisfied == false",
+        "context_strategy": "full",
+        "context_config": {
+          "include_feedback": true
+        },
+        "max_iterations": 1
+      },
+      {
+        "from_node": "escalation_handler",
+        "to_node": "response_formatter",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {}
+      }
+    ],
+    "entry_node": "intake_classifier",
+    "termination_conditions": [
+      {
+        "type": "agent_completion",
+        "agent_id": "response_formatter"
+      },
+      {
+        "type": "max_iterations",
+        "value": 5
+      },
+      {
+        "type": "timeout",
+        "value": 300
+      }
+    ]
+  },
+  "execution_strategy": "hybrid",
+  "strategy_config": {
+    "max_concurrent": 3,
+    "dependency_resolution": "automatic",
+    "optimization_level": "latency",
+    "cycle_detection": true,
+    "max_cycle_iterations": 2
+  },
+  "cache_config": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 1800
+    },
+    "agent_result": {
+      "enabled": false
+    }
+  },
+  "resource_limits": {
+    "max_concurrent_executions": 10,
+    "max_execution_time": 300,
+    "max_agent_calls": 20,
+    "max_context_size": 80000
+  },
+  "retry_strategy": {
+    "max_retries": 2,
+    "backoff_type": "fixed",
+    "delay": 2.0,
+    "retry_on": ["timeout", "rate_limit"]
+  },
+  "observability": {
+    "logging": {
+      "level": "INFO",
+      "include_customer_data": false,
+      "include_responses": true
+    },
+    "metrics": {
+      "track_resolution_time": true,
+      "track_escalation_rate": true,
+      "track_satisfaction_rate": true
+    }
+  },
+  "metadata": {
+    "use_case": "customer_support",
+    "complexity": "high",
+    "estimated_duration": "30-90s",
+    "features": ["intelligent_routing", "escalation", "satisfaction_check"]
+  },
+  "enabled": true,
+  "usage_examples": [
+    {
+      "scenario": "Simple FAQ",
+      "message": "How do I reset my password?",
+      "expected_route": "intake_classifier → faq_handler → satisfaction_checker → response_formatter",
+      "estimated_time": "15-30s"
+    },
+    {
+      "scenario": "Technical Issue",
+      "message": "My application keeps crashing when I try to upload files larger than 10MB",
+      "expected_route": "intake_classifier → technical_support → satisfaction_checker → response_formatter",
+      "estimated_time": "30-60s"
+    },
+    {
+      "scenario": "Complex Issue with Escalation",
+      "message": "I've been charged twice for my subscription and need an immediate refund",
+      "expected_route": "intake_classifier → escalation_handler → response_formatter",
+      "estimated_time": "45-90s"
+    }
+  ]
+}

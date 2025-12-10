@@ -1,0 +1,290 @@
+{
+  "_comment": "Complete Research Workflow Example - Demonstrates tree topology with parallel research",
+  "id": "complete_research_workflow",
+  "name": "Comprehensive Research Workflow",
+  "description": "A complete example of a research workflow using tree topology with parallel branches, quality control, and result aggregation",
+  "version": "2.0",
+  "topology": {
+    "type": "tree",
+    "nodes": [
+      {
+        "id": "query_analyzer",
+        "agent_id": "reasoning_agent",
+        "description": "Analyzes the research query and creates a research plan",
+        "input_transform": null,
+        "output_transform": ".research_plan",
+        "config_override": {
+          "system_message": "You are a research planner. Analyze the user's query and create a structured research plan with 3 specific research topics. Return JSON with 'topics' array and 'strategy' string.",
+          "llm_config": {
+            "temperature": 0.4,
+            "max_tokens": 800
+          },
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["topics", "strategy"],
+                "properties": {
+                  "topics": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "strategy": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "researcher_technical",
+        "agent_id": "knowledge_agent",
+        "description": "Researches technical aspects",
+        "input_transform": ".research_plan.topics[0]",
+        "output_transform": ".findings",
+        "config_override": {
+          "system_message": "You are a technical researcher. Use RAG and web search to find detailed technical information. Cite all sources.",
+          "tools": ["rag_query", "web_search"],
+          "llm_config": {
+            "temperature": 0.3,
+            "max_tokens": 1500
+          }
+        }
+      },
+      {
+        "id": "researcher_business",
+        "agent_id": "knowledge_agent",
+        "description": "Researches business and market aspects",
+        "input_transform": ".research_plan.topics[1]",
+        "output_transform": ".findings",
+        "config_override": {
+          "system_message": "You are a business researcher. Focus on market trends, business implications, and industry analysis. Cite sources.",
+          "tools": ["rag_query", "web_search"],
+          "llm_config": {
+            "temperature": 0.3,
+            "max_tokens": 1500
+          }
+        }
+      },
+      {
+        "id": "researcher_academic",
+        "agent_id": "knowledge_agent",
+        "description": "Researches academic and theoretical aspects",
+        "input_transform": ".research_plan.topics[2]",
+        "output_transform": ".findings",
+        "config_override": {
+          "system_message": "You are an academic researcher. Find scholarly sources, research papers, and theoretical frameworks. Cite all sources.",
+          "tools": ["rag_query"],
+          "llm_config": {
+            "temperature": 0.3,
+            "max_tokens": 1500
+          }
+        }
+      },
+      {
+        "id": "quality_validator",
+        "agent_id": "reasoning_agent",
+        "description": "Validates quality and completeness of research",
+        "input_transform": null,
+        "output_transform": ".validation",
+        "config_override": {
+          "system_message": "You are a research quality validator. Check if the research findings are comprehensive, well-cited, and answer the original query. Return JSON with 'approved' boolean and 'feedback' string.",
+          "llm_config": {
+            "temperature": 0.2,
+            "max_tokens": 500
+          },
+          "behavior": {
+            "output_format": {
+              "type": "json",
+              "schema": {
+                "type": "object",
+                "required": ["approved", "feedback", "completeness_score"],
+                "properties": {
+                  "approved": {"type": "boolean"},
+                  "feedback": {"type": "string"},
+                  "completeness_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "synthesizer",
+        "agent_id": "response_agent",
+        "description": "Synthesizes all research into comprehensive response",
+        "input_transform": null,
+        "output_transform": null,
+        "config_override": {
+          "system_message": "You are a research synthesizer. Combine findings from technical, business, and academic research into a comprehensive, well-structured response. Include an executive summary, detailed findings, and conclusions. Maintain all citations.",
+          "llm_config": {
+            "temperature": 0.6,
+            "max_tokens": 3000
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from_node": "query_analyzer",
+        "to_node": "researcher_technical",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["research_plan.topics[0]", "research_plan.strategy"]
+        }
+      },
+      {
+        "from_node": "query_analyzer",
+        "to_node": "researcher_business",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["research_plan.topics[1]", "research_plan.strategy"]
+        }
+      },
+      {
+        "from_node": "query_analyzer",
+        "to_node": "researcher_academic",
+        "condition": null,
+        "context_strategy": "selective",
+        "context_config": {
+          "fields": ["research_plan.topics[2]", "research_plan.strategy"]
+        }
+      },
+      {
+        "from_node": "researcher_technical",
+        "to_node": "quality_validator",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {
+          "include_system_messages": false,
+          "include_tool_calls": true
+        }
+      },
+      {
+        "from_node": "researcher_business",
+        "to_node": "quality_validator",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {
+          "include_system_messages": false,
+          "include_tool_calls": true
+        }
+      },
+      {
+        "from_node": "researcher_academic",
+        "to_node": "quality_validator",
+        "condition": null,
+        "context_strategy": "full",
+        "context_config": {
+          "include_system_messages": false,
+          "include_tool_calls": true
+        }
+      },
+      {
+        "from_node": "quality_validator",
+        "to_node": "synthesizer",
+        "condition": ".validation.approved == true",
+        "context_strategy": "full",
+        "context_config": {}
+      }
+    ],
+    "entry_node": "query_analyzer",
+    "termination_conditions": [
+      {
+        "type": "agent_completion",
+        "agent_id": "synthesizer"
+      },
+      {
+        "type": "max_iterations",
+        "value": 2
+      },
+      {
+        "type": "timeout",
+        "value": 600
+      }
+    ]
+  },
+  "execution_strategy": "hybrid",
+  "strategy_config": {
+    "max_concurrent": 3,
+    "dependency_resolution": "automatic",
+    "optimization_level": "balanced",
+    "parallel_branches": ["researcher_technical", "researcher_business", "researcher_academic"]
+  },
+  "cache_config": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 14400
+    },
+    "agent_result": {
+      "enabled": true,
+      "ttl": 7200
+    },
+    "embedding": {
+      "enabled": true,
+      "ttl": 86400
+    }
+  },
+  "resource_limits": {
+    "max_concurrent_executions": 2,
+    "max_execution_time": 600,
+    "max_agent_calls": 25,
+    "max_context_size": 150000
+  },
+  "retry_strategy": {
+    "max_retries": 3,
+    "backoff_type": "exponential",
+    "backoff_factor": 2.0,
+    "initial_delay": 2.0,
+    "max_delay": 60.0,
+    "retry_on": ["timeout", "rate_limit", "temporary_failure"]
+  },
+  "observability": {
+    "logging": {
+      "level": "INFO",
+      "include_prompts": false,
+      "include_responses": true
+    },
+    "tracing": {
+      "enabled": true,
+      "trace_all_agents": true
+    },
+    "metrics": {
+      "track_execution_time": true,
+      "track_token_usage": true,
+      "track_cache_hits": true
+    }
+  },
+  "metadata": {
+    "use_case": "comprehensive_research",
+    "complexity": "high",
+    "estimated_duration": "120-300s",
+    "parallelization": "high",
+    "quality_control": "enabled"
+  },
+  "enabled": true,
+  "usage_example": {
+    "api_call": "POST /api/v1/sessions",
+    "request_body": {
+      "workflow_id": "complete_research_workflow",
+      "message": "Research the impact of artificial intelligence on healthcare diagnostics"
+    },
+    "expected_flow": [
+      "1. Query analyzer breaks down into 3 topics",
+      "2. Three researchers work in parallel (technical, business, academic)",
+      "3. Quality validator checks completeness",
+      "4. Synthesizer creates final comprehensive report"
+    ],
+    "expected_duration": "2-3 minutes",
+    "expected_cost": "~$0.50-1.00 (depending on model and caching)"
+  }
+}

@@ -77,8 +77,10 @@ import {
                   <mat-spinner diameter="18" class="button-spinner"></mat-spinner>
                   <span>Loading...</span>
                 } @else {
-                  <mat-icon>search</mat-icon>
-                  <span>Preview Endpoints</span>
+                  <ng-container>
+                    <mat-icon>search</mat-icon>
+                    <span>Preview Endpoints</span>
+                  </ng-container>
                 }
               </button>
             </div>
@@ -222,8 +224,10 @@ import {
                   <mat-spinner diameter="18" class="button-spinner"></mat-spinner>
                   <span>Importing...</span>
                 } @else {
-                  <mat-icon>download</mat-icon>
-                  <span>Import {{ selectedCount() }} Tools</span>
+                  <ng-container>
+                    <mat-icon>download</mat-icon>
+                    <span>Import {{ selectedCount() }} Tools</span>
+                  </ng-container>
                 }
               </button>
             </div>

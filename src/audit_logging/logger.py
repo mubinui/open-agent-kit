@@ -72,6 +72,9 @@ def bind_correlation_ids(
     request_id: Optional[str] = None,
     session_id: Optional[UUID] = None,
     user_id: Optional[str] = None,
+    workflow_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    node_id: Optional[str] = None,
 ) -> None:
     """
     Bind correlation IDs to the logging context.
@@ -83,8 +86,11 @@ def bind_correlation_ids(
         request_id: HTTP request ID
         session_id: Conversation session ID
         user_id: User identifier
+        workflow_id: Workflow identifier
+        agent_id: Agent identifier
+        node_id: Node identifier in workflow graph
         
-    Requirements: 6.1, 6.2, 12.1, 12.2
+    Requirements: 6.1, 6.2, 9.1, 12.1, 12.2
     """
     context = {}
     
@@ -94,6 +100,12 @@ def bind_correlation_ids(
         context["session_id"] = str(session_id)
     if user_id:
         context["user_id"] = user_id
+    if workflow_id:
+        context["workflow_id"] = workflow_id
+    if agent_id:
+        context["agent_id"] = agent_id
+    if node_id:
+        context["node_id"] = node_id
     
     if context:
         structlog.contextvars.bind_contextvars(**context)
@@ -175,3 +187,254 @@ def log_tool_call(
         logger.error("tool_call_failed", **log_data)
     else:
         logger.info("tool_call_success", **log_data)
+
+
+def log_agent_execution_start(
+    logger: structlog.BoundLogger,
+    agent_id: str,
+    node_id: str,
+    workflow_id: str,
+    input_message: Optional[str] = None,
+) -> None:
+    """
+    Log the start of agent execution.
+    
+    Args:
+        logger: Logger instance
+        agent_id: Agent identifier
+        node_id: Node identifier in workflow
+        workflow_id: Workflow identifier
+        input_message: Input message to agent
+        
+    Requirements: 9.1, 9.2
+    """
+    logger.info(
+        "agent_execution_start",
+        agent_id=agent_id,
+        node_id=node_id,
+        workflow_id=workflow_id,
+        input_message=input_message,
+    )
+
+
+def log_agent_execution_end(
+    logger: structlog.BoundLogger,
+    agent_id: str,
+    node_id: str,
+    workflow_id: str,
+    status: str,
+    execution_time: float,
+    output: Optional[str] = None,
+    error: Optional[str] = None,
+) -> None:
+    """
+    Log the end of agent execution.
+    
+    Args:
+        logger: Logger instance
+        agent_id: Agent identifier
+        node_id: Node identifier in workflow
+        workflow_id: Workflow identifier
+        status: Execution status (success, failure, timeout)
+        execution_time: Execution time in seconds
+        output: Agent output
+        error: Error message if failed
+        
+    Requirements: 9.1, 9.2, 9.4
+    """
+    log_data = {
+        "agent_id": agent_id,
+        "node_id": node_id,
+        "workflow_id": workflow_id,
+        "status": status,
+        "execution_time_seconds": execution_time,
+    }
+    
+    if output:
+        log_data["output"] = output
+    if error:
+        log_data["error"] = error
+    
+    if status == "success":
+        logger.info("agent_execution_end", **log_data)
+    else:
+        logger.error("agent_execution_end", **log_data)
+
+
+def log_workflow_execution_start(
+    logger: structlog.BoundLogger,
+    workflow_id: str,
+    session_id: str,
+    message: str,
+) -> None:
+    """
+    Log the start of workflow execution.
+    
+    Args:
+        logger: Logger instance
+        workflow_id: Workflow identifier
+        session_id: Session identifier
+        message: Initial message
+        
+    Requirements: 9.1, 9.2
+    """
+    logger.info(
+        "workflow_execution_start",
+        workflow_id=workflow_id,
+        session_id=session_id,
+        message=message,
+    )
+
+
+def log_workflow_execution_end(
+    logger: structlog.BoundLogger,
+    workflow_id: str,
+    session_id: str,
+    status: str,
+    execution_time: float,
+    agent_count: int,
+    final_response: Optional[str] = None,
+) -> None:
+    """
+    Log the end of workflow execution.
+    
+    Args:
+        logger: Logger instance
+        workflow_id: Workflow identifier
+        session_id: Session identifier
+        status: Execution status
+        execution_time: Total execution time in seconds
+        agent_count: Number of agents executed
+        final_response: Final response from workflow
+        
+    Requirements: 9.1, 9.2, 9.4
+    """
+    log_data = {
+        "workflow_id": workflow_id,
+        "session_id": session_id,
+        "status": status,
+        "execution_time_seconds": execution_time,
+        "agent_count": agent_count,
+    }
+    
+    if final_response:
+        log_data["final_response"] = final_response
+    
+    if status == "success":
+        logger.info("workflow_execution_end", **log_data)
+    else:
+        logger.error("workflow_execution_end", **log_data)
+
+
+def log_llm_call(
+    logger: structlog.BoundLogger,
+    agent_id: str,
+    provider: str,
+    model: str,
+    prompt: Optional[str] = None,
+    response: Optional[str] = None,
+    prompt_tokens: Optional[int] = None,
+    completion_tokens: Optional[int] = None,
+    execution_time: Optional[float] = None,
+    cache_hit: bool = False,
+) -> None:
+    """
+    Log an LLM API call with optional prompt/response in debug mode.
+    
+    Args:
+        logger: Logger instance
+        agent_id: Agent identifier
+        provider: LLM provider name
+        model: Model identifier
+        prompt: LLM prompt (logged only in debug mode)
+        response: LLM response (logged only in debug mode)
+        prompt_tokens: Number of prompt tokens
+        completion_tokens: Number of completion tokens
+        execution_time: Execution time in seconds
+        cache_hit: Whether response was from cache
+        
+    Requirements: 9.3, 9.4
+    """
+    from src.config import get_settings
+    settings = get_settings()
+    
+    log_data = {
+        "agent_id": agent_id,
+        "provider": provider,
+        "model": model,
+        "cache_hit": cache_hit,
+    }
+    
+    if prompt_tokens is not None:
+        log_data["prompt_tokens"] = prompt_tokens
+    if completion_tokens is not None:
+        log_data["completion_tokens"] = completion_tokens
+    if execution_time is not None:
+        log_data["execution_time_seconds"] = execution_time
+    
+    # Only log prompts and responses in debug mode
+    if settings.telemetry.debug_mode or settings.telemetry.log_llm_prompts:
+        if prompt:
+            log_data["prompt"] = prompt
+    
+    if settings.telemetry.debug_mode or settings.telemetry.log_llm_responses:
+        if response:
+            log_data["response"] = response
+    
+    logger.info("llm_call", **log_data)
+
+
+def log_error_context(
+    logger: structlog.BoundLogger,
+    error: Exception,
+    agent_id: Optional[str] = None,
+    node_id: Optional[str] = None,
+    workflow_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    agent_state: Optional[dict] = None,
+    conversation_history: Optional[list] = None,
+    retry_count: int = 0,
+) -> None:
+    """
+    Log error with full context for debugging.
+    
+    Args:
+        logger: Logger instance
+        error: Exception that occurred
+        agent_id: Agent identifier
+        node_id: Node identifier
+        workflow_id: Workflow identifier
+        session_id: Session identifier
+        agent_state: Current agent state
+        conversation_history: Conversation history
+        retry_count: Number of retries attempted
+        
+    Requirements: 9.3, 9.5
+    """
+    from src.config import get_settings
+    settings = get_settings()
+    
+    log_data = {
+        "error_type": type(error).__name__,
+        "error_message": str(error),
+        "retry_count": retry_count,
+    }
+    
+    if agent_id:
+        log_data["agent_id"] = agent_id
+    if node_id:
+        log_data["node_id"] = node_id
+    if workflow_id:
+        log_data["workflow_id"] = workflow_id
+    if session_id:
+        log_data["session_id"] = session_id
+    
+    # Include agent state and conversation history in debug mode
+    if settings.telemetry.debug_mode or settings.telemetry.log_agent_state:
+        if agent_state:
+            log_data["agent_state"] = agent_state
+        if conversation_history:
+            # Limit conversation history to last 5 messages to avoid log bloat
+            log_data["conversation_history"] = conversation_history[-5:]
+    
+    logger.error("error_with_context", **log_data, exc_info=True)

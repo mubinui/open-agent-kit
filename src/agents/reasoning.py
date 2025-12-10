@@ -46,7 +46,6 @@ class ReasoningAgent(BaseAgent):
         llm_config: Optional[Dict[str, Any]] = None
         if provider:
             # Get API key from environment variable specified in provider auth
-            import os
             api_key = ""
             if provider.auth and provider.auth.env_var:
                 api_key = os.getenv(provider.auth.env_var, "")

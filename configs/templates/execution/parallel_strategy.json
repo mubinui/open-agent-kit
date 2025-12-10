@@ -1,0 +1,101 @@
+{
+  "_comment": "Parallel Execution Strategy - Execute independent agents concurrently",
+  "execution_strategy": "parallel",
+  "strategy_config": {
+    "max_concurrent": 5,
+    "wait_for_all": true,
+    "timeout_per_agent": 180,
+    "fail_on_first_error": false,
+    "collect_all_results": true,
+    "worker_pool_size": 10
+  },
+  "description": "Parallel execution runs independent agents concurrently to minimize latency.",
+  "use_cases": [
+    "Independent research tasks",
+    "Multi-source data collection",
+    "Parallel analysis from different perspectives",
+    "High-throughput batch processing"
+  ],
+  "advantages": [
+    "Minimized latency (max of agent times, not sum)",
+    "Better resource utilization",
+    "Higher throughput",
+    "Scales with available resources"
+  ],
+  "disadvantages": [
+    "Higher resource consumption",
+    "More complex error handling",
+    "Potential race conditions",
+    "Harder to debug"
+  ],
+  "configuration_options": {
+    "max_concurrent": {
+      "type": "number",
+      "default": 5,
+      "description": "Maximum number of agents to run concurrently"
+    },
+    "wait_for_all": {
+      "type": "boolean",
+      "default": true,
+      "description": "Wait for all parallel agents to complete (false = return on first completion)"
+    },
+    "timeout_per_agent": {
+      "type": "number",
+      "default": 180,
+      "description": "Timeout in seconds for each agent execution"
+    },
+    "fail_on_first_error": {
+      "type": "boolean",
+      "default": false,
+      "description": "Cancel all agents if any one fails"
+    },
+    "collect_all_results": {
+      "type": "boolean",
+      "default": true,
+      "description": "Collect results from all agents, even if some fail"
+    },
+    "worker_pool_size": {
+      "type": "number",
+      "default": 10,
+      "description": "Size of the async worker pool"
+    }
+  },
+  "example_workflow": {
+    "topology": {
+      "nodes": ["coordinator", "researcher_1", "researcher_2", "researcher_3", "aggregator"],
+      "edges": [
+        {"from": "coordinator", "to": "researcher_1"},
+        {"from": "coordinator", "to": "researcher_2"},
+        {"from": "coordinator", "to": "researcher_3"},
+        {"from": "researcher_1", "to": "aggregator"},
+        {"from": "researcher_2", "to": "aggregator"},
+        {"from": "researcher_3", "to": "aggregator"}
+      ]
+    },
+    "execution_stages": [
+      {
+        "stage": 1,
+        "agents": ["coordinator"],
+        "parallel": false
+      },
+      {
+        "stage": 2,
+        "agents": ["researcher_1", "researcher_2", "researcher_3"],
+        "parallel": true
+      },
+      {
+        "stage": 3,
+        "agents": ["aggregator"],
+        "parallel": false
+      }
+    ],
+    "total_time": "time(coordinator) + max(time(researcher_1), time(researcher_2), time(researcher_3)) + time(aggregator)"
+  },
+  "best_practices": [
+    "Ensure agents are truly independent (no shared state)",
+    "Set appropriate max_concurrent based on available resources",
+    "Use timeouts to prevent hanging agents",
+    "Implement proper error handling for partial failures",
+    "Monitor resource usage (CPU, memory, API rate limits)"
+  ]
+}

@@ -1,0 +1,138 @@
+{
+  "_comment": "Full Cache Configuration - All caching layers enabled with optimal settings",
+  "global_enabled": true,
+  "description": "Full caching configuration for maximum performance and cost savings",
+  "layers": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 3600,
+      "max_size": 10000,
+      "eviction_policy": "LRU",
+      "description": "Cache LLM API responses to reduce costs and latency"
+    },
+    "embedding": {
+      "enabled": true,
+      "ttl": 86400,
+      "max_size": 50000,
+      "eviction_policy": "LFU",
+      "description": "Cache vector embeddings for RAG operations"
+    },
+    "session": {
+      "enabled": true,
+      "ttl": 1800,
+      "max_size": null,
+      "eviction_policy": "TTL",
+      "description": "Cache session state for quick retrieval"
+    },
+    "agent_result": {
+      "enabled": true,
+      "ttl": 600,
+      "max_size": 5000,
+      "eviction_policy": "LRU",
+      "description": "Cache complete agent execution results"
+    }
+  },
+  "workflow_overrides": {
+    "batch_processing": {
+      "llm_response": {
+        "enabled": true,
+        "ttl": 7200,
+        "max_size": 20000,
+        "eviction_policy": "LRU",
+        "description": "Longer cache for batch workflows"
+      },
+      "agent_result": {
+        "enabled": true,
+        "ttl": 3600,
+        "max_size": 10000,
+        "eviction_policy": "LRU"
+      }
+    },
+    "research_workflow": {
+      "llm_response": {
+        "ttl": 14400,
+        "description": "4-hour cache for research results"
+      },
+      "embedding": {
+        "ttl": 172800,
+        "description": "2-day cache for embeddings"
+      }
+    }
+  },
+  "agent_overrides": {
+    "reasoning_agent": {
+      "llm_response": {
+        "enabled": true,
+        "ttl": 7200,
+        "max_size": 5000,
+        "eviction_policy": "LRU",
+        "description": "Longer cache for reasoning results"
+      }
+    },
+    "knowledge_agent": {
+      "llm_response": {
+        "ttl": 10800,
+        "description": "3-hour cache for knowledge retrieval"
+      },
+      "agent_result": {
+        "enabled": true,
+        "ttl": 7200
+      }
+    }
+  },
+  "cache_key_strategy": {
+    "llm_response": {
+      "include": ["model", "messages", "temperature", "max_tokens"],
+      "exclude": ["cache_seed", "user_id"],
+      "hash_algorithm": "sha256"
+    },
+    "embedding": {
+      "include": ["text", "model"],
+      "hash_algorithm": "sha256"
+    },
+    "agent_result": {
+      "include": ["agent_id", "input", "config"],
+      "hash_algorithm": "sha256"
+    }
+  },
+  "eviction_policies": {
+    "LRU": {
+      "description": "Least Recently Used - evict items not accessed recently",
+      "use_when": "General purpose caching with temporal locality"
+    },
+    "LFU": {
+      "description": "Least Frequently Used - evict items accessed least often",
+      "use_when": "Caching items with varying access frequencies"
+    },
+    "TTL": {
+      "description": "Time To Live - evict items after fixed time",
+      "use_when": "Time-sensitive data or memory-constrained environments"
+    }
+  },
+  "monitoring": {
+    "metrics": [
+      "cache_hit_rate",
+      "cache_miss_rate",
+      "eviction_count",
+      "cache_size",
+      "average_ttl"
+    ],
+    "alerts": {
+      "low_hit_rate": {
+        "threshold": 0.5,
+        "action": "Review cache configuration and TTL values"
+      },
+      "high_eviction_rate": {
+        "threshold": 100,
+        "action": "Increase max_size or reduce TTL"
+      }
+    }
+  },
+  "best_practices": [
+    "Enable all layers for maximum benefit",
+    "Set TTL based on data freshness requirements",
+    "Use LRU for general purpose, LFU for hot data",
+    "Monitor hit rates and adjust accordingly",
+    "Override at workflow/agent level for specific needs"
+  ]
+}

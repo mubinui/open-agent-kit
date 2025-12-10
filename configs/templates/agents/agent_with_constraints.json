@@ -1,0 +1,151 @@
+{
+  "_comment": "Agent with Constraints - Demonstrates various constraint configurations",
+  "id": "constrained_analyst",
+  "type": "conversable",
+  "name": "ConstrainedAnalyst",
+  "system_message": "You are a data analyst that provides structured analysis in JSON format. Always include confidence scores and cite sources.",
+  "llm_config": {
+    "provider_id": "openrouter",
+    "model": "openai/gpt-oss-20b",
+    "temperature": 0.5,
+    "max_tokens": 1500,
+    "cache_seed": 42,
+    "timeout": 120
+  },
+  "human_input_mode": "NEVER",
+  "code_execution_config": false,
+  "tools": ["rag_query", "web_search"],
+  "max_consecutive_auto_reply": 5,
+  "behavior": {
+    "output_format": {
+      "type": "json",
+      "schema": {
+        "type": "object",
+        "required": ["analysis", "confidence", "sources"],
+        "properties": {
+          "analysis": {
+            "type": "string",
+            "minLength": 100,
+            "maxLength": 2000
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "analysis_type": {
+                "type": "string",
+                "enum": ["quantitative", "qualitative", "mixed"]
+              },
+              "data_quality": {
+                "type": "string",
+                "enum": ["high", "medium", "low"]
+              }
+            }
+          }
+        }
+      },
+      "strict_schema": true
+    },
+    "constraints": {
+      "max_output_length": 3000,
+      "min_output_length": 200,
+      "max_tool_calls": 5,
+      "max_tokens_per_message": 1500,
+      "require_citations": true,
+      "min_confidence_threshold": 0.6,
+      "timeout": 120,
+      "rate_limit": {
+        "max_requests_per_minute": 10,
+        "max_tokens_per_minute": 15000
+      }
+    },
+    "validation": {
+      "json_schema_validation": true,
+      "confidence_check": true,
+      "source_verification": true,
+      "on_validation_failure": "reject",
+      "provide_feedback": true
+    }
+  },
+  "cache_override": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 7200,
+      "description": "Cache analysis results for 2 hours"
+    }
+  },
+  "resource_limits": {
+    "timeout": 120,
+    "max_retries": 2,
+    "max_tokens": 1500
+  },
+  "description": "Analyst agent with strict output constraints and validation",
+  "version": 1,
+  "constraint_details": {
+    "output_length": {
+      "min": 200,
+      "max": 3000,
+      "reason": "Ensure sufficient detail without verbosity"
+    },
+    "tool_calls": {
+      "max": 5,
+      "reason": "Prevent excessive API calls and costs"
+    },
+    "confidence_threshold": {
+      "min": 0.6,
+      "reason": "Reject low-confidence analyses"
+    },
+    "citations": {
+      "required": true,
+      "min_sources": 1,
+      "reason": "Ensure verifiable information"
+    },
+    "rate_limiting": {
+      "requests_per_minute": 10,
+      "tokens_per_minute": 15000,
+      "reason": "Prevent API quota exhaustion"
+    }
+  },
+  "output_examples": {
+    "valid_output": {
+      "analysis": "Based on the data collected from multiple sources, the market trend shows a 15% increase in demand over the past quarter. This growth is primarily driven by increased consumer spending in the technology sector. The analysis indicates strong momentum with supporting indicators across multiple metrics.",
+      "confidence": 0.85,
+      "sources": [
+        "Market Research Report Q4 2024",
+        "Consumer Spending Index",
+        "Technology Sector Analysis"
+      ],
+      "metadata": {
+        "analysis_type": "quantitative",
+        "data_quality": "high"
+      }
+    },
+    "invalid_output_1": {
+      "analysis": "The market is growing.",
+      "confidence": 0.5,
+      "sources": []
+    },
+    "invalid_reason_1": "Analysis too short (< 100 chars), confidence below threshold (< 0.6), no sources provided",
+    "invalid_output_2": {
+      "summary": "Market analysis shows growth",
+      "score": 0.8
+    },
+    "invalid_reason_2": "Missing required fields (analysis, confidence, sources), incorrect field names"
+  },
+  "metadata": {
+    "use_case": "structured_analysis",
+    "output_format": "json",
+    "validation_level": "strict"
+  }
+}

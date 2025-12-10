@@ -1,0 +1,113 @@
+{
+  "_comment": "Cache Disabled Configuration - No caching for real-time or testing scenarios",
+  "global_enabled": false,
+  "description": "Configuration with all caching disabled for real-time applications or testing",
+  "layers": {
+    "llm_response": {
+      "enabled": false,
+      "ttl": 0,
+      "max_size": null,
+      "eviction_policy": "LRU",
+      "description": "LLM response caching disabled"
+    },
+    "embedding": {
+      "enabled": false,
+      "ttl": 0,
+      "max_size": null,
+      "eviction_policy": "LFU",
+      "description": "Embedding caching disabled"
+    },
+    "session": {
+      "enabled": false,
+      "ttl": 0,
+      "max_size": null,
+      "eviction_policy": "TTL",
+      "description": "Session caching disabled"
+    },
+    "agent_result": {
+      "enabled": false,
+      "ttl": 0,
+      "max_size": null,
+      "eviction_policy": "LRU",
+      "description": "Agent result caching disabled"
+    }
+  },
+  "workflow_overrides": {},
+  "agent_overrides": {},
+  "use_cases": [
+    "Real-time chat applications",
+    "Live data streaming",
+    "Testing and development",
+    "Debugging workflows",
+    "Compliance requirements (no data retention)",
+    "Highly dynamic content"
+  ],
+  "advantages": [
+    "Always fresh data",
+    "No stale cache issues",
+    "Simpler debugging",
+    "No cache invalidation complexity",
+    "Guaranteed current responses"
+  ],
+  "disadvantages": [
+    "Higher latency (no cache hits)",
+    "Increased API costs",
+    "Higher load on LLM providers",
+    "More network traffic",
+    "Reduced throughput"
+  ],
+  "when_to_use": {
+    "development": {
+      "description": "Disable cache during development to see immediate changes",
+      "recommendation": "Use for testing, enable for production"
+    },
+    "real_time": {
+      "description": "Applications requiring current data (news, stocks, weather)",
+      "recommendation": "Disable cache or use very short TTL (< 60s)"
+    },
+    "compliance": {
+      "description": "Regulations prohibiting data caching",
+      "recommendation": "Disable all caching layers"
+    },
+    "debugging": {
+      "description": "Troubleshooting cache-related issues",
+      "recommendation": "Temporarily disable to isolate problems"
+    }
+  },
+  "migration_path": {
+    "from_full_cache": {
+      "step_1": "Set global_enabled to false",
+      "step_2": "Monitor performance impact",
+      "step_3": "Identify high-latency operations",
+      "step_4": "Selectively re-enable cache for expensive operations",
+      "step_5": "Use workflow/agent overrides for fine-tuning"
+    }
+  },
+  "performance_considerations": {
+    "latency_increase": "Expect 2-10x increase in response time",
+    "cost_increase": "API costs will increase proportionally to cache hit rate",
+    "throughput_decrease": "Lower throughput due to API rate limits",
+    "mitigation_strategies": [
+      "Use faster models for non-cached operations",
+      "Implement request queuing",
+      "Add rate limiting",
+      "Consider selective caching for expensive operations"
+    ]
+  },
+  "testing_configuration": {
+    "description": "Recommended cache configuration for testing",
+    "global_enabled": false,
+    "override_for_tests": {
+      "use_mock_cache": true,
+      "cache_all_responses": true,
+      "ttl": 3600,
+      "description": "Cache all test responses to avoid hitting real APIs"
+    }
+  },
+  "notes": [
+    "This configuration disables all caching globally",
+    "Use workflow/agent overrides to selectively enable caching",
+    "Monitor costs and performance when running without cache",
+    "Consider hybrid approach: disable for some workflows, enable for others"
+  ]
+}

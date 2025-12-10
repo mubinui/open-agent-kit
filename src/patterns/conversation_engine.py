@@ -15,6 +15,7 @@ class ConversationPattern(str, Enum):
     SEQUENTIAL = "sequential"
     GROUP_CHAT = "group_chat"
     NESTED = "nested"
+    SELECTOR = "selector"
 
 
 class ConversationPatternEngine:

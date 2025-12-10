@@ -497,13 +497,24 @@ helm install orchestration-service ./helm/orchestration-service
 
 ## 📖 Documentation
 
+### Core Documentation
+
 | Guide | Description |
 |-------|-------------|
-| [Getting Started](docs/getting-started.md) | Detailed setup instructions |
-| [API Quick Start](docs/api-quickstart.md) | API usage examples |
-| [Workflow Configuration](docs/workflow-configuration.md) | Configure conversation patterns |
-| [Deployment Guide](docs/deployment-guide.md) | Production deployment |
-| [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
+| [Topology Configuration](docs/TOPOLOGY_CONFIGURATION.md) | Configure workflow topologies (sequential, tree, graph, hybrid) |
+| [Migration Guide](docs/MIGRATION_GUIDE.md) | Migrate from old workflow format to new topology format |
+| [Execution Strategies](docs/EXECUTION_STRATEGIES.md) | Choose and configure execution strategies |
+| [Cache Configuration](docs/CACHE_CONFIGURATION.md) | Configure multi-layer caching for performance and cost optimization |
+| [Agent Behavior](docs/AGENT_BEHAVIOR.md) | Configure agent output formats, constraints, and validation |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Diagnose and resolve common issues |
+
+### Additional Resources
+
+| Guide | Description |
+|-------|-------------|
+| [Model Configuration](docs/MODEL_CONFIGURATION.md) | Configure and switch between LLM models |
+| [RAG Setup](docs/RAG_SETUP.md) | Set up vector databases and RAG workflows |
+| [Deployment Guide](DEPLOYMENT.md) | Production deployment quick reference |
 
 ---
 

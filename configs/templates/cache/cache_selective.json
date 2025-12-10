@@ -1,0 +1,129 @@
+{
+  "_comment": "Selective Cache Configuration - Strategic caching for balanced performance",
+  "global_enabled": true,
+  "description": "Selective caching configuration that balances performance, cost, and data freshness",
+  "layers": {
+    "llm_response": {
+      "enabled": true,
+      "ttl": 1800,
+      "max_size": 5000,
+      "eviction_policy": "LRU",
+      "description": "Short-term cache for LLM responses (30 minutes)"
+    },
+    "embedding": {
+      "enabled": true,
+      "ttl": 43200,
+      "max_size": 20000,
+      "eviction_policy": "LFU",
+      "description": "Medium-term cache for embeddings (12 hours)"
+    },
+    "session": {
+      "enabled": true,
+      "ttl": 900,
+      "max_size": null,
+      "eviction_policy": "TTL",
+      "description": "Short session cache (15 minutes)"
+    },
+    "agent_result": {
+      "enabled": false,
+      "description": "Agent result caching disabled by default"
+    }
+  },
+  "workflow_overrides": {
+    "realtime_chat": {
+      "llm_response": {
+        "enabled": false,
+        "description": "Disable cache for real-time conversations"
+      },
+      "session": {
+        "ttl": 600,
+        "description": "10-minute session cache for active chats"
+      }
+    },
+    "static_content": {
+      "llm_response": {
+        "enabled": true,
+        "ttl": 86400,
+        "description": "24-hour cache for static content generation"
+      },
+      "agent_result": {
+        "enabled": true,
+        "ttl": 86400
+      }
+    },
+    "data_analysis": {
+      "llm_response": {
+        "ttl": 3600,
+        "description": "1-hour cache for analysis results"
+      },
+      "agent_result": {
+        "enabled": true,
+        "ttl": 7200,
+        "description": "2-hour cache for expensive analysis"
+      }
+    }
+  },
+  "agent_overrides": {
+    "code_generator": {
+      "llm_response": {
+        "enabled": false,
+        "description": "Disable cache for code generation (always fresh)"
+      }
+    },
+    "fact_checker": {
+      "llm_response": {
+        "enabled": false,
+        "description": "Disable cache for fact checking (need current data)"
+      }
+    },
+    "template_filler": {
+      "llm_response": {
+        "enabled": true,
+        "ttl": 7200,
+        "description": "Cache template filling (deterministic)"
+      }
+    }
+  },
+  "cache_rules": {
+    "enable_when": [
+      "Deterministic operations (same input = same output)",
+      "Expensive operations (high latency or cost)",
+      "Frequently accessed data",
+      "Static or slowly changing content"
+    ],
+    "disable_when": [
+      "Real-time data requirements",
+      "User-specific personalized content",
+      "Time-sensitive information",
+      "Rapidly changing data sources"
+    ]
+  },
+  "use_cases": {
+    "cache_enabled": {
+      "examples": [
+        "FAQ responses",
+        "Document summarization",
+        "Code explanation",
+        "Translation of static content",
+        "Mathematical calculations"
+      ]
+    },
+    "cache_disabled": {
+      "examples": [
+        "Live chat conversations",
+        "Current news/weather",
+        "Stock prices",
+        "User authentication",
+        "Personalized recommendations"
+      ]
+    }
+  },
+  "optimization_tips": [
+    "Start with conservative TTL values",
+    "Monitor cache hit rates per workflow",
+    "Disable cache for workflows with <20% hit rate",
+    "Enable agent_result cache only for expensive agents",
+    "Use workflow overrides for special cases",
+    "Review and adjust based on usage patterns"
+  ]
+}
