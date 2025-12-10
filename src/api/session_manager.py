@@ -328,6 +328,7 @@ class SessionManager:
                 agents=agents,
                 message=message,
                 max_turns=max_turns,
+                session=session,
             )
             
             # Extract response
@@ -641,6 +642,7 @@ class SessionManager:
         agents: Dict[str, ConversableAgent],
         message: str,
         max_turns: Optional[int] = None,
+        session: Optional[ConversationState] = None,
     ) -> Dict[str, Any]:
         """
         Execute a workflow based on its pattern or topology.
@@ -651,6 +653,7 @@ class SessionManager:
             agents: Dictionary of agent instances
             message: User message
             max_turns: Optional override for max turns
+            session: Optional conversation state for context
 
         Returns:
             Dictionary containing response and metadata
@@ -669,7 +672,7 @@ class SessionManager:
 
         if pattern == ConversationPattern.TWO_AGENT:
             return await self._execute_two_agent_workflow(
-                workflow, agents, message, max_turns
+                workflow, agents, message, max_turns, session
             )
         elif pattern == ConversationPattern.SEQUENTIAL:
             return await self._execute_sequential_workflow(
@@ -685,7 +688,7 @@ class SessionManager:
             )
         elif pattern == ConversationPattern.SELECTOR:
             return await self._execute_selector_workflow(
-                workflow, agents, message, max_turns
+                session_id, workflow, agents, message, max_turns, session
             )
         else:
             raise ValueError(f"Unsupported conversation pattern: {pattern}")
@@ -781,6 +784,7 @@ class SessionManager:
         agents: Dict[str, ConversableAgent],
         message: str,
         max_turns: Optional[int] = None,
+        session: Optional[ConversationState] = None,
     ) -> Dict[str, Any]:
         """Execute a two-agent workflow."""
         sender = agents.get(workflow.entry_agent_id)
@@ -792,6 +796,34 @@ class SessionManager:
         # Use workflow max_turns if not overridden
         turns = max_turns if max_turns is not None else workflow.max_turns
 
+        # Build message with conversation history context
+        message_with_context = message
+        if session and session.messages:
+            # Get previous messages (excluding the current one which was just added)
+            previous_messages = session.messages[:-1] if len(session.messages) > 1 else []
+            
+            if previous_messages:
+                # Build conversation history context
+                history_parts = []
+                for msg in previous_messages[-10:]:  # Last 10 messages for context
+                    role = "User" if msg.role.value == "user" else "Assistant"
+                    history_parts.append(f"{role}: {msg.content}")
+                
+                history_context = "\n".join(history_parts)
+                message_with_context = f"""[Previous conversation context]
+{history_context}
+
+[Current message]
+{message}
+
+Please respond to the current message, taking into account the previous conversation context above."""
+                
+                logger.debug(
+                    "Added conversation history to message",
+                    history_messages=len(previous_messages),
+                    context_length=len(history_context),
+                )
+
         logger.debug(
             "Executing two-agent workflow",
             sender=workflow.entry_agent_id,
@@ -801,12 +833,13 @@ class SessionManager:
             recipient_name=recipient.name,
             recipient_has_llm=recipient.llm_config is not False,
             max_turns=turns,
+            has_history_context=session is not None and len(session.messages) > 1,
         )
 
         chat_result = self.pattern_engine.execute_two_agent_chat(
             sender=sender,
             recipient=recipient,
-            message=message,
+            message=message_with_context,
             max_turns=turns,
             summary_method=workflow.summary_method.value,
         )
@@ -1048,10 +1081,12 @@ class SessionManager:
 
     async def _execute_selector_workflow(
         self,
+        session_id: UUID,
         workflow: WorkflowConfig,
         agents: Dict[str, ConversableAgent],
         message: str,
         max_turns: Optional[int] = None,
+        session: Optional[ConversationState] = None,
     ) -> Dict[str, Any]:
         """
         Execute a selector (router) workflow.
@@ -1070,6 +1105,7 @@ class SessionManager:
             agents: Dictionary of agent instances
             message: User message
             max_turns: Optional override for max turns
+            session: Optional conversation state for context
             
         Returns:
             Dictionary containing response and metadata
@@ -1223,12 +1259,35 @@ class SessionManager:
         
         # Step 4: Execute domain agent
         # Create a new user proxy for the domain agent interaction
+        # Use max_consecutive_auto_reply=3 to stop after getting a substantive response
         domain_user_proxy = AutogenAgent(
             name="UserProxy",
             llm_config=False,
             human_input_mode="NEVER",
-            max_consecutive_auto_reply=10,
+            max_consecutive_auto_reply=3,
         )
+        
+        # Build message with conversation context if available
+        # Use passed session or fetch if not provided
+        if session is None:
+            session = await self.get_session(session_id)
+        
+        context_message = message
+        if session and session.messages:
+            # Build context from recent conversation history (last 5 exchanges)
+            recent_messages = session.messages[-10:]  # Last 10 messages (5 exchanges)
+            if len(recent_messages) > 1:  # Only add context if there's history
+                history_text = "\n".join([
+                    f"{'User' if m.role.value == 'user' else 'Assistant'}: {m.content}"
+                    for m in recent_messages[:-1]  # Exclude current message
+                ])
+                context_message = f"""[Previous conversation context]
+{history_text}
+
+[Current message]
+{message}
+
+Please respond to the current message, taking into account the previous conversation context above."""
         
         # Register tools for the domain agent if it has any
         from src.config.loader import load_agents_config
@@ -1264,7 +1323,7 @@ class SessionManager:
         domain_result = self.pattern_engine.execute_two_agent_chat(
             sender=domain_user_proxy,
             recipient=target_agent,
-            message=message,
+            message=context_message,  # Use message with conversation context
             max_turns=domain_turns,
             summary_method=workflow.summary_method.value,
         )
