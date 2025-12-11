@@ -441,7 +441,7 @@ export class AgentFormDialogComponent implements OnInit {
           id: 'openrouter',
           name: 'OpenRouter',
           type: 'llm',
-          models: [{ name: 'openai/gpt-oss-20b', default: true }]
+          models: [{ name: '@preset/procurement-chatbot', default: true }]
         }]);
         this.updateAvailableModels();
       }

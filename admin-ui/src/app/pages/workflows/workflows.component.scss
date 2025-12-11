@@ -32,13 +32,21 @@
 .workflows-table {
   width: 100%;
 
+  table-layout: fixed;
+
   th {
     font-weight: 600;
     color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   td {
     padding: 12px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   button {
@@ -68,7 +76,7 @@
 
 .update-info {
   font-size: 13px;
-  
+
   .updated-by {
     font-size: 11px;
     color: #999;

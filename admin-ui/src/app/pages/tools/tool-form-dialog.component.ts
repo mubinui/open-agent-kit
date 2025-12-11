@@ -171,9 +171,7 @@ import { ToolConfig } from '../../models/tool.model';
     }
 
     mat-dialog-content {
-      width: 600px;
-      max-width: 90vw;
-      max-height: 70vh;
+      width: 100%;
       padding: 20px 24px;
       box-sizing: border-box;
       overflow-x: hidden;
@@ -230,29 +228,41 @@ export class ToolFormDialogComponent {
     if (this.data.tool) {
       this.tool = { ...this.data.tool };
       this.isEdit.set(true);
-      
+
       // Prefer settings.type, otherwise infer from entrypoint (API executor)
+      // Prefer settings.type, otherwise infer from entrypoint or presence of API fields
       const settings = this.tool.settings || {};
-      const inferredType =
+      let inferredType =
         settings['type'] ||
-        (settings['api_url'] ? 'api' : undefined) ||
+        (settings['api_url'] || this.tool.api_url ? 'api' : undefined) ||
         (this.tool.entrypoint?.includes('api_tool_executor') ? 'api' : 'function');
-      this.tool.type = inferredType as 'api' | 'function';
-      
+
+      // Normalize type to lowercase
+      inferredType = inferredType?.toLowerCase();
+
+      this.tool.type = (inferredType === 'api' ? 'api' : 'function');
+
       if (this.tool.type === 'api') {
-        // Map API fields from settings (fall back to empty strings so inputs render)
-        this.tool.api_url = settings['api_url'] || '';
-        this.tool.http_method = settings['http_method'] || 'GET';
-        this.tool.auth_type = settings['auth_type'] || 'none';
-        this.tool.auth_header = settings['auth_header'] || '';
-        this.tool.auth_env_var = settings['auth_env_var'] || '';
-        this.tool.headers = settings['headers'] || undefined;
-        this.tool.body_template = settings['body_template'] || '';
-        this.tool.response_path = settings['response_path'] || '';
-        this.tool.timeout = settings['timeout'] ?? 30;
-        this.tool.forward_user_context = settings['forward_user_context'] ?? true;
-        this.tool.client_username = settings['client_username'] || '';
-        this.tool.client_roles = settings['client_roles'] || '';
+        // Map API fields from settings (prioritize settings, fall back to flat properties or defaults)
+        this.tool.api_url = settings['api_url'] || this.tool.api_url || '';
+
+        // Normalize HTTP method to uppercase
+        const method = settings['http_method'] || this.tool.http_method || 'GET';
+        this.tool.http_method = method.toUpperCase() as any;
+
+        // Normalize auth type to lowercase
+        const authType = settings['auth_type'] || this.tool.auth_type || 'none';
+        this.tool.auth_type = authType.toLowerCase() as any;
+
+        this.tool.auth_header = settings['auth_header'] || this.tool.auth_header || '';
+        this.tool.auth_env_var = settings['auth_env_var'] || this.tool.auth_env_var || '';
+        this.tool.headers = settings['headers'] || this.tool.headers || undefined;
+        this.tool.body_template = settings['body_template'] || this.tool.body_template || '';
+        this.tool.response_path = settings['response_path'] || this.tool.response_path || '';
+        this.tool.timeout = settings['timeout'] ?? this.tool.timeout ?? 30;
+        this.tool.forward_user_context = settings['forward_user_context'] ?? this.tool.forward_user_context ?? true;
+        this.tool.client_username = settings['client_username'] || this.tool.client_username || '';
+        this.tool.client_roles = settings['client_roles'] || this.tool.client_roles || '';
       } else {
         this.tool.type = 'function';
       }
@@ -320,7 +330,7 @@ export class ToolFormDialogComponent {
   onSave(): void {
     // Parse headers before saving
     this.parseHeaders();
-    
+
     // Store API configuration in settings field for backend compatibility
     if (this.tool.type === 'api') {
       this.tool.settings = {
@@ -339,7 +349,7 @@ export class ToolFormDialogComponent {
         client_roles: this.tool.client_roles
       };
     }
-    
+
     this.dialogRef.close(this.tool);
   }
 }

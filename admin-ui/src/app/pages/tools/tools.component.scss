@@ -49,14 +49,22 @@
 .tools-table {
   width: 100%;
 
+  table-layout: fixed;
+
   th {
     font-weight: 600;
     color: #64748b; // Slate 500
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   td {
     padding: 12px 8px;
     color: #334155; // Slate 700
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   button {
