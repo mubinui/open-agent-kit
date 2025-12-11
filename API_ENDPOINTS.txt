@@ -39,7 +39,8 @@ GET  /api/v1/sessions/user/{user_id}      - Get all sessions for a specific user
 GET  /api/v1/sessions/{session_id}        - Get session details
 DELETE /api/v1/sessions/{session_id}      - Delete session
 GET  /api/v1/sessions/{session_id}/history - Get chat history
-POST /api/v1/sessions/{session_id}/messages - Send message to chatbot (main chat endpoint)
+POST /api/v1/sessions/{session_id}/messages - Send message to chatbot (path-based endpoint)
+POST /api/v1/sessions/query               - Send query to chatbot (body-based endpoint, sessionId in request body)
 
 ================================================================================
 AGENTS (/api/v1/agents)
@@ -124,15 +125,37 @@ CHATBOT USAGE EXAMPLE
    Body: { "workflow_id": "procurement_chatbot", "user_id": "john.doe" }
    Response: { "session_id": "uuid-here", ... }
 
-2. Send messages:
+2. Send messages (path-based endpoint):
    POST /api/v1/sessions/{session_id}/messages
    Body: { "message": "What is the status of requisition REQ-2024-001?" }
    Response: { "response": "...", "chat_history": [...] }
 
-3. Get chat history:
+3. Send messages (body-based query endpoint - RECOMMENDED):
+   POST /api/v1/sessions/query
+   Body: {
+     "sessionId": "uuid-here",
+     "query": "What is the status of requisition REQ-2024-001?",
+     "pattern": "TWO_AGENT",      // Optional: TWO_AGENT, SEQUENTIAL, GROUP_CHAT, NESTED, SELECTOR
+     "maxTurns": 10,              // Optional: maximum conversation turns
+     "metadata": {}               // Optional: additional metadata
+   }
+   Response: {
+     "sessionId": "uuid-here",
+     "response": "The requisition REQ-2024-001 is currently...",
+     "turnCount": 1,
+     "chatHistory": [...],
+     "summary": "",
+     "safetyPassed": true,
+     "cost": {},
+     "metadata": {
+       "isFallback": false        // true if fallback response was used
+     }
+   }
+
+4. Get chat history:
    GET /api/v1/sessions/{session_id}/history
 
-4. Get all chats for a user (simplified DTO for frontend):
+5. Get all chats for a user (simplified DTO for frontend):
    GET /api/v1/sessions/chats?user_id=john.doe
    Response: {
      "chats": [
@@ -147,13 +170,58 @@ CHATBOT USAGE EXAMPLE
      "total": 1
    }
 
-5. Get all sessions for a user (detailed):
+6. Get all sessions for a user (detailed):
    GET /api/v1/sessions/user/john.doe
    Response: { "user_id": "john.doe", "sessions": [...], "total_count": 5, "active_count": 2 }
 
-6. List all sessions (with optional filters):
+7. List all sessions (with optional filters):
    GET /api/v1/sessions?user_id=john.doe&active_only=true
    Response: [{ "session_id": "...", "workflow_id": "...", ... }]
 
-7. End session:
+8. End session:
    DELETE /api/v1/sessions/{session_id}
+
+================================================================================
+QUERY ENDPOINT DETAILS (/api/v1/sessions/query)
+================================================================================
+
+The query endpoint provides a simplified interface for sending messages to the
+chatbot with the sessionId in the request body instead of the URL path.
+
+Request Body (QueryRequest):
+  - sessionId (string, required): The session identifier
+  - query (string, required): The message/query content (cannot be empty or whitespace-only)
+  - pattern (string, optional): Conversation pattern (TWO_AGENT, SEQUENTIAL, GROUP_CHAT, NESTED, SELECTOR)
+  - maxTurns (integer, optional): Maximum conversation turns
+  - metadata (object, optional): Additional metadata
+
+Response Body (QueryResponse):
+  - sessionId (string): The session identifier
+  - response (string): AI agent response
+  - turnCount (integer): Current turn count
+  - chatHistory (array): Conversation history
+  - summary (string): Conversation summary
+  - safetyPassed (boolean): Content safety check result
+  - cost (object): Cost information
+  - metadata (object): Response metadata (includes isFallback flag if fallback was used)
+
+Error Responses:
+  - 400 Bad Request: Invalid session ID format or empty/whitespace query
+  - 401 Unauthorized: Missing or invalid authentication
+  - 404 Not Found: Session does not exist
+  - 500 Internal Server Error: Processing error
+
+Fallback Response:
+  When the AI agent fails to generate a proper response, the endpoint returns
+  a user-friendly fallback message. The metadata will contain:
+  - isFallback: true
+  - fallbackReason: "empty_response" | "invalid_format" | "exception"
+
+Example with curl:
+  curl -X POST http://localhost:8000/api/v1/sessions/query \
+    -H "Authorization: Bearer <token>" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "sessionId": "550e8400-e29b-41d4-a716-446655440000",
+      "query": "What is the status of my order?"
+    }'

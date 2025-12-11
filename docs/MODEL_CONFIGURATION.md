@@ -2,9 +2,9 @@
 
 This guide explains how to configure and switch between different LLM models in the orchestration service.
 
-## Quick Start: Using GPT-OSS-20B from OpenRouter
+## Quick Start: Using OpenRouter Preset
 
-The system is now configured to use `openai/gpt-oss-20b` from OpenRouter by default. This model is:
+The system is now configured to use `@preset/procurement-chatbot` from OpenRouter by default. This preset is:
 - Fast and efficient
 - Cost-effective
 - Good for general-purpose tasks
@@ -16,8 +16,8 @@ The model can be configured using environment variables in your `.env` file:
 ```bash
 # OpenRouter Configuration
 OPENROUTER_API_KEY=your_api_key_here
-OPENROUTER_MODEL=openai/gpt-oss-20b
-DEFAULT_LLM_MODEL=openai/gpt-oss-20b
+OPENROUTER_MODEL=@preset/procurement-chatbot
+DEFAULT_LLM_MODEL=@preset/procurement-chatbot
 DEFAULT_LLM_PROVIDER=openrouter
 ```
 
@@ -27,8 +27,8 @@ DEFAULT_LLM_PROVIDER=openrouter
 
 1. Edit your `.env` file:
 ```bash
-# For GPT-OSS-20B (default, fast, economical)
-OPENROUTER_MODEL=openai/gpt-oss-20b
+# For procurement chatbot preset (default)
+OPENROUTER_MODEL=@preset/procurement-chatbot
 
 # For GPT-4 (more capable, more expensive)
 OPENROUTER_MODEL=openai/gpt-4
@@ -61,7 +61,7 @@ Edit `configs/agents.json` to change the model for specific agents:
   "id": "reasoning_agent",
   "llm_config": {
     "provider_id": "openrouter",
-    "model": "openai/gpt-oss-20b",  // Change this
+    "model": "@preset/procurement-chatbot",  // Change this
     "temperature": 0.7,
     "max_tokens": 500
   }
@@ -77,7 +77,7 @@ Edit `configs/api_providers.json` to change the default model:
   "id": "openrouter",
   "models": [
     {
-      "name": "openai/gpt-oss-20b",
+      "name": "@preset/procurement-chatbot",
       "default": true,  // Set this to true for your preferred model
       "capabilities": ["chat", "reasoning"]
     }
@@ -87,8 +87,10 @@ Edit `configs/api_providers.json` to change the default model:
 
 ## Available Models on OpenRouter
 
+### OpenRouter Presets
+- `@preset/procurement-chatbot` - Custom preset for procurement workflows (current default)
+
 ### OpenAI Models
-- `openai/gpt-oss-20b` - Fast, efficient, economical (current default)
 - `openai/gpt-4` - Most capable OpenAI model
 - `openai/gpt-4-turbo` - Faster GPT-4 with larger context
 - `openai/gpt-3.5-turbo` - Fast and economical
@@ -119,7 +121,7 @@ The system uses this priority order for model selection:
 1. **Agent-specific model** in `configs/agents.json`
 2. **Environment variable** `OPENROUTER_MODEL` or `DEFAULT_LLM_MODEL`
 3. **Default model** marked in `configs/api_providers.json`
-4. **Fallback** to `openai/gpt-oss-20b`
+4. **Fallback** to `@preset/procurement-chatbot`
 
 ## Testing Your Configuration
 
@@ -146,7 +148,7 @@ Different models may require different parameters:
 {
   "llm_config": {
     "provider_id": "openrouter",
-    "model": "openai/gpt-oss-20b",
+    "model": "@preset/procurement-chatbot",
     "temperature": 0.7,      // Creativity: 0.0-2.0
     "max_tokens": 500,       // Response length limit
     "cache_seed": 42,        // Enable response caching
@@ -160,7 +162,7 @@ Different models may require different parameters:
 **Fast Responses (Chatbots):**
 ```json
 {
-  "model": "openai/gpt-oss-20b",
+  "model": "@preset/procurement-chatbot",
   "temperature": 0.7,
   "max_tokens": 500
 }
@@ -215,8 +217,8 @@ Different models may require different parameters:
 
 ```bash
 # Primary model configuration
-OPENROUTER_MODEL=openai/gpt-oss-20b         # Model to use
-DEFAULT_LLM_MODEL=openai/gpt-oss-20b        # Fallback if agent config doesn't specify
+OPENROUTER_MODEL=@preset/procurement-chatbot         # Model to use
+DEFAULT_LLM_MODEL=@preset/procurement-chatbot        # Fallback if agent config doesn't specify
 DEFAULT_LLM_PROVIDER=openrouter              # Provider to use
 
 # Provider settings

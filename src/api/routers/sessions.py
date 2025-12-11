@@ -6,12 +6,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from src.api.auth import CurrentUser, get_current_user, require_user
 from src.api.context import set_request_user
+from src.api.response_validator import ResponseValidator
 from src.api.models import (
     Chat,
     ChatHistoryResponse,
     ChatListResponse,
     MessageRequest,
     MessageResponse,
+    QueryRequest,
+    QueryResponse,
     SessionCreateRequest,
     SessionResponse,
     UserSessionsResponse,
@@ -530,6 +533,28 @@ async def send_message(
         result.setdefault("summary", "")
         result.setdefault("safety_passed", True)
         
+        # Validate response and apply fallback if needed
+        original_response = result.get("response", "")
+        validated_response, is_fallback, fallback_reason = ResponseValidator.validate_and_get_response(
+            response=original_response,
+        )
+        
+        # Update metadata with fallback information if applicable
+        response_metadata = result.get("metadata", {}).copy()
+        if is_fallback:
+            response_metadata["isFallback"] = True
+            response_metadata["fallbackReason"] = fallback_reason
+            logger.info(
+                "Returning fallback response for messages endpoint",
+                request_id=request_id,
+                session_id=session_id,
+                fallback_reason=fallback_reason,
+            )
+        
+        # Update result with validated response and metadata
+        result["response"] = validated_response
+        result["metadata"] = response_metadata
+        
         return MessageResponse(**result)
         
     except ValueError as e:
@@ -555,6 +580,176 @@ async def send_message(
             "session_id": str(session_id),
             "context": {
                 "message_length": len(body.message),
+                "pattern": body.pattern.value if body.pattern else None,
+                "max_turns": body.max_turns,
+            },
+        }
+        
+        # Add specific error details if available
+        if hasattr(e, '__dict__'):
+            error_detail["details"] = {
+                k: str(v) for k, v in e.__dict__.items()
+                if not k.startswith('_')
+            }
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_detail,
+        )
+    finally:
+        # Clean up tool execution context
+        clear_tool_execution_context()
+
+
+@router.post("/query", response_model=QueryResponse)
+async def query_session(
+    request: Request,
+    body: QueryRequest,
+    current_user: CurrentUser = Depends(require_user),
+) -> QueryResponse:
+    """
+    Send a query to a session and get a response.
+    
+    This endpoint accepts the sessionId in the request body for simplified
+    frontend integration.
+    
+    Args:
+        request: FastAPI request object
+        body: Query request containing sessionId and query
+        
+    Returns:
+        Response from the agent conversation
+        
+    Requirements: 1.1, 1.4, 2.3, 2.4
+    """
+    from src.tools.context_utils import set_tool_execution_context, clear_tool_execution_context
+    
+    request_id = getattr(request.state, "request_id", None)
+    
+    # Parse and validate session ID
+    try:
+        session_id = UUID(body.session_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_code": "INVALID_SESSION_ID",
+                "error_message": f"Invalid session ID format: {body.session_id}",
+                "error_type": "ValueError",
+                "request_id": request_id,
+                "session_id": body.session_id,
+            },
+        )
+    
+    # Set request context (ContextVar - for direct access)
+    set_request_user(current_user)
+    
+    # Set tool execution context (thread-local - persists through agent execution)
+    # This ensures tools like get_requisition can access user info
+    set_tool_execution_context(
+        username=current_user.username,
+        roles=current_user.roles,
+        raw_token=current_user.raw_token,
+    )
+    
+    logger.info(
+        "Processing query",
+        request_id=request_id,
+        session_id=session_id,
+        pattern=body.pattern,
+        username=current_user.username,
+        has_roles=bool(current_user.roles),
+        has_raw_token=bool(current_user.raw_token),
+        roles=current_user.roles,
+    )
+    
+    try:
+        session_manager = get_session_manager()
+        result = await session_manager.process_message(
+            session_id=session_id,
+            message=body.query,
+            max_turns=body.max_turns,
+            metadata=body.metadata,
+        )
+        
+        # Ensure required fields have default values if null
+        result.setdefault("cost", {})
+        result.setdefault("metadata", {})
+        result.setdefault("chat_history", [])
+        result.setdefault("summary", "")
+        result.setdefault("safety_passed", True)
+        
+        # Validate response and apply fallback if needed
+        original_response = result.get("response", "")
+        validated_response, is_fallback, fallback_reason = ResponseValidator.validate_and_get_response(
+            response=original_response,
+        )
+        
+        # Update metadata with fallback information if applicable
+        response_metadata = result.get("metadata", {}).copy()
+        if is_fallback:
+            response_metadata["isFallback"] = True
+            response_metadata["fallbackReason"] = fallback_reason
+            logger.info(
+                "Returning fallback response",
+                request_id=request_id,
+                session_id=session_id,
+                fallback_reason=fallback_reason,
+            )
+        
+        return QueryResponse(
+            session_id=str(result["session_id"]),
+            response=validated_response,
+            turn_count=result.get("turn_count", 0),
+            chat_history=result.get("chat_history", []),
+            summary=result.get("summary", ""),
+            safety_passed=result.get("safety_passed", True),
+            cost=result.get("cost", {}),
+            metadata=response_metadata,
+        )
+        
+    except ValueError as e:
+        error_message = str(e)
+        # Check if it's a session not found error
+        if "not found" in error_message.lower() or "session" in error_message.lower():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "error_code": "SESSION_NOT_FOUND",
+                    "error_message": error_message,
+                    "error_type": "ValueError",
+                    "request_id": request_id,
+                    "session_id": str(session_id),
+                },
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_code": "VALIDATION_ERROR",
+                "error_message": error_message,
+                "error_type": "ValueError",
+                "request_id": request_id,
+                "session_id": str(session_id),
+            },
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to process query",
+            request_id=request_id,
+            session_id=session_id,
+            error=str(e),
+            exc_info=True,
+        )
+        
+        # Build detailed error response
+        error_detail = {
+            "error_code": "PROCESSING_ERROR",
+            "error_message": f"Failed to process query: {str(e)}",
+            "error_type": type(e).__name__,
+            "request_id": request_id,
+            "session_id": str(session_id),
+            "context": {
+                "query_length": len(body.query),
                 "pattern": body.pattern.value if body.pattern else None,
                 "max_turns": body.max_turns,
             },

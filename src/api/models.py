@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.patterns.conversation_engine import ConversationPattern
 
@@ -81,6 +81,91 @@ class MessageResponse(BaseModel):
     chat_history: list[dict[str, Any]] = Field(default_factory=list, description="Conversation history")
     summary: str = Field(default="", description="Conversation summary")
     safety_passed: bool = Field(default=True, description="Content safety check result")
+
+
+class QueryRequest(BaseModel):
+    """Request DTO for the query endpoint.
+    
+    Accepts sessionId in the request body for simplified frontend integration.
+    """
+
+    session_id: str = Field(
+        description="Session identifier",
+        alias="sessionId"
+    )
+    query: str = Field(
+        description="The message/query content",
+        min_length=1
+    )
+    pattern: Optional[ConversationPattern] = Field(
+        default=None,
+        description="Conversation pattern to use (optional)"
+    )
+    max_turns: Optional[int] = Field(
+        default=None,
+        description="Maximum conversation turns (optional)",
+        alias="maxTurns"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional metadata"
+    )
+
+    model_config = {
+        "populate_by_name": True,
+        "extra": "ignore"  # Forward compatibility - ignore unknown fields
+    }
+
+    @field_validator("query")
+    @classmethod
+    def validate_query_not_whitespace(cls, v: str) -> str:
+        """Reject whitespace-only queries."""
+        if not v.strip():
+            raise ValueError("Query cannot be empty or contain only whitespace")
+        return v
+
+
+class QueryResponse(BaseModel):
+    """Response DTO for the query endpoint.
+    
+    Uses camelCase field naming for frontend compatibility.
+    """
+
+    session_id: str = Field(
+        description="Session identifier",
+        serialization_alias="sessionId"
+    )
+    response: str = Field(description="AI agent response")
+    turn_count: int = Field(
+        description="Current turn count",
+        serialization_alias="turnCount"
+    )
+    chat_history: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Conversation history",
+        serialization_alias="chatHistory"
+    )
+    summary: str = Field(
+        default="",
+        description="Conversation summary"
+    )
+    safety_passed: bool = Field(
+        default=True,
+        description="Content safety check result",
+        serialization_alias="safetyPassed"
+    )
+    cost: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Cost information"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Response metadata"
+    )
+
+    model_config = {
+        "populate_by_name": True
+    }
 
 
 class ChatHistoryResponse(BaseModel):

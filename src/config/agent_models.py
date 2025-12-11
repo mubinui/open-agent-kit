@@ -29,7 +29,11 @@ class LLMConfig(BaseModel):
     """LLM configuration for an agent."""
 
     provider_id: str = Field(description="ID of the LLM provider from provider registry")
-    model: str = Field(description="Model name to use (e.g., 'openai/gpt-oss-20b')")
+    model: str = Field(description="Model name to use (e.g., 'openai/gpt-oss-20b' or '@preset/procurement-chatbot')")
+    preset: Optional[str] = Field(
+        default=None, 
+        description="OpenRouter preset name (e.g., 'procurement-chatbot'). Can also use 'model@preset/name' syntax."
+    )
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: Optional[int] = Field(default=None, ge=1, description="Maximum tokens in response")
     cache_seed: Optional[int] = Field(default=42, description="Seed for caching (None to disable)")

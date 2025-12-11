@@ -15,7 +15,7 @@ class OpenRouterConfig(BaseSettings):
     )
 
     api_key: str = Field(default="mock_api_key_for_testing", alias="OPENROUTER_API_KEY")
-    model: str = Field(default="openai/gpt-oss-20b", alias="OPENROUTER_MODEL")
+    model: str = Field(default="@preset/procurement-chatbot", alias="OPENROUTER_MODEL")
     base_url: str = Field(
         default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
     )

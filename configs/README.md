@@ -20,7 +20,7 @@ Defines all conversable agents and their behaviors.
       "system_message": "System prompt for the agent",
       "llm_config": {
         "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
+        "model": "@preset/procurement-chatbot",
         "temperature": 0.7,
         "max_tokens": 1000,
         "cache_seed": 42,

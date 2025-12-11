@@ -279,23 +279,39 @@ async def execute_api_tool(
     request_headers.update(extra_headers)
     
     # =========================================================================
-    # AUTHENTICATION - Same pattern as requisition_api.py (DEFAULT for all APIs)
+    # AUTHENTICATION - Two modes based on endpoint type
     # =========================================================================
-    # 1. Get admin token using client_credentials grant (service-to-service auth)
-    # 2. Forward user context via x-client-username and x-client-ref headers
-    # This is the DEFAULT behavior for ALL API tools - no configuration needed
+    # For "self" endpoints (e.g., /self, /myself): Use user's own token
+    # For other endpoints: Use admin token with x-client headers
     # =========================================================================
     
-    # Step 1: Get admin token (always)
-    admin_token = await _get_admin_token()
-    if admin_token:
-        request_headers["Authorization"] = f"Bearer {admin_token}"
-    else:
-        logger.warning("proceeding_without_admin_token", tool_id=tool_id)
-    
-    # Step 2: Get user context from the incoming request (always)
-    # This extracts username/roles from the JWT that the frontend sent
+    # Step 1: Get user context from the incoming request
+    # This extracts username/roles/raw_token from the JWT that the frontend sent
     user_info = get_user_context_info()
+    
+    # Step 2: Determine authentication mode based on URL
+    # "Self" endpoints need the user's own token to identify them
+    is_self_endpoint = "/self" in url.lower() or "/myself" in url.lower()
+    
+    if is_self_endpoint:
+        # For "self" endpoints, use the user's own token
+        raw_token = user_info.get("raw_token") if user_info else None
+        if raw_token:
+            # Add "Bearer " prefix if not already present
+            if not raw_token.startswith("Bearer "):
+                request_headers["Authorization"] = f"Bearer {raw_token}"
+            else:
+                request_headers["Authorization"] = raw_token
+            logger.info("using_user_token_for_self_endpoint", tool_id=tool_id, has_token=True)
+        else:
+            logger.warning("no_user_token_for_self_endpoint", tool_id=tool_id)
+    else:
+        # For other endpoints, use admin token with x-client headers
+        admin_token = await _get_admin_token()
+        if admin_token:
+            request_headers["Authorization"] = f"Bearer {admin_token}"
+        else:
+            logger.warning("proceeding_without_admin_token", tool_id=tool_id)
     
     username = user_info.get("username") if user_info else None
     roles = user_info.get("roles") if user_info else None

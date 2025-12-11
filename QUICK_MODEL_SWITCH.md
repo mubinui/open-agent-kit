@@ -1,7 +1,7 @@
 # Quick Model Switch Guide
 
 ## Current Configuration
-✅ **Model**: `openai/gpt-oss-20b` from OpenRouter  
+✅ **Model**: `@preset/procurement-chatbot` from OpenRouter  
 ✅ **Configured via**: Environment variables in `.env`
 
 ## How to Switch Models
@@ -9,7 +9,7 @@
 ### 1. Edit `.env` file:
 ```bash
 # Change this line:
-OPENROUTER_MODEL=openai/gpt-oss-20b
+OPENROUTER_MODEL=@preset/procurement-chatbot
 
 # To any of these popular options:
 # OPENROUTER_MODEL=openai/gpt-4              # Most capable
@@ -35,7 +35,7 @@ python src/main.py
 
 | Model | Use Case | Speed | Cost |
 |-------|----------|-------|------|
-| `openai/gpt-oss-20b` | Development, testing | ⚡️ Fast | 💰 Low |
+| `@preset/procurement-chatbot` | Procurement workflows | ⚡️ Fast | 💰 Low |
 | `openai/gpt-3.5-turbo` | Production chatbots | ⚡️ Fast | 💰 Low |
 | `openai/gpt-4` | Complex reasoning | 🐢 Slower | 💰💰💰 High |
 | `anthropic/claude-3.5-sonnet` | Code, analysis | ⚡️ Fast | 💰💰 Medium |
@@ -48,15 +48,15 @@ The model is set in 3 places (all updated):
 
 1. **`.env`** - Environment variables (PRIMARY)
    ```bash
-   OPENROUTER_MODEL=openai/gpt-oss-20b
-   DEFAULT_LLM_MODEL=openai/gpt-oss-20b
+   OPENROUTER_MODEL=@preset/procurement-chatbot
+   DEFAULT_LLM_MODEL=@preset/procurement-chatbot
    ```
 
 2. **`configs/agents.json`** - Agent-specific models (OVERRIDE)
    ```json
    {
      "llm_config": {
-       "model": "openai/gpt-oss-20b"
+       "model": "@preset/procurement-chatbot"
      }
    }
    ```
@@ -65,7 +65,7 @@ The model is set in 3 places (all updated):
    ```json
    {
      "models": [{
-       "name": "openai/gpt-oss-20b",
+       "name": "@preset/procurement-chatbot",
        "default": true
      }]
    }

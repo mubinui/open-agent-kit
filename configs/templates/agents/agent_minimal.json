@@ -6,7 +6,7 @@
   "system_message": "You are a helpful AI assistant. Answer questions clearly and concisely.",
   "llm_config": {
     "provider_id": "openrouter",
-    "model": "openai/gpt-oss-20b",
+    "model": "@preset/procurement-chatbot",
     "temperature": 0.7
   },
   "human_input_mode": "NEVER",
@@ -50,7 +50,7 @@
       "description": "LLM configuration",
       "example": {
         "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b"
+        "model": "@preset/procurement-chatbot"
       }
     }
   },

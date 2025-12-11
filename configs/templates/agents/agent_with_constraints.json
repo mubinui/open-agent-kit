@@ -6,7 +6,7 @@
   "system_message": "You are a data analyst that provides structured analysis in JSON format. Always include confidence scores and cite sources.",
   "llm_config": {
     "provider_id": "openrouter",
-    "model": "openai/gpt-oss-20b",
+    "model": "@preset/procurement-chatbot",
     "temperature": 0.5,
     "max_tokens": 1500,
     "cache_seed": 42,
