@@ -15,7 +15,7 @@
       "models": [
         {
           "name": "openai/gpt-oss-20b",
-          "default": true,
+          "default": false,
           "capabilities": ["chat", "reasoning"],
           "pricing": {
             "input_per_million_tokens": 2.0,

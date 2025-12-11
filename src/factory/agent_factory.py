@@ -357,6 +357,14 @@ class AgentFactory:
 
         if provider.base_url:
             config_entry["base_url"] = provider.base_url
+        
+        # Add OpenRouter-specific provider routing for tool support
+        if llm_cfg.provider_id == "openrouter":
+            config_entry["extra_body"] = {
+                "provider": {
+                    "allow_fallbacks": True
+                }
+            }
 
         # Build full llm_config
         llm_config_dict: dict[str, Any] = {
