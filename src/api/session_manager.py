@@ -21,6 +21,7 @@ from src.memory.store import ConversationStore
 from src.patterns.conversation_engine import ConversationPatternEngine
 from src.patterns.execution_engine import ExecutionEngine, ExecutionStatus
 from src.patterns.topology_engine import WorkflowGraph
+from src.utils import context_utils
 
 logger = get_logger(__name__)
 
@@ -334,8 +335,11 @@ class SessionManager:
             # Extract response
             response_text = result.get("response", "")
             
-            # Add assistant response to history
-            session.add_message(MessageRole.ASSISTANT, response_text)
+            # Sanitize response before storing to remove context wrappers
+            sanitized_response = self._sanitize_response(response_text)
+            
+            # Add sanitized assistant response to history
+            session.add_message(MessageRole.ASSISTANT, sanitized_response)
             session.increment_turn()
             
             # Update session using the appropriate store
@@ -352,6 +356,9 @@ class SessionManager:
                 for msg in session.messages
             ]
             
+            # Update result with sanitized response
+            result["response"] = sanitized_response
+            
             # Add session metadata to result
             result["session_id"] = session_id
             result["turn_count"] = session.turn_count
@@ -366,7 +373,7 @@ class SessionManager:
                 session_id=session_id,
                 pattern=workflow.pattern.value,
                 turn_count=session.turn_count,
-                response_length=len(response_text),
+                response_length=len(sanitized_response),
             )
             
             return result
@@ -796,33 +803,13 @@ class SessionManager:
         # Use workflow max_turns if not overridden
         turns = max_turns if max_turns is not None else workflow.max_turns
 
-        # Build message with conversation history context
-        message_with_context = message
-        if session and session.messages:
-            # Get previous messages (excluding the current one which was just added)
-            previous_messages = session.messages[:-1] if len(session.messages) > 1 else []
-            
-            if previous_messages:
-                # Build conversation history context
-                history_parts = []
-                for msg in previous_messages[-10:]:  # Last 10 messages for context
-                    role = "User" if msg.role.value == "user" else "Assistant"
-                    history_parts.append(f"{role}: {msg.content}")
-                
-                history_context = "\n".join(history_parts)
-                message_with_context = f"""[Previous conversation context]
-{history_context}
-
-[Current message]
-{message}
-
-Please respond to the current message, taking into account the previous conversation context above."""
-                
-                logger.debug(
-                    "Added conversation history to message",
-                    history_messages=len(previous_messages),
-                    context_length=len(history_context),
-                )
+        # Build message with conversation history context using new method
+        message_with_context = self._build_context_message(
+            current_message=message,
+            session=session,
+            context_type="general",
+            max_exchanges=5
+        )
 
         logger.debug(
             "Executing two-agent workflow",
@@ -1142,39 +1129,14 @@ Please respond to the current message, taking into account the previous conversa
             max_consecutive_auto_reply=0,
         )
         
-        # Build message with conversation context for selector
+        # Build message with conversation context for selector using new method
         # This helps the selector understand references like "the number I gave you"
-        selector_message = message
-        if session and session.messages:
-            recent_messages = session.messages[-6:]  # Last 3 exchanges for context
-            if len(recent_messages) > 1:
-                # Build a compact context summary for the selector
-                context_parts = []
-                for m in recent_messages[:-1]:  # Exclude current message
-                    content = m.content
-                    # Skip messages that are just context wrappers
-                    if "[Previous conversation context]" in content or "[Recent conversation for context]" in content:
-                        continue
-                    role = "User" if m.role.value == "user" else "Assistant"
-                    # Truncate long messages for selector context
-                    if len(content) > 200:
-                        content = content[:200] + "..."
-                    context_parts.append(f"{role}: {content}")
-                
-                if context_parts:
-                    context_summary = "\n".join(context_parts)
-                    selector_message = f"""[Recent conversation for context]
-{context_summary}
-
-[Current user message to route]
-{message}
-
-Analyze the CURRENT message and route it appropriately. Use the conversation context to understand any references (like "the number", "that requisition", etc.)."""
-                    
-                    logger.debug(
-                        "Added context to selector message",
-                        context_messages=len(context_parts),
-                    )
+        selector_message = self._build_context_message(
+            current_message=message,
+            session=session,
+            context_type="selector",
+            max_exchanges=3
+        )
         
         # Execute chat with selector to get routing decision
         turns = max_turns if max_turns is not None else 2
@@ -1301,40 +1263,18 @@ Analyze the CURRENT message and route it appropriately. Use the conversation con
             max_consecutive_auto_reply=3,
         )
         
-        # Build message with conversation context if available
+        # Build message with conversation context if available using new method
         # Use passed session or fetch if not provided
         if session is None:
             session = await self.get_session(session_id)
         
-        context_message = message
-        if session and session.messages:
-            # Build context from recent conversation history (last 5 exchanges)
-            recent_messages = session.messages[-10:]  # Last 10 messages (5 exchanges)
-            if len(recent_messages) > 1:  # Only add context if there's history
-                history_parts = []
-                for m in recent_messages[:-1]:  # Exclude current message
-                    content = m.content
-                    # Strip out any existing context markers to avoid nesting
-                    if "[Previous conversation context]" in content:
-                        # Extract just the actual response, not the context wrapper
-                        if "[Current message]" in content:
-                            # This was a wrapped message, skip it or extract the response
-                            continue
-                    # Truncate very long messages to keep context manageable
-                    if len(content) > 500:
-                        content = content[:500] + "..."
-                    role = "User" if m.role.value == "user" else "Assistant"
-                    history_parts.append(f"{role}: {content}")
-                
-                if history_parts:
-                    history_text = "\n".join(history_parts)
-                    context_message = f"""[Previous conversation context]
-{history_text}
-
-[Current message]
-{message}
-
-Please respond to the current message, taking into account the previous conversation context above."""
+        # Build context message for domain agent
+        context_message = self._build_context_message(
+            current_message=message,
+            session=session,
+            context_type="domain",
+            max_exchanges=5
+        )
         
         # Register tools for the domain agent if it has any
         # Note: domain_user_proxy is created fresh each request, so we must always
@@ -1658,6 +1598,129 @@ Please ask me a specific question about requisitions, purchase orders, or framew
         )
         
         return response_text
+
+    def _sanitize_response(self, response: str) -> str:
+        """
+        Sanitize response by removing context wrappers and markers.
+        
+        This method ensures that responses returned to users don't contain
+        internal context markers like "[Previous conversation context]" or
+        "[Current message]" that are used for agent communication.
+        
+        Args:
+            response: Raw response from agent
+            
+        Returns:
+            Cleaned response suitable for user display
+        """
+        # Handle edge cases
+        if not response:
+            return response
+        
+        # Strip context wrappers using utility function
+        sanitized = context_utils.strip_context_wrappers(response)
+        
+        # If stripping resulted in empty string, return original
+        # (this shouldn't happen with our implementation, but defensive)
+        if not sanitized:
+            return response
+        
+        logger.debug(
+            "Sanitized response",
+            original_length=len(response),
+            sanitized_length=len(sanitized),
+            had_wrappers=response != sanitized,
+        )
+        
+        return sanitized
+
+    def _build_context_message(
+        self,
+        current_message: str,
+        session: Optional[ConversationState],
+        context_type: str = "general",
+        max_exchanges: int = 5
+    ) -> str:
+        """
+        Build a message with conversation context.
+        
+        This method creates a properly formatted message that includes
+        conversation history context for agents. It prevents nested wrappers
+        by checking existing messages and extracting clean content.
+        
+        Args:
+            current_message: The current user message
+            session: Conversation session with history
+            context_type: Type of context ("general", "selector", "domain")
+            max_exchanges: Maximum number of recent exchanges to include
+            
+        Returns:
+            Message with appropriate context formatting
+        """
+        # If no session or no history, return message as-is
+        if not session or not session.messages:
+            return current_message
+        
+        # Get recent messages (excluding the current one which was just added)
+        previous_messages = session.messages[:-1] if len(session.messages) > 1 else []
+        
+        if not previous_messages:
+            return current_message
+        
+        # Configure limits based on context type
+        if context_type == "selector":
+            # Selector needs compact context to understand references
+            max_messages = max_exchanges * 2  # exchanges = user + assistant pairs
+            max_msg_length = 200
+        elif context_type == "domain":
+            # Domain agents need more detailed context
+            max_messages = max_exchanges * 2
+            max_msg_length = 500
+        else:  # general
+            # General two-agent workflow
+            max_messages = max_exchanges * 2
+            max_msg_length = 500
+        
+        # Build clean context using utility function
+        # This automatically filters out existing wrappers
+        context_text = context_utils.build_clean_context(
+            messages=previous_messages,
+            limit=max_messages,
+            max_message_length=max_msg_length
+        )
+        
+        # If no context was built (all messages were wrappers), return current message
+        if not context_text:
+            return current_message
+        
+        # Format based on context type
+        if context_type == "selector":
+            formatted_message = f"""[Recent conversation for context]
+{context_text}
+
+[Current user message to route]
+{current_message}
+
+Analyze the CURRENT message and route it appropriately. Use the conversation context to understand any references (like "the number", "that requisition", etc.)."""
+        else:
+            # General and domain use same format
+            formatted_message = f"""[Previous conversation context]
+{context_text}
+
+[Current message]
+{current_message}
+
+Please respond to the current message, taking into account the previous conversation context above."""
+        
+        logger.debug(
+            "Built context message",
+            context_type=context_type,
+            history_messages=len(previous_messages),
+            context_length=len(context_text),
+            total_length=len(formatted_message),
+        )
+        
+        return formatted_message
 
 
 # Singleton instance

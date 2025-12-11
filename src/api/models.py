@@ -11,9 +11,13 @@ from src.patterns.conversation_engine import ConversationPattern
 
 # Session Models
 class SessionCreateRequest(BaseModel):
-    """Request to create a new session."""
+    """
+    Request to create a new session.
+    
+    If workflow_id is not provided, the default workflow will be used.
+    """
 
-    workflow_id: str = Field(description="ID of the workflow to use")
+    workflow_id: Optional[str] = Field(default=None, description="ID of the workflow to use (optional, uses default if not provided)")
     user_id: Optional[str] = Field(default=None, description="Optional user identifier")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
@@ -439,6 +443,7 @@ class WorkflowResponse(BaseModel):
     max_turns: Optional[int] = None
     summary_method: Optional[str] = None
     enabled: Optional[bool] = None
+    default: Optional[bool] = Field(default=False, description="Whether this is the default workflow")
     steps: Optional[list[WorkflowStepConfig]] = None
     group_chat: Optional[GroupChatConfigModel] = None
     nested_chats: Optional[List[dict]] = None

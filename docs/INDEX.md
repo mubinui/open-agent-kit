@@ -118,6 +118,8 @@ Detailed configuration examples:
 - **Validate agent output**: [Agent Behavior - Validation](AGENT_BEHAVIOR.md#validation-configuration)
 - **Migrate old workflow**: [Migration Guide - Pattern by Pattern](MIGRATION_GUIDE.md#pattern-by-pattern-migration)
 - **Fix topology errors**: [Troubleshooting - Topology](TROUBLESHOOTING.md#topology-configuration-issues)
+- **Use default workflow**: [README - Default Workflow](../README.md#default-workflow)
+- **Configure context management**: [README - Context Management](../README.md#context-management)
 
 ### Configuration Examples
 
@@ -145,6 +147,7 @@ Detailed configuration examples:
 | Troubleshooting | ✅ Complete | 2024-12-10 |
 | Model Configuration | ✅ Complete | 2024-11-26 |
 | RAG Setup | ✅ Complete | 2024-12-03 |
+| Default Workflow & Context | ✅ Complete | 2024-12-11 |
 
 ## Contributing to Documentation
 

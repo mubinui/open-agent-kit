@@ -135,6 +135,23 @@ class KeycloakConfig(BaseSettings):
         return f"{self.server_url}/realms/{self.realm}"
 
 
+class ContextConfig(BaseSettings):
+    """Configuration for conversation context management."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    max_history_messages: int = Field(default=10, alias="MAX_HISTORY_MESSAGES")
+    max_context_exchanges: int = Field(default=5, alias="MAX_CONTEXT_EXCHANGES")
+    max_message_length: int = Field(default=500, alias="MAX_MESSAGE_LENGTH")
+    strip_wrappers_from_storage: bool = Field(default=True, alias="STRIP_WRAPPERS_FROM_STORAGE")
+    strip_wrappers_from_response: bool = Field(default=True, alias="STRIP_WRAPPERS_FROM_RESPONSE")
+
+
 class ExternalServicesConfig(BaseSettings):
     """External service endpoints configuration (Service1, Service2)."""
 
@@ -184,6 +201,7 @@ class Settings(BaseSettings):
     message_broker: MessageBrokerConfig = Field(default_factory=MessageBrokerConfig)
     keycloak: KeycloakConfig = Field(default_factory=KeycloakConfig)
     external_services: ExternalServicesConfig = Field(default_factory=ExternalServicesConfig)
+    context: ContextConfig = Field(default_factory=ContextConfig)
 
 
 # Global settings instance

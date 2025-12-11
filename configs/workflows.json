@@ -89,6 +89,7 @@
       "max_turns": 10,
       "summary_method": "last_msg",
       "enabled": true,
+      "default": true,
       "selector_config": {
         "routing_agents": {
           "requisition": "requisition_domain_agent",

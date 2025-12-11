@@ -129,7 +129,7 @@ cp .env.example .env
 alembic upgrade head
 
 # 7. Start the API server
-uvicorn src.api.main:app --reload --port 8000
+uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Verify Installation
@@ -138,7 +138,12 @@ uvicorn src.api.main:app --reload --port 8000
 # Check health
 curl http://localhost:8000/health
 
-# Create a session and send a message
+# Create a session using the default workflow (procurement_chatbot)
+curl -X POST http://localhost:8000/api/v1/sessions \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# Or specify a workflow explicitly
 curl -X POST http://localhost:8000/api/v1/sessions \
   -H "Content-Type: application/json" \
   -d '{"workflow_id": "simple_assistant"}'
@@ -228,6 +233,59 @@ orchestration-service/
 | `sequential` | Chain of conversations with context carryover |
 | `group_chat` | Multi-agent collaboration with speaker selection |
 | `nested` | Complex workflows with conditional sub-conversations |
+| `selector` | Routes queries to specialized domain agents |
+
+### Default Workflow
+
+The system supports a default workflow that is used when no `workflow_id` is specified during session creation. The `procurement_chatbot` workflow is configured as the default.
+
+To set a workflow as default, add `"default": true` in `configs/workflows.json`:
+
+```json
+{
+  "id": "procurement_chatbot",
+  "name": "Procurement Chatbot",
+  "pattern": "selector",
+  "default": true,
+  ...
+}
+```
+
+Using the default workflow:
+
+```bash
+# Create session without specifying workflow_id (uses default)
+curl -X POST http://localhost:8000/api/v1/sessions \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# List workflows to see which is default
+curl http://localhost:8000/api/v1/workflows
+# Response includes "is_default": true for the default workflow
+```
+
+### Context Management
+
+The system automatically manages conversation context to ensure clean, professional responses without internal markers.
+
+**Context Sanitization**: Internal context wrapper markers (like `[Previous conversation context]` or `[Current message]`) are automatically stripped from:
+- Responses returned to users
+- Messages stored in session history
+
+**Context Window Limits**: Conversation context is bounded to prevent unbounded growth:
+- `MAX_CONTEXT_EXCHANGES`: Limits recent exchanges included in agent context (default: 5)
+- `MAX_MESSAGE_LENGTH`: Truncates long messages in context (default: 500 chars)
+- `MAX_HISTORY_MESSAGES`: Limits total messages kept in session history (default: 10)
+
+**Configuration Options** (via environment variables or `.env`):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAX_HISTORY_MESSAGES` | 10 | Maximum messages to keep in session history |
+| `MAX_CONTEXT_EXCHANGES` | 5 | Maximum exchanges to include in agent context |
+| `MAX_MESSAGE_LENGTH` | 500 | Maximum length for individual messages in context |
+| `STRIP_WRAPPERS_FROM_STORAGE` | true | Strip context wrappers before storing messages |
+| `STRIP_WRAPPERS_FROM_RESPONSE` | true | Strip context wrappers from final responses |
 
 ### Environment Variables
 
@@ -244,6 +302,13 @@ REDIS_URL=redis://localhost:6379/0
 RABBITMQ_URL=amqp://guest:guest@localhost:5672/
 LOG_LEVEL=INFO
 ENABLE_METRICS=true
+
+# Context Management (Optional)
+MAX_HISTORY_MESSAGES=10          # Maximum messages to keep in history
+MAX_CONTEXT_EXCHANGES=5          # Maximum exchanges to include in agent context
+MAX_MESSAGE_LENGTH=500           # Maximum length for individual messages in context
+STRIP_WRAPPERS_FROM_STORAGE=true # Strip context wrappers before storing messages
+STRIP_WRAPPERS_FROM_RESPONSE=true # Strip context wrappers from final responses
 ```
 
 ### Vector Database & RAG Setup

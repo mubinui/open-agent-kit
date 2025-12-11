@@ -36,6 +36,8 @@ async def create_session(
     """
     Create a new conversation session.
     
+    If workflow_id is not provided in the request, the default workflow will be used.
+    
     Args:
         request: FastAPI request object
         body: Session creation request
@@ -43,31 +45,49 @@ async def create_session(
     Returns:
         Created session information
         
-    Requirements: 1.1, 1.3
+    Requirements: 1.1, 1.3, 2.2, 2.3
     """
+    from src.config.workflow_registry import get_workflow_registry
+    
     request_id = getattr(request.state, "request_id", None)
     
     # Set request context
     set_request_user(current_user)
     
+    # Use default workflow if not specified
+    workflow_id = body.workflow_id
+    if not workflow_id:
+        workflow_registry = get_workflow_registry()
+        workflow_id = workflow_registry.get_default_workflow_id()
+        if not workflow_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No workflow_id provided and no default workflow configured",
+            )
+        logger.info(
+            "Using default workflow",
+            request_id=request_id,
+            workflow_id=workflow_id,
+        )
+    
     logger.info(
         "Creating session",
         request_id=request_id,
-        workflow_id=body.workflow_id,
+        workflow_id=workflow_id,
         user_id=body.user_id,
     )
     
     try:
         session_manager = get_session_manager()
         session = await session_manager.create_session(
-            workflow_id=body.workflow_id,
+            workflow_id=workflow_id,
             user_id=body.user_id,
             metadata=body.metadata,
         )
         
         return SessionResponse(
             session_id=session.session_id,
-            workflow_id=body.workflow_id,
+            workflow_id=workflow_id,
             user_id=body.user_id,
             active=session.active,
             created_at=session.created_at,

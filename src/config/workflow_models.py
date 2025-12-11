@@ -292,6 +292,10 @@ class WorkflowConfig(BaseModel):
         default=True,
         description="Whether this workflow is enabled"
     )
+    default: bool = Field(
+        default=False,
+        description="Whether this is the default workflow"
+    )
     metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional workflow metadata"

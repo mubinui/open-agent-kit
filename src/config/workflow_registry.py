@@ -134,6 +134,51 @@ class WorkflowRegistry:
         
         return self._workflows_config.workflows
 
+    def get_default_workflow(self) -> Optional[WorkflowConfig]:
+        """
+        Get the default workflow configuration.
+        
+        Returns:
+            Default workflow config or None if no default is set.
+            If the default workflow is disabled, falls back to the first enabled workflow.
+        """
+        if self._workflows_config is None:
+            return None
+        
+        # Find workflow marked as default
+        default_workflow = next(
+            (w for w in self._workflows_config.workflows if w.default),
+            None
+        )
+        
+        # If default workflow exists and is enabled, return it
+        if default_workflow is not None and default_workflow.enabled:
+            return default_workflow
+        
+        # If default workflow is disabled, fall back to first enabled workflow
+        if default_workflow is not None and not default_workflow.enabled:
+            logger.warning(
+                "Default workflow is disabled, falling back to first enabled workflow",
+                default_workflow_id=default_workflow.id,
+            )
+            enabled_workflows = self._workflows_config.get_enabled_workflows()
+            if enabled_workflows:
+                return enabled_workflows[0]
+        
+        # No default configured, return None
+        return None
+
+    def get_default_workflow_id(self) -> Optional[str]:
+        """
+        Get the ID of the default workflow.
+        
+        Returns:
+            Default workflow ID or None if no default is set.
+            If the default workflow is disabled, falls back to the first enabled workflow.
+        """
+        default_workflow = self.get_default_workflow()
+        return default_workflow.id if default_workflow is not None else None
+
     def validate_workflow(
         self,
         workflow: WorkflowConfig,
