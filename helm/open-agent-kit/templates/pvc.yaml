@@ -1,0 +1,18 @@
+{{- if .Values.chromadb.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "open-agent-kit.fullname" . }}-chromadb-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "open-agent-kit.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.chromadb.persistence.size }}
+  {{- if .Values.chromadb.persistence.storageClass }}
+  storageClassName: {{ .Values.chromadb.persistence.storageClass }}
+  {{- end }}
+{{- end }}

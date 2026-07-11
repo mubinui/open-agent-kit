@@ -1,11 +1,14 @@
-"""Async task processor for agent conversations via RabbitMQ."""
+"""Async task processor for agent conversations via RabbitMQ.
+
+CrewAI IMPLEMENTATION:
+- Uses CrewAI's Runner and Session for execution
+- Agent execution uses _run_async_impl() instead of generate_reply()
+"""
 
 import asyncio
 import logging
 from typing import Any, Dict, Optional
 from uuid import UUID
-
-from autogen.agentchat import ChatResult
 
 from src.api.session_manager import SessionManager
 from src.infrastructure.message_broker import (
@@ -14,7 +17,11 @@ from src.infrastructure.message_broker import (
     AgentTaskPublisher,
     RabbitMQConnectionPool,
 )
-from src.patterns.conversation_engine import ConversationPatternEngine
+
+# Legacy CrewAI stub - CrewAI uses SessionManager's Runner directly
+class ConversationPatternEngine:
+    """Stub for legacy CrewAI pattern engine - not used in CrewAI."""
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -182,14 +189,14 @@ class AsyncAgentTaskProcessor:
     
     def _extract_chat_result(
         self,
-        chat_result: ChatResult,
+        chat_result: Any,
         recipient_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Extract result data from ChatResult.
+        Extract result data from CrewAI execution result.
         
         Args:
-            chat_result: Autogen ChatResult object
+            chat_result: CrewAI execution result object
             recipient_name: Optional name of recipient agent
             
         Returns:

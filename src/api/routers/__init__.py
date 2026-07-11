@@ -1,1 +1,1 @@
-"""API routers for the Orchestration Service."""
+"""API routers for Open Agent Kit."""

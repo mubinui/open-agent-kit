@@ -62,3 +62,11 @@ k8s/
 .env.*.local
 *.bak
 *.tmp
+# Open Agent Kit additions
+workflow-editor/node_modules/
+workflow-editor/dist/
+static/
+.crewai/
+.hypothesis/
+.uv-cache/
+deployments/

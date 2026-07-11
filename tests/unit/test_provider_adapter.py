@@ -99,7 +99,6 @@ def test_provider_adapter_initialization(temp_config_files):
     
     assert adapter is not None
     assert len(adapter._providers) == 3
-    assert len(adapter._vector_db_configs) == 2
 
 
 def test_get_llm_client_success(temp_config_files):
@@ -201,51 +200,16 @@ def test_get_api_client_success(temp_config_files):
             assert call_kwargs['headers']['X-API-Key'] == 'api_key_456'
 
 
-def test_get_vector_db_client_chromadb(temp_config_files):
-    """Test getting ChromaDB client."""
-    with patch('src.infrastructure.providers.adapter.ChromaDBClient') as mock_client:
-        adapter = ProviderAdapter(
-            config_path=str(temp_config_files["providers_file"]),
-            vector_db_config_path=str(temp_config_files["vector_db_file"]),
-            enable_file_watching=False
-        )
-        
-        client = adapter.get_vector_db_client("test_collection")
-        
-        assert client is not None
-        mock_client.assert_called_once()
-
-
-def test_get_vector_db_client_not_found(temp_config_files):
-    """Test getting a non-existent vector DB client."""
+def test_get_vector_db_client_removed(temp_config_files):
+    """Local vector DB clients were removed in favor of the external RAG service."""
     adapter = ProviderAdapter(
         config_path=str(temp_config_files["providers_file"]),
         vector_db_config_path=str(temp_config_files["vector_db_file"]),
         enable_file_watching=False
     )
-    
-    with pytest.raises(ValueError, match="Vector database configuration not found"):
-        adapter.get_vector_db_client("nonexistent_collection")
 
-
-def test_get_vector_db_client_caching(temp_config_files):
-    """Test that vector DB clients are cached."""
-    with patch('src.infrastructure.providers.adapter.ChromaDBClient') as mock_client:
-        adapter = ProviderAdapter(
-            config_path=str(temp_config_files["providers_file"]),
-            vector_db_config_path=str(temp_config_files["vector_db_file"]),
-            cache_ttl_seconds=300,
-            enable_file_watching=False
-        )
-        
-        # First call
-        client1 = adapter.get_vector_db_client("test_collection")
-        # Second call (should use cache)
-        client2 = adapter.get_vector_db_client("test_collection")
-        
-        # Should only create client once
-        assert mock_client.call_count == 1
-        assert client1 is client2
+    with pytest.raises(NotImplementedError, match="RAG pipeline"):
+        adapter.get_vector_db_client("test_collection")
 
 
 def test_get_credentials_from_env(temp_config_files):
@@ -441,7 +405,6 @@ def test_missing_config_files():
     
     # Should initialize with empty configs
     assert len(adapter._providers) == 0
-    assert len(adapter._vector_db_configs) == 0
 
 
 def test_create_llm_client_without_credentials(temp_config_files):

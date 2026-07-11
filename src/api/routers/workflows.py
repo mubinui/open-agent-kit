@@ -2,9 +2,11 @@
 
 import json
 from pathlib import Path
-from typing import List, Set
+from typing import List, Optional, Set
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 
 from src.api.models import (
     WorkflowCreateRequest,
@@ -12,11 +14,24 @@ from src.api.models import (
     WorkflowUpdateRequest,
     WorkflowValidationResponse,
 )
+from src.api.test_models import (
+    TestStatus,
+    WorkflowExecuteRequest,
+    WorkflowExecuteResponse,
+    WorkflowTestCaseCreate,
+    WorkflowTestCaseResponse,
+    WorkflowTestCaseUpdate,
+    WorkflowTestResultResponse,
+    WorkflowTestRunResponse,
+    TestRunRequest,
+)
 from src.api.workflow_validation import validate_workflow
 from src.audit_logging import get_logger
 from src.config.dependency_validation import DependencyError, get_validator
 from src.config.workflow_models import WorkflowConfig
 from src.config.config_loader import get_config_loader
+from src.core.workflow_test_runner import get_test_runner
+from src.api.session_manager import get_session_manager
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/workflows", tags=["workflows"])
@@ -385,3 +400,638 @@ async def delete_workflow(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete workflow: {str(e)}",
         )
+
+
+# ============================================================================
+# Standalone Workflow Execution (n8n-style)
+# ============================================================================
+
+@router.post("/{workflow_id}/execute", response_model=WorkflowExecuteResponse)
+async def execute_workflow(
+    request: Request,
+    workflow_id: str,
+    body: WorkflowExecuteRequest,
+) -> WorkflowExecuteResponse:
+    """
+    Execute a workflow standalone without session lifecycle.
+    
+    This endpoint runs a workflow with a single input/output, similar to n8n's
+    execute workflow functionality. No session is created or persisted.
+    
+    Use this for:
+    - Testing workflows independently
+    - One-shot workflow execution
+    - Integration with external systems
+    - Dry-run validation
+    
+    Args:
+        request: FastAPI request object
+        workflow_id: Workflow identifier
+        body: Execution request with message and options
+        
+    Returns:
+        Execution response with result and trace
+        
+    Requirements: 1.1, 2.1, Testing
+    """
+    request_id = getattr(request.state, "request_id", None)
+    
+    logger.info(
+        "Executing workflow standalone",
+        request_id=request_id,
+        workflow_id=workflow_id,
+        dry_run=body.dry_run,
+    )
+    
+    try:
+        test_runner = get_test_runner()
+        result = await test_runner.execute_workflow(workflow_id, body)
+        
+        logger.info(
+            "Workflow execution completed",
+            request_id=request_id,
+            workflow_id=workflow_id,
+            success=result.success,
+            execution_time_ms=result.execution_time_ms,
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(
+            "Workflow execution failed",
+            request_id=request_id,
+            workflow_id=workflow_id,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Workflow execution failed: {str(e)}",
+        )
+
+
+@router.post("/{workflow_id}/execute/stream")
+async def stream_workflow_execution(
+    request: Request,
+    workflow_id: str,
+    body: WorkflowExecuteRequest,
+) -> StreamingResponse:
+    """Execute a workflow and stream real-time agent/tool deltas as SSE."""
+    request_id = getattr(request.state, "request_id", None)
+
+    async def event_stream():
+        session_manager = get_session_manager()
+        conversation = await session_manager.create_session(
+            workflow_id=workflow_id,
+            user_id="live-runner",
+            metadata={"source": "workflow_live_run", **body.metadata},
+        )
+        async for delta in session_manager.stream_message(
+            session_id=conversation.session_id,
+            message=body.message,
+            max_turns=None,
+            metadata={"workflow_id": workflow_id, "source": "workflow_live_run", **body.metadata},
+            correlation_id=request_id,
+        ):
+            yield delta.to_sse()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/{workflow_id}/validate", response_model=WorkflowValidationResponse)
+async def validate_workflow_config(
+    request: Request,
+    workflow_id: str,
+) -> WorkflowValidationResponse:
+    """
+    Validate a workflow configuration without executing.
+    
+    Checks:
+    - Workflow exists and is enabled
+    - All referenced agents exist
+    - All referenced tools exist
+    - Topology is valid
+    
+    Args:
+        request: FastAPI request object
+        workflow_id: Workflow identifier
+        
+    Returns:
+        Validation result
+        
+    Requirements: 1.1, 2.1
+    """
+    request_id = getattr(request.state, "request_id", None)
+    
+    logger.info(
+        "Validating workflow",
+        request_id=request_id,
+        workflow_id=workflow_id,
+    )
+    
+    try:
+        test_runner = get_test_runner()
+        is_valid, error = test_runner.validate_workflow(workflow_id)
+        
+        return WorkflowValidationResponse(
+            valid=is_valid,
+            errors=[error] if error else [],
+            warnings=[],
+        )
+        
+    except Exception as e:
+        logger.error(
+            "Workflow validation failed",
+            request_id=request_id,
+            workflow_id=workflow_id,
+            error=str(e),
+            exc_info=True,
+        )
+        return WorkflowValidationResponse(
+            valid=False,
+            errors=[str(e)],
+            warnings=[],
+        )
+
+
+# ============================================================================
+# Workflow Test Case Management
+# ============================================================================
+
+# In-memory storage for test cases (will be replaced with DB when migration runs)
+_test_cases: dict[str, dict] = {}
+_test_results: dict[str, dict] = {}
+_test_runs: dict[str, dict] = {}
+
+
+@router.post("/{workflow_id}/test-cases", response_model=WorkflowTestCaseResponse, status_code=status.HTTP_201_CREATED)
+async def create_test_case(
+    request: Request,
+    workflow_id: str,
+    body: WorkflowTestCaseCreate,
+) -> WorkflowTestCaseResponse:
+    """
+    Create a test case for a workflow.
+    
+    Args:
+        request: FastAPI request object
+        workflow_id: Workflow identifier
+        body: Test case creation request
+        
+    Returns:
+        Created test case
+    """
+    from datetime import datetime
+    from uuid import uuid4
+    
+    request_id = getattr(request.state, "request_id", None)
+    
+    # Validate workflow exists
+    config = _load_workflows_config()
+    if not any(w["id"] == workflow_id for w in config["workflows"]):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workflow not found: {workflow_id}",
+        )
+    
+    # Create test case
+    test_case_id = uuid4()
+    now = datetime.utcnow()
+    
+    test_case = {
+        "id": test_case_id,
+        "workflow_id": workflow_id,
+        "name": body.name,
+        "description": body.description,
+        "input_message": body.input_message,
+        "expected_agent": body.expected_agent,
+        "expected_tools": body.expected_tools,
+        "expected_output_contains": body.expected_output_contains,
+        "expected_output_pattern": body.expected_output_pattern,
+        "timeout_seconds": body.timeout_seconds,
+        "enabled": body.enabled,
+        "created_at": now,
+        "updated_at": now,
+        "created_by": None,
+        "metadata": body.metadata,
+    }
+    
+    _test_cases[str(test_case_id)] = test_case
+    
+    logger.info(
+        "Created test case",
+        request_id=request_id,
+        workflow_id=workflow_id,
+        test_case_id=str(test_case_id),
+    )
+    
+    return WorkflowTestCaseResponse(**test_case)
+
+
+@router.get("/{workflow_id}/test-cases", response_model=List[WorkflowTestCaseResponse])
+async def list_test_cases(
+    request: Request,
+    workflow_id: str,
+    enabled_only: bool = False,
+) -> List[WorkflowTestCaseResponse]:
+    """
+    List test cases for a workflow.
+    
+    Args:
+        request: FastAPI request object
+        workflow_id: Workflow identifier
+        enabled_only: If true, only return enabled test cases
+        
+    Returns:
+        List of test cases
+    """
+    cases = [
+        WorkflowTestCaseResponse(**tc)
+        for tc in _test_cases.values()
+        if tc["workflow_id"] == workflow_id
+        and (not enabled_only or tc["enabled"])
+    ]
+    return cases
+
+
+@router.get("/{workflow_id}/test-cases/{test_case_id}", response_model=WorkflowTestCaseResponse)
+async def get_test_case(
+    request: Request,
+    workflow_id: str,
+    test_case_id: str,
+) -> WorkflowTestCaseResponse:
+    """Get a specific test case."""
+    if test_case_id not in _test_cases:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test case not found: {test_case_id}",
+        )
+    
+    tc = _test_cases[test_case_id]
+    if tc["workflow_id"] != workflow_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test case not found in workflow: {workflow_id}",
+        )
+    
+    return WorkflowTestCaseResponse(**tc)
+
+
+@router.put("/{workflow_id}/test-cases/{test_case_id}", response_model=WorkflowTestCaseResponse)
+async def update_test_case(
+    request: Request,
+    workflow_id: str,
+    test_case_id: str,
+    body: WorkflowTestCaseUpdate,
+) -> WorkflowTestCaseResponse:
+    """Update a test case."""
+    from datetime import datetime
+    
+    if test_case_id not in _test_cases:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test case not found: {test_case_id}",
+        )
+    
+    tc = _test_cases[test_case_id]
+    if tc["workflow_id"] != workflow_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test case not found in workflow: {workflow_id}",
+        )
+    
+    # Update fields
+    update_data = body.model_dump(exclude_unset=True)
+    tc.update(update_data)
+    tc["updated_at"] = datetime.utcnow()
+    
+    return WorkflowTestCaseResponse(**tc)
+
+
+@router.delete("/{workflow_id}/test-cases/{test_case_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_test_case(
+    request: Request,
+    workflow_id: str,
+    test_case_id: str,
+) -> None:
+    """Delete a test case."""
+    if test_case_id not in _test_cases:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test case not found: {test_case_id}",
+        )
+    
+    tc = _test_cases[test_case_id]
+    if tc["workflow_id"] != workflow_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test case not found in workflow: {workflow_id}",
+        )
+    
+    del _test_cases[test_case_id]
+
+
+# ============================================================================
+# Workflow Test Execution
+# ============================================================================
+
+@router.post("/{workflow_id}/test-cases/{test_case_id}/run", response_model=WorkflowTestResultResponse)
+async def run_test_case(
+    request: Request,
+    workflow_id: str,
+    test_case_id: str,
+) -> WorkflowTestResultResponse:
+    """
+    Run a single test case.
+    
+    Args:
+        request: FastAPI request object
+        workflow_id: Workflow identifier
+        test_case_id: Test case identifier
+        
+    Returns:
+        Test result
+    """
+    from datetime import datetime
+    from uuid import uuid4
+    
+    request_id = getattr(request.state, "request_id", None)
+    
+    if test_case_id not in _test_cases:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test case not found: {test_case_id}",
+        )
+    
+    tc = _test_cases[test_case_id]
+    if tc["workflow_id"] != workflow_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test case not found in workflow: {workflow_id}",
+        )
+    
+    test_case = WorkflowTestCaseResponse(**tc)
+    
+    logger.info(
+        "Running test case",
+        request_id=request_id,
+        workflow_id=workflow_id,
+        test_case_id=test_case_id,
+        test_name=test_case.name,
+    )
+    
+    # Run the test
+    test_runner = get_test_runner()
+    result_id = uuid4()
+    started_at = datetime.utcnow()
+    
+    try:
+        exec_result, status_result, error_msg = await test_runner.run_test_case(test_case)
+        
+        completed_at = datetime.utcnow()
+        execution_time_ms = exec_result.execution_time_ms if exec_result else 0
+        
+        result = {
+            "id": result_id,
+            "test_case_id": UUID(test_case_id),
+            "workflow_id": workflow_id,
+            "status": status_result,
+            "actual_response": exec_result.response if exec_result else None,
+            "actual_agent": exec_result.agents_called[0] if exec_result and exec_result.agents_called else None,
+            "actual_tools": exec_result.tools_called if exec_result else None,
+            "execution_time_ms": execution_time_ms,
+            "error_message": error_msg,
+            "execution_trace": exec_result.execution_trace if exec_result else None,
+            "started_at": started_at,
+            "completed_at": completed_at,
+            "run_by": None,
+            "run_id": None,
+            "metadata": {},
+        }
+        
+        _test_results[str(result_id)] = result
+        
+        logger.info(
+            "Test case completed",
+            request_id=request_id,
+            test_case_id=test_case_id,
+            status=status_result.value,
+            execution_time_ms=execution_time_ms,
+        )
+        
+        return WorkflowTestResultResponse(**result)
+        
+    except Exception as e:
+        logger.error(
+            "Test case execution failed",
+            request_id=request_id,
+            test_case_id=test_case_id,
+            error=str(e),
+            exc_info=True,
+        )
+        
+        result = {
+            "id": result_id,
+            "test_case_id": UUID(test_case_id),
+            "workflow_id": workflow_id,
+            "status": TestStatus.ERROR,
+            "actual_response": None,
+            "actual_agent": None,
+            "actual_tools": None,
+            "execution_time_ms": int((datetime.utcnow() - started_at).total_seconds() * 1000),
+            "error_message": str(e),
+            "execution_trace": None,
+            "started_at": started_at,
+            "completed_at": datetime.utcnow(),
+            "run_by": None,
+            "run_id": None,
+            "metadata": {},
+        }
+        
+        _test_results[str(result_id)] = result
+        return WorkflowTestResultResponse(**result)
+
+
+@router.post("/{workflow_id}/test", response_model=WorkflowTestRunResponse)
+async def run_workflow_tests(
+    request: Request,
+    workflow_id: str,
+    body: Optional[TestRunRequest] = None,
+) -> WorkflowTestRunResponse:
+    """
+    Run all test cases for a workflow.
+    
+    Args:
+        request: FastAPI request object
+        workflow_id: Workflow identifier
+        body: Optional test run configuration
+        
+    Returns:
+        Test run summary
+    """
+    from datetime import datetime
+    from uuid import uuid4
+    
+    request_id = getattr(request.state, "request_id", None)
+    
+    # Get test cases for this workflow
+    test_cases = [
+        WorkflowTestCaseResponse(**tc)
+        for tc in _test_cases.values()
+        if tc["workflow_id"] == workflow_id and tc["enabled"]
+    ]
+    
+    if not test_cases:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No enabled test cases found for workflow: {workflow_id}",
+        )
+    
+    run_id = uuid4()
+    started_at = datetime.utcnow()
+    
+    logger.info(
+        "Starting test run",
+        request_id=request_id,
+        workflow_id=workflow_id,
+        run_id=str(run_id),
+        test_count=len(test_cases),
+    )
+    
+    # Run all tests
+    test_runner = get_test_runner()
+    passed = 0
+    failed = 0
+    errors = 0
+    skipped = 0
+    
+    for tc in test_cases:
+        try:
+            exec_result, status_result, error_msg = await test_runner.run_test_case(tc)
+            
+            if status_result == TestStatus.PASSED:
+                passed += 1
+            elif status_result == TestStatus.FAILED:
+                failed += 1
+            elif status_result == TestStatus.ERROR:
+                errors += 1
+            elif status_result == TestStatus.SKIPPED:
+                skipped += 1
+                
+        except Exception as e:
+            logger.error(
+                "Test case error",
+                test_case_id=str(tc.id),
+                error=str(e),
+            )
+            errors += 1
+    
+    completed_at = datetime.utcnow()
+    total = len(test_cases)
+    
+    # Determine overall status
+    if errors > 0:
+        run_status = TestStatus.ERROR
+    elif failed > 0:
+        run_status = TestStatus.FAILED
+    elif passed == total:
+        run_status = TestStatus.PASSED
+    else:
+        run_status = TestStatus.PASSED
+    
+    run = {
+        "id": run_id,
+        "workflow_id": workflow_id,
+        "name": body.name if body else f"Test run {run_id}",
+        "total_tests": total,
+        "passed_tests": passed,
+        "failed_tests": failed,
+        "error_tests": errors,
+        "skipped_tests": skipped,
+        "status": run_status,
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "run_by": None,
+        "metadata": body.metadata if body else {},
+    }
+    
+    _test_runs[str(run_id)] = run
+    
+    logger.info(
+        "Test run completed",
+        request_id=request_id,
+        workflow_id=workflow_id,
+        run_id=str(run_id),
+        passed=passed,
+        failed=failed,
+        errors=errors,
+    )
+    
+    return WorkflowTestRunResponse(**run)
+
+
+@router.get("/{workflow_id}/test-results", response_model=List[WorkflowTestResultResponse])
+async def list_test_results(
+    request: Request,
+    workflow_id: str,
+    limit: int = 50,
+) -> List[WorkflowTestResultResponse]:
+    """
+    List recent test results for a workflow.
+    
+    Args:
+        request: FastAPI request object
+        workflow_id: Workflow identifier
+        limit: Maximum number of results to return
+        
+    Returns:
+        List of test results
+    """
+    results = [
+        WorkflowTestResultResponse(**r)
+        for r in _test_results.values()
+        if r["workflow_id"] == workflow_id
+    ]
+    
+    # Sort by started_at descending
+    results.sort(key=lambda r: r.started_at, reverse=True)
+    
+    return results[:limit]
+
+
+@router.get("/{workflow_id}/test-runs", response_model=List[WorkflowTestRunResponse])
+async def list_test_runs(
+    request: Request,
+    workflow_id: str,
+    limit: int = 20,
+) -> List[WorkflowTestRunResponse]:
+    """
+    List recent test runs for a workflow.
+    
+    Args:
+        request: FastAPI request object
+        workflow_id: Workflow identifier
+        limit: Maximum number of runs to return
+        
+    Returns:
+        List of test runs
+    """
+    runs = [
+        WorkflowTestRunResponse(**r)
+        for r in _test_runs.values()
+        if r["workflow_id"] == workflow_id
+    ]
+    
+    # Sort by started_at descending
+    runs.sort(key=lambda r: r.started_at, reverse=True)
+    
+    return runs[:limit]

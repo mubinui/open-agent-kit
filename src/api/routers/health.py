@@ -29,7 +29,7 @@ async def health_check(request: Request) -> HealthResponse:
     """
     return HealthResponse(
         status="healthy",
-        service="orchestration-service",
+        service="open-agent-kit",
         version="0.1.0",
     )
 
@@ -55,34 +55,8 @@ async def readiness_check(request: Request) -> Dict[str, Any]:
     settings = get_settings()
     checks = {}
     
-    # Check MongoDB (for both auth and conversation store)
-    if settings.memory.mongodb_url:
-        try:
-            from src.infrastructure.database.mongo_auth_store import get_mongo_auth_store
-            
-            auth_store = get_mongo_auth_store()
-            if auth_store and auth_store.health_check():
-                checks["mongodb"] = "ok"
-            else:
-                # Try to initialize and check
-                from src.infrastructure.database.mongo_store import MongoDBConversationStore
-                
-                mongo_store = MongoDBConversationStore(
-                    connection_string=settings.memory.mongodb_url,
-                    database_name=settings.memory.mongodb_database,
-                )
-                
-                if mongo_store.health_check():
-                    checks["mongodb"] = "ok"
-                else:
-                    checks["mongodb"] = "failed"
-                    logger.error("MongoDB health check failed - service not ready")
-                
-                mongo_store.close()
-                
-        except Exception as e:
-            logger.error(f"MongoDB health check failed: {e}")
-            checks["mongodb"] = "failed"
+    # MongoDB removed - no longer required
+    # Using PostgreSQL for all storage needs
     
     # Check Redis cache
     if settings.memory.redis_url:
@@ -104,7 +78,7 @@ async def readiness_check(request: Request) -> Dict[str, Any]:
     
     return {
         "status": "ready" if all_ok else "not_ready",
-        "service": "orchestration-service",
+        "service": "open-agent-kit",
         "version": "0.1.0",
         "timestamp": time.time(),
         "checks": checks,
@@ -129,7 +103,7 @@ async def liveness_check(request: Request) -> Dict[str, Any]:
     """
     return {
         "status": "alive",
-        "service": "orchestration-service",
+        "service": "open-agent-kit",
         "version": "0.1.0",
         "timestamp": time.time(),
     }
@@ -173,6 +147,19 @@ async def dashboard_metrics(request: Request) -> Dict[str, Any]:
     Returns:
         Dashboard metrics as JSON
     """
+    # Get LLM provider info
+    llm_info = {}
+    try:
+        from src.config.llm_provider import get_provider_config
+        config = get_provider_config()
+        llm_info = {
+            "provider": config.provider.value,
+            "model": config.model_name,
+            "openrouter_presets": config.get_openrouter_presets() if config.provider.value == "openrouter" else None,
+        }
+    except Exception as e:
+        llm_info = {"error": str(e)}
+    
     return {
         "total_agents": 0,
         "total_tools": 0,
@@ -182,4 +169,5 @@ async def dashboard_metrics(request: Request) -> Dict[str, Any]:
         "cache_hit_rate": 0.0,
         "avg_response_time": 0.0,
         "error_rate": 0.0,
+        "llm_provider": llm_info,
     }

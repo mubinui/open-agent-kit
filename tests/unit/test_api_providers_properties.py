@@ -43,9 +43,8 @@ def test_api_key_masking(api_key):
         assert len(masked) == len(api_key)
         assert masked.endswith(api_key[-4:])
         assert masked.startswith("*")
-        # Ensure the original key (except last 4 chars) is not visible
-        if len(api_key) > 4:
-            assert api_key[:-4] not in masked
+        # Everything except the last 4 characters must be masked out
+        assert masked == "*" * (len(api_key) - 4) + api_key[-4:]
 
 
 # **Feature: config-management-ui, Property 1: Configuration CRUD consistency**

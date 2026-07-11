@@ -17,7 +17,8 @@ def extract_variables(template: str) -> list[str]:
     Returns:
         List of unique variable names found in the template
     """
-    pattern = r'\{([^{}]+)\}'
+    # Only valid Python identifiers count as variables ({123} or {-x} are not)
+    pattern = r'\{([A-Za-z_][A-Za-z0-9_]*)\}'
     variables = re.findall(pattern, template)
     return sorted(set(variables))
 
@@ -30,9 +31,11 @@ class PromptTemplateConfig(BaseModel):
         description="Unique prompt template identifier"
     )
     name: str = Field(
+        min_length=1,
         description="Human-readable name for the prompt template"
     )
     description: str = Field(
+        min_length=1,
         description="Description of what this prompt template is used for"
     )
     template: str = Field(
@@ -100,11 +103,12 @@ class PromptTemplateConfig(BaseModel):
                     f"Template contains nested braces in variable: {{{match}}}"
                 )
             
-            # Validate variable name format (alphanumeric and underscore only)
-            if not re.match(r'^[a-zA-Z0-9_]+$', match):
+            # Validate variable name format (must be a valid identifier)
+            if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', match):
                 raise ValueError(
                     f"Invalid variable name '{match}'. "
-                    "Variable names must contain only letters, numbers, and underscores"
+                    "Variable names must start with a letter or underscore and "
+                    "contain only letters, numbers, and underscores"
                 )
         
         return v

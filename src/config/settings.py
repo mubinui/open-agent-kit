@@ -15,7 +15,7 @@ class OpenRouterConfig(BaseSettings):
     )
 
     api_key: str = Field(default="mock_api_key_for_testing", alias="OPENROUTER_API_KEY")
-    model: str = Field(default="@preset/procurement-chatbot", alias="OPENROUTER_MODEL")
+    model: str = Field(default="openai/gpt-oss-20b", alias="OPENROUTER_MODEL")
     base_url: str = Field(
         default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
     )
@@ -29,6 +29,14 @@ class ApplicationConfig(BaseSettings):
     max_conversation_turns: int = Field(default=20, alias="MAX_CONVERSATION_TURNS")
     response_timeout_seconds: int = Field(default=30, alias="RESPONSE_TIMEOUT_SECONDS")
     otlp_endpoint: str | None = Field(default=None, alias="OTLP_ENDPOINT")
+    # Port configuration — set APP_PORT to run on a different port (like n8n's N8N_PORT)
+    api_port: int = Field(default=8000, alias="APP_PORT")
+    # CORS — comma-separated list of allowed frontend origins, or "*" to allow all
+    frontend_url: str = Field(default="*", alias="FRONTEND_URL")
+    agent_runtime: str = Field(default="crewai", alias="AGENT_RUNTIME")
+    crewai_storage_dir: str = Field(default="./data/.crewai", alias="CREWAI_STORAGE_DIR")
+    crewai_memory_enabled: bool = Field(default=True, alias="CREWAI_MEMORY_ENABLED")
+    crewai_process_default: str = Field(default="sequential", alias="CREWAI_PROCESS_DEFAULT")
 
 
 class MemoryConfig(BaseSettings):
@@ -44,8 +52,6 @@ class MemoryConfig(BaseSettings):
     backend: str = Field(default="inmemory", alias="MEMORY_BACKEND")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
-    mongodb_url: str | None = Field(default=None, alias="MONGODB_URL")
-    mongodb_database: str = Field(default="orchestration", alias="MONGODB_DATABASE")
 
 
 class VectorDBConfig(BaseSettings):
@@ -100,7 +106,7 @@ class SecurityConfig(BaseSettings):
 
 
 class KeycloakConfig(BaseSettings):
-    """Keycloak OIDC configuration."""
+    """Keycloak OIDC configuration with multi-realm support."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -116,6 +122,7 @@ class KeycloakConfig(BaseSettings):
     client_secret: str | None = Field(default=None, alias="KEYCLOAK_CLIENT_SECRET")
     admin_client_id: str = Field(default="admin-client", alias="KEYCLOAK_ADMIN_CLIENT_ID")
     admin_client_secret: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_CLIENT_SECRET")
+
     verify_audience: bool = Field(default=True, alias="KEYCLOAK_VERIFY_AUDIENCE")
     jwks_cache_ttl: int = Field(default=3600, alias="KEYCLOAK_JWKS_CACHE_TTL")
 
@@ -133,23 +140,25 @@ class KeycloakConfig(BaseSettings):
     def issuer(self) -> str:
         """Expected token issuer."""
         return f"{self.server_url}/realms/{self.realm}"
-
-
-class ContextConfig(BaseSettings):
-    """Configuration for conversation context management."""
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
-    )
-
-    max_history_messages: int = Field(default=10, alias="MAX_HISTORY_MESSAGES")
-    max_context_exchanges: int = Field(default=5, alias="MAX_CONTEXT_EXCHANGES")
-    max_message_length: int = Field(default=500, alias="MAX_MESSAGE_LENGTH")
-    strip_wrappers_from_storage: bool = Field(default=True, alias="STRIP_WRAPPERS_FROM_STORAGE")
-    strip_wrappers_from_response: bool = Field(default=True, alias="STRIP_WRAPPERS_FROM_RESPONSE")
+    
+    def get_jwks_uri(self, realm: str | None = None) -> str:
+        """Get JWKS URI for a specific realm."""
+        realm_name = realm or self.realm
+        return f"{self.server_url}/realms/{realm_name}/protocol/openid-connect/certs"
+    
+    def get_token_endpoint(self, realm: str | None = None) -> str:
+        """Get token endpoint for a specific realm."""
+        realm_name = realm or self.realm
+        return f"{self.server_url}/realms/{realm_name}/protocol/openid-connect/token"
+    
+    def get_issuer(self, realm: str | None = None) -> str:
+        """Get issuer for a specific realm."""
+        realm_name = realm or self.realm
+        return f"{self.server_url}/realms/{realm_name}"
+    
+    def get_admin_secret(self, realm: str | None = None) -> str | None:
+        """Get admin client secret for a specific realm."""
+        return self.admin_client_secret
 
 
 class ExternalServicesConfig(BaseSettings):
@@ -201,7 +210,11 @@ class Settings(BaseSettings):
     message_broker: MessageBrokerConfig = Field(default_factory=MessageBrokerConfig)
     keycloak: KeycloakConfig = Field(default_factory=KeycloakConfig)
     external_services: ExternalServicesConfig = Field(default_factory=ExternalServicesConfig)
-    context: ContextConfig = Field(default_factory=ContextConfig)
+    
+    @property
+    def database_url(self) -> str:
+        """Database URL for platform persistence (SQLite by default)."""
+        return self.memory.database_url or "sqlite:///./data/oak.db"
 
 
 # Global settings instance

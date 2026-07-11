@@ -93,10 +93,16 @@ def get_versioned_config_service() -> "VersionedConfigService":
         )
     settings = get_settings()
     audit_logger = AuditLogger()
-    return VersionedConfigService(
-        database_url=settings.database.url,
+    service = VersionedConfigService(
+        database_url=settings.database_url,
         audit_logger=audit_logger,
     )
+    if not service.is_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Configuration versioning backend is not initialized. Apply database migrations to enable version history.",
+        )
+    return service
 
 
 @router.get("/{config_type}/{config_id}", response_model=ConfigResponse)

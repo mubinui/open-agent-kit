@@ -6,7 +6,7 @@
   "system_message": "You are a code generator that produces Python code. Always return valid, well-formatted Python code with proper error handling.",
   "llm_config": {
     "provider_id": "openrouter",
-    "model": "@preset/procurement-chatbot",
+    "model": "openai/gpt-oss-20b",
     "temperature": 0.3,
     "max_tokens": 2000,
     "cache_seed": 42,

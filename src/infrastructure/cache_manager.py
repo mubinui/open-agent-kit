@@ -1,11 +1,4 @@
-"""
-AUTOGEN 0.2 RESEARCH:
-- Feature needed: Multi-layer cache management with configuration hierarchy
-- Autogen provides: cache_seed parameter for basic LLM response caching
-- Using: Custom CacheManager extending Autogen's basic caching with fine-grained control
-- Documentation: https://microsoft.github.io/autogen/0.2/docs/reference/agentchat/conversable_agent
-- Decision: Custom implementation - Autogen's cache_seed is too basic, we need workflow/agent-level control
-"""
+"""Multi-layer cache management with configuration hierarchy."""
 
 import logging
 from typing import Optional, Any, Dict

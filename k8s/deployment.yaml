@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: orchestration-service
-  namespace: orchestration
+  name: open-agent-kit
+  namespace: open-agent-kit
   labels:
-    app: orchestration-service
+    app: open-agent-kit
     version: v1
 spec:
   replicas: 3
@@ -15,18 +15,18 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: orchestration-service
+      app: open-agent-kit
   template:
     metadata:
       labels:
-        app: orchestration-service
+        app: open-agent-kit
         version: v1
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
         prometheus.io/path: "/metrics"
     spec:
-      serviceAccountName: orchestration-service
+      serviceAccountName: open-agent-kit
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -35,23 +35,23 @@ spec:
       initContainers:
       # Run database migrations before starting the app
       - name: db-migration
-        image: orchestration-service:latest
+        image: open-agent-kit:latest
         command: ["alembic", "upgrade", "head"]
         env:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: orchestration-secrets
+              name: open-agent-kit-secrets
               key: DATABASE_URL
         envFrom:
         - configMapRef:
-            name: orchestration-config
+            name: open-agent-kit-config
         - secretRef:
-            name: orchestration-secrets
+            name: open-agent-kit-secrets
       
       containers:
-      - name: orchestration-service
-        image: orchestration-service:latest
+      - name: open-agent-kit
+        image: open-agent-kit:latest
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
@@ -66,24 +66,24 @@ spec:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: orchestration-secrets
+              name: open-agent-kit-secrets
               key: DATABASE_URL
         - name: REDIS_URL
           valueFrom:
             secretKeyRef:
-              name: orchestration-secrets
+              name: open-agent-kit-secrets
               key: REDIS_URL
         - name: RABBITMQ_URL
           valueFrom:
             secretKeyRef:
-              name: orchestration-secrets
+              name: open-agent-kit-secrets
               key: RABBITMQ_URL
         
         envFrom:
         - configMapRef:
-            name: orchestration-config
+            name: open-agent-kit-config
         - secretRef:
-            name: orchestration-secrets
+            name: open-agent-kit-secrets
         
         resources:
           requests:
@@ -124,25 +124,25 @@ spec:
           claimName: chromadb-pvc
       - name: config-volume
         configMap:
-          name: orchestration-config
+          name: open-agent-kit-config
 
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: orchestration-service
-  namespace: orchestration
+  name: open-agent-kit
+  namespace: open-agent-kit
   labels:
-    app: orchestration-service
+    app: open-agent-kit
 
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: chromadb-pvc
-  namespace: orchestration
+  namespace: open-agent-kit
   labels:
-    app: orchestration-service
+    app: open-agent-kit
 spec:
   accessModes:
     - ReadWriteOnce

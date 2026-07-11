@@ -172,8 +172,12 @@ class TestBehaviorValidationIntegration:
     
     def test_behavior_config_has_validation_method(self):
         """Test that behavior config correctly reports if validation is configured."""
-        # No validation
+        # Default config has response-quality validation enabled
         behavior = AgentBehaviorConfig()
+        assert behavior.has_validation()
+
+        # No validation when quality checks are explicitly disabled
+        behavior = AgentBehaviorConfig(validate_response_quality=False)
         assert not behavior.has_validation()
         
         # With output format

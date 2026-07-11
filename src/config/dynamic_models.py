@@ -43,6 +43,7 @@ class ModelCapability(str, Enum):
     EMBEDDING = "embedding"
     VISION = "vision"
     FUNCTION_CALLING = "function_calling"
+    STRUCTURED_OUTPUTS = "structured_outputs"
 
 
 class ModelPricing(BaseModel):
@@ -76,9 +77,9 @@ class ProviderConfig(BaseModel):
     """Configuration for an API provider."""
 
     id: str = Field(pattern=r"^[a-z0-9_]+$")
-    name: str
+    name: str = Field(min_length=1)
     type: ProviderType
-    description: str
+    description: str = Field(default="")
     enabled: bool = Field(default=True)
 
     # LLM-specific fields

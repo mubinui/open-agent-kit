@@ -1,4 +1,4 @@
-"""Redis caching infrastructure for the orchestration service."""
+"""Redis caching infrastructure for Open Agent Kit."""
 
 import json
 import logging

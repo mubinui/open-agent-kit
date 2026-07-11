@@ -1,12 +1,4 @@
-"""
-AUTOGEN 0.2 RESEARCH:
-- Feature needed: Agent behavior configuration and output validation
-- Autogen provides: ConversableAgent with system_message, register_reply for custom handlers
-- Using: ConversableAgent base class, register_reply for validation hooks
-- Documentation: https://microsoft.github.io/autogen/0.2/docs/reference/agentchat/conversable_agent
-- Decision: Autogen doesn't provide output format validation or behavior constraints.
-  We need to implement custom validation as an extension using register_reply hooks.
-"""
+"""Agent behavior configuration and output validation."""
 
 from enum import Enum
 from typing import Any, Optional
@@ -129,10 +121,59 @@ class AgentBehaviorConfig(BaseModel):
         description="Security and validation configuration"
     )
     
+    # ==========================================================================
+    # RELIABILITY SETTINGS (CrewAI 0.4 best practices)
+    # ==========================================================================
+    
+    reflect_on_tool_use: bool = Field(
+        default=True,
+        description="Whether agent should synthesize tool results into natural language. "
+                    "When True, the agent will transform raw tool output into user-friendly responses."
+    )
+    max_validation_retries: int = Field(
+        default=2,
+        ge=0,
+        le=5,
+        description="Maximum number of retries when response validation fails. "
+                    "Agent will receive feedback and retry on validation failure."
+    )
+    validate_response_quality: bool = Field(
+        default=True,
+        description="Whether to validate response quality (detect raw JSON, errors, etc.)"
+    )
+    min_response_length: int = Field(
+        default=10,
+        ge=0,
+        description="Minimum acceptable response length in characters"
+    )
+    
+    # Raw output detection patterns (configurable)
+    raw_output_patterns: list[str] = Field(
+        default_factory=lambda: [
+            r'["\']?status_code["\']?\s*:',
+            r'["\']?success["\']?\s*:\s*(true|false|True|False)',
+            r'^{[^}]*["\']data["\']:\s*[\[\{]',
+        ],
+        description="Regex patterns to detect raw tool output that should be transformed"
+    )
+    
+    # Error patterns that indicate response failure
+    error_patterns: list[str] = Field(
+        default_factory=lambda: [
+            r"I don'?t have access",
+            r"I cannot (access|retrieve|find)",
+            r"^Error:",
+            r"Exception:",
+            r"(Key|Type|Attribute|Value|Runtime)Error:",
+        ],
+        description="Regex patterns to detect error responses that may need retry"
+    )
+    
     def has_validation(self) -> bool:
         """Check if any validation is configured."""
         return (
             self.output_format is not None
             or self.constraints is not None
             or self.validation is not None
+            or self.validate_response_quality
         )

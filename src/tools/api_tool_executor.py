@@ -4,7 +4,7 @@ This module provides a generic executor for API tools that were imported
 from Swagger/OpenAPI specifications. It handles HTTP requests with proper
 authentication and user context forwarding.
 
-Authentication Flow (SAME as requisition_api.py - DEFAULT for ALL APIs):
+Authentication Flow:
 1. Frontend sends user JWT → Backend extracts username and roles
 2. Backend gets admin token using client_credentials grant
 3. Backend calls target API with:
@@ -15,7 +15,9 @@ Authentication Flow (SAME as requisition_api.py - DEFAULT for ALL APIs):
 This is AUTOMATIC - no configuration needed when importing APIs via Swagger.
 """
 
+import base64
 import json
+import os
 from typing import Any, Callable, Optional, Annotated
 
 import httpx
@@ -31,7 +33,7 @@ async def _get_admin_token() -> Optional[str]:
     """
     Get admin token using client_credentials grant from Keycloak.
     
-    This is the same approach as requisition_api.py - used for service-to-service
+    Used for service-to-service
     authentication while passing user context via x-client headers.
     
     Returns:
@@ -48,7 +50,7 @@ async def _get_admin_token() -> Optional[str]:
         return None
     
     try:
-        async with httpx.AsyncClient(timeout=10, verify=False) as client:
+        async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(
                 settings.keycloak.token_endpoint,
                 data={
@@ -89,10 +91,10 @@ def create_api_tool_function(
     Create a bound API tool function for a specific tool configuration.
     
     This factory creates a closure that binds the tool_id and settings,
-    returning a function that Autogen can call directly with just the
+    returning a function that CrewAI can call directly with just the
     user-provided arguments.
     
-    Autogen requires functions to have explicit parameter annotations,
+    CrewAI requires functions to have explicit parameter annotations,
     so we dynamically create a function signature based on the Swagger
     parameter metadata.
     
@@ -102,7 +104,7 @@ def create_api_tool_function(
         description: Tool description for docstring
         
     Returns:
-        A callable async function that can be registered with Autogen
+        A callable async function that can be registered with CrewAI
     """
     # Extract parameter metadata from _swagger_metadata if available
     swagger_metadata = settings.get("_swagger_metadata", {})
@@ -147,7 +149,7 @@ def create_api_tool_function(
         optional_params = [(n, t, d, default) for n, t, req, d, default in param_info if not req]
         
         # Create the function dynamically using exec
-        # This allows us to create proper type annotations that Autogen can inspect
+        # This allows us to create proper type annotations that CrewAI can inspect
         param_strs = []
         annotations = {"return": dict[str, Any]}
         
@@ -279,25 +281,30 @@ async def execute_api_tool(
     request_headers.update(extra_headers)
     
     # =========================================================================
-    # AUTHENTICATION - Two modes based on endpoint type
+    # AUTHENTICATION
     # =========================================================================
-    # For "self" endpoints (e.g., /self, /myself): Use user's own token
-    # For other endpoints: Use admin token with x-client headers
+    # Modes (settings["auth_type"]):
+    #   none    - no Authorization header (public APIs)
+    #   bearer  - Bearer token from env var settings["auth_env_var"]
+    #   api_key - key from env var settings["auth_env_var"] sent in
+    #             header settings["auth_header"] (default "X-API-Key")
+    #   basic   - "user:pass" from env var settings["auth_env_var"]
+    #   keycloak- service-account admin token from the configured Keycloak
+    # Additionally, "/self"-style endpoints (or settings["use_user_token"])
+    # forward the calling user's own JWT instead.
     # =========================================================================
-    
-    # Step 1: Get user context from the incoming request
-    # This extracts username/roles/raw_token from the JWT that the frontend sent
+
+    # Get user context from the incoming request (username/roles/raw_token)
     user_info = get_user_context_info()
-    
-    # Step 2: Determine authentication mode based on URL
-    # "Self" endpoints need the user's own token to identify them
+
+    admin_token = None
+    auth_type = settings.get("auth_type", "none")
     is_self_endpoint = "/self" in url.lower() or "/myself" in url.lower()
-    
-    if is_self_endpoint:
-        # For "self" endpoints, use the user's own token
+
+    if is_self_endpoint or settings.get("use_user_token", False):
+        # Use the calling user's own token to identify them to the upstream API
         raw_token = user_info.get("raw_token") if user_info else None
         if raw_token:
-            # Add "Bearer " prefix if not already present
             if not raw_token.startswith("Bearer "):
                 request_headers["Authorization"] = f"Bearer {raw_token}"
             else:
@@ -305,13 +312,26 @@ async def execute_api_tool(
             logger.info("using_user_token_for_self_endpoint", tool_id=tool_id, has_token=True)
         else:
             logger.warning("no_user_token_for_self_endpoint", tool_id=tool_id)
-    else:
-        # For other endpoints, use admin token with x-client headers
+    elif auth_type in ("bearer", "api_key", "basic"):
+        env_var = settings.get("auth_env_var")
+        credential = os.environ.get(env_var, "") if env_var else ""
+        if not credential:
+            logger.warning("api_tool_missing_credential", tool_id=tool_id, auth_type=auth_type, env_var=env_var)
+        elif auth_type == "bearer":
+            request_headers["Authorization"] = f"Bearer {credential}"
+        elif auth_type == "api_key":
+            request_headers[settings.get("auth_header", "X-API-Key")] = credential
+        else:  # basic
+            encoded = base64.b64encode(credential.encode()).decode()
+            request_headers["Authorization"] = f"Basic {encoded}"
+    elif auth_type == "keycloak":
+        # Use the Keycloak service-account admin token with x-client headers
         admin_token = await _get_admin_token()
         if admin_token:
             request_headers["Authorization"] = f"Bearer {admin_token}"
         else:
             logger.warning("proceeding_without_admin_token", tool_id=tool_id)
+    # auth_type "none": no Authorization header
     
     username = user_info.get("username") if user_info else None
     roles = user_info.get("roles") if user_info else None
@@ -324,11 +344,11 @@ async def execute_api_tool(
         roles_count=len(roles) if roles else 0,
     )
     
-    # Step 3: Add user context headers (same as requisition_api.py)
+    # Add user context headers when forwarding user identity
     if username:
         request_headers["x-client-username"] = username
     if roles:
-        # x-client-ref should be comma-separated string (same as requisition_api.py)
+        # x-client-ref is a comma-separated string of role names
         if isinstance(roles, list):
             request_headers["x-client-ref"] = ",".join(roles)
         else:
@@ -355,7 +375,7 @@ async def execute_api_tool(
     if http_method == "GET" and kwargs:
         params = {k: v for k, v in kwargs.items() if f"{{{k}}}" not in api_url}
     
-    # Log the API call (same style as requisition_api.py)
+    # Log the API call
     logger.info(
         "calling_api_tool",
         tool_id=tool_id,
@@ -368,7 +388,7 @@ async def execute_api_tool(
     )
     
     try:
-        async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
+        async with httpx.AsyncClient(timeout=timeout, verify=settings.get("verify_ssl", True)) as client:
             response = await client.request(
                 method=http_method,
                 url=url,

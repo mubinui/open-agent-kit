@@ -3,10 +3,10 @@
 This module provides REST API endpoints for managing the RAG Pipeline service
 configuration used by workflows for document retrieval and semantic search.
 
-The remote RAG Pipeline service (http://10.42.65.199:8000) handles all vector
+The remote RAG Pipeline service (RAG_PIPELINE_BASE_URL) handles all vector
 database operations internally. No local vector DB setup is required.
 
-See Swagger docs: http://10.42.65.199:8000/docs
+See the RAG service Swagger docs at <RAG_PIPELINE_BASE_URL>/docs
 """
 
 import json
@@ -97,7 +97,7 @@ async def get_rag_service_config(
         # Get rag_service config or fall back to env vars
         rag_config = config.get("rag_service", {})
         
-        base_url = rag_config.get("base_url") or os.getenv("RAG_PIPELINE_BASE_URL", "http://10.42.65.199:8000")
+        base_url = rag_config.get("base_url") or os.getenv("RAG_PIPELINE_BASE_URL", "http://localhost:8003")
         enabled = rag_config.get("enabled", os.getenv("RAG_PIPELINE_ENABLED", "true").lower() == "true")
         default_collection = rag_config.get("default_collection") or os.getenv("RAG_PIPELINE_DEFAULT_COLLECTION", "knowledge_base")
         timeout = rag_config.get("timeout", int(os.getenv("RAG_PIPELINE_TIMEOUT", "60")))
@@ -167,7 +167,7 @@ async def list_rag_collections(
         config = _load_vector_dbs_config()
         rag_config = config.get("rag_service", {})
         
-        base_url = rag_config.get("base_url") or os.getenv("RAG_PIPELINE_BASE_URL", "http://10.42.65.199:8000")
+        base_url = rag_config.get("base_url") or os.getenv("RAG_PIPELINE_BASE_URL", "http://localhost:8003")
         
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(f"{base_url}/collections")

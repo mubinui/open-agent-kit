@@ -1,19 +1,19 @@
-# Orchestration Service Helm Chart
+# Open Agent Kit Helm Chart
 
-Helm chart for deploying the Orchestration Service on Kubernetes.
+Helm chart for deploying the Open Agent Kit on Kubernetes.
 
 ## TL;DR
 
 ```bash
-helm install orchestration-service ./orchestration-service \
-  --namespace orchestration \
+helm install open-agent-kit ./open-agent-kit \
+  --namespace open-agent-kit \
   --create-namespace \
   --set secrets.openrouterApiKey=your-key
 ```
 
 ## Introduction
 
-This chart bootstraps an Orchestration Service deployment on a Kubernetes cluster using the Helm package manager.
+This chart bootstraps an Open Agent Kit deployment on a Kubernetes cluster using the Helm package manager.
 
 ## Prerequisites
 
@@ -26,17 +26,17 @@ This chart bootstraps an Orchestration Service deployment on a Kubernetes cluste
 ### From Local Directory
 
 ```bash
-helm install orchestration-service ./orchestration-service \
-  --namespace orchestration \
+helm install open-agent-kit ./open-agent-kit \
+  --namespace open-agent-kit \
   --create-namespace \
-  --values ./orchestration-service/values-prod.yaml
+  --values ./open-agent-kit/values-prod.yaml
 ```
 
 ### With Custom Values
 
 ```bash
-helm install orchestration-service ./orchestration-service \
-  --namespace orchestration \
+helm install open-agent-kit ./open-agent-kit \
+  --namespace open-agent-kit \
   --create-namespace \
   --set image.tag=v1.0.0 \
   --set replicaCount=5 \
@@ -46,19 +46,19 @@ helm install orchestration-service ./orchestration-service \
 ### Development Environment
 
 ```bash
-helm install orchestration-dev ./orchestration-service \
-  --namespace orchestration-dev \
+helm install oak-dev ./open-agent-kit \
+  --namespace oak-dev \
   --create-namespace \
-  --values ./orchestration-service/values-dev.yaml
+  --values ./open-agent-kit/values-dev.yaml
 ```
 
 ### Production Environment
 
 ```bash
-helm install orchestration-prod ./orchestration-service \
-  --namespace orchestration-prod \
+helm install oak-prod ./open-agent-kit \
+  --namespace oak-prod \
   --create-namespace \
-  --values ./orchestration-service/values-prod.yaml \
+  --values ./open-agent-kit/values-prod.yaml \
   --set secrets.openrouterApiKey=$OPENROUTER_API_KEY \
   --set secrets.openaiApiKey=$OPENAI_API_KEY \
   --set secrets.jwtSecretKey=$JWT_SECRET \
@@ -68,7 +68,7 @@ helm install orchestration-prod ./orchestration-service \
 ## Uninstalling the Chart
 
 ```bash
-helm uninstall orchestration-service -n orchestration
+helm uninstall open-agent-kit -n open-agent-kit
 ```
 
 This removes all the Kubernetes components associated with the chart and deletes the release.
@@ -80,7 +80,7 @@ This removes all the Kubernetes components associated with the chart and deletes
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `replicaCount` | Number of replicas | `3` |
-| `image.repository` | Image repository | `orchestration-service` |
+| `image.repository` | Image repository | `open-agent-kit` |
 | `image.tag` | Image tag | `latest` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 
@@ -107,8 +107,8 @@ This removes all the Kubernetes components associated with the chart and deletes
 |-----------|-------------|---------|
 | `ingress.enabled` | Enable ingress | `true` |
 | `ingress.className` | Ingress class name | `nginx` |
-| `ingress.hosts[0].host` | Hostname | `orchestration.example.com` |
-| `ingress.tls[0].secretName` | TLS secret name | `orchestration-tls` |
+| `ingress.hosts[0].host` | Hostname | `oak.example.com` |
+| `ingress.tls[0].secretName` | TLS secret name | `oak-tls` |
 
 ### Resource Configuration
 
@@ -136,7 +136,7 @@ This removes all the Kubernetes components associated with the chart and deletes
 | `postgresql.enabled` | Enable PostgreSQL | `true` |
 | `postgresql.auth.username` | Database username | `orchestrator` |
 | `postgresql.auth.password` | Database password | `orchestrator_pass` |
-| `postgresql.auth.database` | Database name | `orchestration` |
+| `postgresql.auth.database` | Database name | `oak` |
 | `postgresql.primary.persistence.size` | Storage size | `20Gi` |
 
 ### Redis Configuration
@@ -177,26 +177,26 @@ This removes all the Kubernetes components associated with the chart and deletes
 ### Minimal Installation
 
 ```bash
-helm install orchestration-service ./orchestration-service \
+helm install open-agent-kit ./open-agent-kit \
   --set secrets.openrouterApiKey=sk-or-v1-xxxxx
 ```
 
 ### Production Installation with External Secrets
 
 ```bash
-helm install orchestration-prod ./orchestration-service \
-  --namespace orchestration-prod \
+helm install oak-prod ./open-agent-kit \
+  --namespace oak-prod \
   --create-namespace \
-  --values ./orchestration-service/values-prod.yaml \
+  --values ./open-agent-kit/values-prod.yaml \
   --set externalSecrets.enabled=true \
   --set externalSecrets.backend=aws-secrets-manager \
-  --set externalSecrets.secretName=orchestration/prod/secrets
+  --set externalSecrets.secretName=oak/prod/secrets
 ```
 
 ### High Availability Setup
 
 ```bash
-helm install orchestration-service ./orchestration-service \
+helm install open-agent-kit ./open-agent-kit \
   --set replicaCount=5 \
   --set autoscaling.minReplicas=5 \
   --set autoscaling.maxReplicas=20 \
@@ -209,10 +209,10 @@ helm install orchestration-service ./orchestration-service \
 ### Development Setup (Minimal Resources)
 
 ```bash
-helm install orchestration-dev ./orchestration-service \
-  --namespace orchestration-dev \
+helm install oak-dev ./open-agent-kit \
+  --namespace oak-dev \
   --create-namespace \
-  --values ./orchestration-service/values-dev.yaml
+  --values ./open-agent-kit/values-dev.yaml
 ```
 
 ## Upgrading
@@ -220,17 +220,17 @@ helm install orchestration-dev ./orchestration-service \
 ### Upgrade to New Version
 
 ```bash
-helm upgrade orchestration-service ./orchestration-service \
-  --namespace orchestration \
-  --values ./orchestration-service/values-prod.yaml \
+helm upgrade open-agent-kit ./open-agent-kit \
+  --namespace open-agent-kit \
+  --values ./open-agent-kit/values-prod.yaml \
   --reuse-values
 ```
 
 ### Upgrade with New Image
 
 ```bash
-helm upgrade orchestration-service ./orchestration-service \
-  --namespace orchestration \
+helm upgrade open-agent-kit ./open-agent-kit \
+  --namespace open-agent-kit \
   --set image.tag=v1.1.0 \
   --reuse-values
 ```
@@ -238,8 +238,8 @@ helm upgrade orchestration-service ./orchestration-service \
 ### Upgrade Configuration Only
 
 ```bash
-helm upgrade orchestration-service ./orchestration-service \
-  --namespace orchestration \
+helm upgrade open-agent-kit ./open-agent-kit \
+  --namespace open-agent-kit \
   --set config.maxConcurrentSessions=500 \
   --reuse-values
 ```
@@ -248,13 +248,13 @@ helm upgrade orchestration-service ./orchestration-service \
 
 ```bash
 # View release history
-helm history orchestration-service -n orchestration
+helm history open-agent-kit -n open-agent-kit
 
 # Rollback to previous version
-helm rollback orchestration-service -n orchestration
+helm rollback open-agent-kit -n open-agent-kit
 
 # Rollback to specific revision
-helm rollback orchestration-service 3 -n orchestration
+helm rollback open-agent-kit 3 -n open-agent-kit
 ```
 
 ## Verification
@@ -263,20 +263,20 @@ helm rollback orchestration-service 3 -n orchestration
 
 ```bash
 # Get release status
-helm status orchestration-service -n orchestration
+helm status open-agent-kit -n open-agent-kit
 
 # Get all resources
-helm get all orchestration-service -n orchestration
+helm get all open-agent-kit -n open-agent-kit
 
 # Get values
-helm get values orchestration-service -n orchestration
+helm get values open-agent-kit -n open-agent-kit
 ```
 
 ### Test Deployment
 
 ```bash
 # Port forward to service
-kubectl port-forward -n orchestration svc/orchestration-service 8000:8000
+kubectl port-forward -n open-agent-kit svc/open-agent-kit 8000:8000
 
 # Test health endpoint
 curl http://localhost:8000/health
@@ -311,14 +311,14 @@ resources:
 
 ingress:
   hosts:
-    - host: orchestration.mycompany.com
+    - host: oak.mycompany.com
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: mycompany-tls
       hosts:
-        - orchestration.mycompany.com
+        - oak.mycompany.com
 
 postgresql:
   primary:
@@ -333,8 +333,8 @@ secrets:
 Install with custom values:
 
 ```bash
-helm install orchestration-service ./orchestration-service \
-  --namespace orchestration \
+helm install open-agent-kit ./open-agent-kit \
+  --namespace open-agent-kit \
   --create-namespace \
   --values my-values.yaml
 ```
@@ -345,29 +345,29 @@ helm install orchestration-service ./orchestration-service \
 
 ```bash
 # Application logs
-kubectl logs -n orchestration -l app.kubernetes.io/name=orchestration-service -f
+kubectl logs -n open-agent-kit -l app.kubernetes.io/name=open-agent-kit -f
 
 # PostgreSQL logs
-kubectl logs -n orchestration -l app=postgres -f
+kubectl logs -n open-agent-kit -l app=postgres -f
 
 # Redis logs
-kubectl logs -n orchestration -l app=redis -f
+kubectl logs -n open-agent-kit -l app=redis -f
 ```
 
 ### Debug Deployment
 
 ```bash
 # Get pod status
-kubectl get pods -n orchestration
+kubectl get pods -n open-agent-kit
 
 # Describe pod
-kubectl describe pod -n orchestration <pod-name>
+kubectl describe pod -n open-agent-kit <pod-name>
 
 # Get events
-kubectl get events -n orchestration --sort-by='.lastTimestamp'
+kubectl get events -n open-agent-kit --sort-by='.lastTimestamp'
 
 # Execute shell in pod
-kubectl exec -n orchestration -it deployment/orchestration-service -- /bin/sh
+kubectl exec -n open-agent-kit -it deployment/open-agent-kit -- /bin/sh
 ```
 
 ### Common Issues

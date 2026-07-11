@@ -1,10 +1,13 @@
-"""Tool registry for managing dynamic tool registration with Autogen agents."""
+"""Tool registry for managing dynamic tool registration with agents.
+
+This module provides tool registration functionality for agents.
+Tools are passed directly to agent constructors via the tools parameter.
+"""
 
 import importlib
 import inspect
 from typing import Any, Callable, Optional, TYPE_CHECKING
 
-from autogen.agentchat import ConversableAgent
 
 if TYPE_CHECKING:
     from src.config.loader import ConfigurationError
@@ -33,6 +36,7 @@ class ToolDefinition:
         function: Callable,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        is_async: Optional[bool] = None,
     ) -> None:
         """
         Initialize a tool definition.
@@ -42,11 +46,14 @@ class ToolDefinition:
             function: The callable function to execute
             name: Optional name for the tool (defaults to function name)
             description: Optional description (extracted from docstring if not provided)
+            is_async: Whether function is async (auto-detected if None)
         """
         self.tool_id = tool_id
         self.function = function
         self.name = name or function.__name__
         self.description = description or self._extract_description(function)
+        # Auto-detect async if not specified
+        self.is_async = is_async if is_async is not None else inspect.iscoroutinefunction(function)
 
     def _extract_description(self, func: Callable) -> str:
         """
@@ -71,12 +78,12 @@ class ToolDefinition:
 
 class ToolRegistry:
     """
-    Registry for managing tools and their registration with Autogen agents.
+    Registry for managing tools and their registration with CrewAI agents.
 
     This registry supports:
     - Dynamic tool registration from Python functions
     - Tool discovery from entrypoints
-    - Autogen's register_for_llm and register_for_execution patterns
+    - CrewAI's register_for_llm and register_for_execution patterns
     - Tool validation and schema generation
     """
 
@@ -96,6 +103,7 @@ class ToolRegistry:
         function: Callable,
         description: Optional[str] = None,
         name: Optional[str] = None,
+        is_async: Optional[bool] = None,
     ) -> None:
         """
         Register a tool function.
@@ -105,6 +113,7 @@ class ToolRegistry:
             function: The callable function to register
             description: Optional description of what the tool does
             name: Optional name for the tool (defaults to function name)
+            is_async: Whether function is async (auto-detected if None)
 
         Raises:
             ValueError: If tool_id already registered or function is invalid
@@ -128,6 +137,7 @@ class ToolRegistry:
             function=function,
             name=name,
             description=description,
+            is_async=is_async,
         )
 
         self._tools[tool_id] = tool_def
@@ -136,6 +146,7 @@ class ToolRegistry:
             "Registered tool",
             tool_id=tool_id,
             tool_name=tool_def.name,
+            is_async=tool_def.is_async,
         )
 
     def register_api_tool(
@@ -149,7 +160,7 @@ class ToolRegistry:
         Register an API tool by creating a bound function.
 
         This method creates a closure that binds the tool settings,
-        allowing the API tool to be called by Autogen with just the
+        allowing the API tool to be called by CrewAI with just the
         user-provided arguments.
 
         Args:
@@ -202,6 +213,7 @@ class ToolRegistry:
         name: Optional[str] = None,
         description: Optional[str] = None,
         settings: Optional[dict[str, Any]] = None,
+        is_async: Optional[bool] = None,
     ) -> None:
         """
         Register a tool by importing from an entrypoint.
@@ -212,6 +224,7 @@ class ToolRegistry:
             name: Optional name for the tool
             description: Optional description
             settings: Optional tool settings (used for API tools)
+            is_async: Whether function is async (auto-detected if None)
 
         Raises:
             ValueError: If entrypoint is invalid or import fails
@@ -246,6 +259,7 @@ class ToolRegistry:
                 function=function,
                 description=description,
                 name=name,
+                is_async=is_async,
             )
 
             _get_logger().info(
@@ -265,92 +279,6 @@ class ToolRegistry:
                 f"Failed to register tool {tool_id} from {entrypoint}: {e}"
             ) from e
 
-    def register_tool_with_agents(
-        self,
-        tool_id: str,
-        caller: ConversableAgent,
-        executor: ConversableAgent,
-    ) -> None:
-        """
-        Register a tool with caller and executor agents using Autogen's pattern.
-
-        This uses Autogen's register_for_llm (for the caller) and
-        register_for_execution (for the executor) pattern.
-
-        Args:
-            tool_id: ID of the tool to register
-            caller: Agent that will call the tool (gets function schema)
-            executor: Agent that will execute the tool (gets function implementation)
-
-        Raises:
-            ValueError: If tool not found
-        """
-        tool_def = self.get_tool(tool_id)
-        if tool_def is None:
-            raise ValueError(f"Tool not found: {tool_id}")
-
-        try:
-            # Use tool_id as the name for consistency
-            # This ensures the agent config tool references match what Autogen sees
-            # The human-readable name goes in the description
-            tool_name = tool_id
-            
-            # Build description that includes the human-readable name if different
-            description = tool_def.description
-            if tool_def.name and tool_def.name != tool_id:
-                description = f"{tool_def.name}: {description}"
-            
-            # Register for LLM (caller gets the schema)
-            caller.register_for_llm(
-                name=tool_name,
-                description=description,
-            )(tool_def.function)
-
-            # Register for execution (executor can run the function)
-            executor.register_for_execution(
-                name=tool_name,
-            )(tool_def.function)
-
-            _get_logger().info(
-                "Registered tool with agents",
-                tool_id=tool_id,
-                tool_name=tool_name,
-                caller=caller.name,
-                executor=executor.name,
-            )
-
-        except Exception as e:
-            _get_logger().error(
-                "Failed to register tool with agents",
-                tool_id=tool_id,
-                caller=caller.name,
-                executor=executor.name,
-                error=str(e),
-            )
-            raise ValueError(
-                f"Failed to register tool {tool_id} with agents: {e}"
-            ) from e
-
-    def register_tool_with_agent(
-        self,
-        tool_id: str,
-        agent: ConversableAgent,
-    ) -> None:
-        """
-        Register a tool with a single agent (both LLM and execution).
-
-        This is a convenience method for when the same agent both calls
-        and executes the tool.
-
-        Args:
-            tool_id: ID of the tool to register
-            agent: Agent to register the tool with
-
-        Raises:
-            ValueError: If tool not found
-        """
-        self.register_tool_with_agents(tool_id, agent, agent)
-
     def get_tool(self, tool_id: str) -> Optional[ToolDefinition]:
         """
         Get tool definition by ID.
@@ -362,6 +290,48 @@ class ToolRegistry:
             ToolDefinition or None if not found
         """
         return self._tools.get(tool_id)
+    
+    def get_tools_for_crewai_agent(
+        self,
+        tool_ids: list[str],
+    ) -> list[Callable]:
+        """
+        Get tool functions for a CrewAI agent.
+        
+        Args:
+            tool_ids: List of tool identifiers
+            
+        Returns:
+            List of raw callables
+            
+        Raises:
+            ValueError: If a tool is not found
+        """
+        tools: list[Callable] = []
+        
+        for tool_id in tool_ids:
+            tool_def = self.get_tool(tool_id)
+            if tool_def is None:
+                _get_logger().warning(
+                    "Tool not found for CrewAI agent",
+                    tool_id=tool_id,
+                )
+                continue
+            
+            tools.append(tool_def.function)
+            
+            _get_logger().debug(
+                "Added tool for CrewAI agent",
+                tool_id=tool_id,
+                tool_name=tool_def.name,
+                is_async=inspect.iscoroutinefunction(tool_def.function),
+            )
+        
+        return tools
+
+    def get_tools_for_agent(self, tool_ids: list[str]) -> list[Callable]:
+        """Get raw callables for a CrewAI agent."""
+        return self.get_tools_for_crewai_agent(tool_ids)
 
     def list_tools(self) -> list[str]:
         """
@@ -440,6 +410,16 @@ class ToolRegistry:
             loader = _get_loader()
             config = loader.load_tools(use_cache=False)
 
+            # Reject duplicate tool ids loudly instead of silently overwriting
+            seen_ids: set[str] = set()
+            duplicates: set[str] = set()
+            for tool in config.tools:
+                if tool.id in seen_ids:
+                    duplicates.add(tool.id)
+                seen_ids.add(tool.id)
+            if duplicates:
+                raise ValueError(f"Duplicate tool ids in tools configuration: {sorted(duplicates)}")
+
             # Track loaded tools
             loaded_count = 0
             failed_count = 0
@@ -453,6 +433,7 @@ class ToolRegistry:
                         name=tool_config.name,
                         description=tool_config.description,
                         settings=tool_config.settings,  # Pass settings for API tools
+                        is_async=tool_config.is_async,  # Pass is_async for v0.4 compatibility
                     )
                     loaded_count += 1
                 except Exception as e:

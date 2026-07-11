@@ -60,10 +60,10 @@ async def login_for_access_token(
     """Authenticate user and return JWT token."""
     try:
         user_manager = UserManager()
-    except ValueError as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service not available (MongoDB not configured)"
+            detail="Authentication database is not available"
         )
     
     user = user_manager.authenticate_user(form_data.username, form_data.password)
@@ -104,10 +104,10 @@ async def create_user(
     """Create a new user (admin only)."""
     try:
         user_manager = UserManager()
-    except ValueError as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service not available (MongoDB not configured)"
+            detail="Authentication database is not available"
         )
     return user_manager.create_user(user_data)
 
@@ -132,10 +132,10 @@ async def create_api_key(
     """Create a new API key (admin only)."""
     try:
         api_key_manager = APIKeyManager()
-    except ValueError as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service not available (MongoDB not configured)"
+            detail="Authentication database is not available"
         )
     return api_key_manager.create_api_key(api_key_data)
 
@@ -148,10 +148,10 @@ async def list_api_keys(
     """List API keys. Non-admin users can only see their own keys."""
     try:
         api_key_manager = APIKeyManager()
-    except ValueError as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service not available (MongoDB not configured)"
+            detail="Authentication database is not available"
         )
     
     # Non-admin users can only see their own keys
@@ -169,10 +169,10 @@ async def revoke_api_key(
     """Revoke an API key (admin only)."""
     try:
         api_key_manager = APIKeyManager()
-    except ValueError as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service not available (MongoDB not configured)"
+            detail="Authentication database is not available"
         )
     
     success = api_key_manager.revoke_api_key(api_key_id)
@@ -194,10 +194,10 @@ async def rotate_api_key(
     """Rotate an API key (admin only)."""
     try:
         api_key_manager = APIKeyManager()
-    except ValueError as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service not available (MongoDB not configured)"
+            detail="Authentication database is not available"
         )
     
     rotated_key = api_key_manager.rotate_api_key(api_key_id)

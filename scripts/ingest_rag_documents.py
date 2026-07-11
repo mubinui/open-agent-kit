@@ -7,10 +7,10 @@ in Qdrant vector database. It supports single file ingestion, batch ingestion,
 and directory scanning.
 
 **Remote RAG Pipeline Service**
-The RAG Pipeline is hosted at http://10.42.65.199:8000
-API Documentation: http://10.42.65.199:8000/docs
+The RAG Pipeline endpoint comes from RAG_PIPELINE_BASE_URL
+API Documentation: <RAG_PIPELINE_BASE_URL>/docs
 **Required Environment Variables**
-- RAG_PIPELINE_BASE_URL: URL of the RAG Pipeline service (default: http://10.42.65.199:8000)
+- RAG_PIPELINE_BASE_URL: URL of the RAG Pipeline service (default: http://localhost:8003)
 - RAG_PIPELINE_API_KEY: API key for authentication (optional, if service requires auth)
 - RAG_PIPELINE_ENABLED: Set to 'true' to enable RAG features (default: true)
 - RAG_PIPELINE_DEFAULT_COLLECTION: Default collection name (default: knowledge_base)
@@ -31,7 +31,7 @@ Usage:
     python scripts/ingest_rag_documents.py --files doc1.pdf doc2.txt doc3.md --collection kb
     
     # Use custom RAG Pipeline URL
-    python scripts/ingest_rag_documents.py --file doc.pdf --url http://10.42.65.199:8000
+    python scripts/ingest_rag_documents.py --file doc.pdf --url http://localhost:8003
 
 For more information, see: docs/RAG_SETUP.md
 """

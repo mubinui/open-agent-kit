@@ -1,12 +1,12 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: orchestration-service-netpol
-  namespace: orchestration
+  name: open-agent-kit-netpol
+  namespace: open-agent-kit
 spec:
   podSelector:
     matchLabels:
-      app: orchestration-service
+      app: open-agent-kit
   policyTypes:
   - Ingress
   - Egress
@@ -72,7 +72,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: postgres-netpol
-  namespace: orchestration
+  namespace: open-agent-kit
 spec:
   podSelector:
     matchLabels:
@@ -80,11 +80,11 @@ spec:
   policyTypes:
   - Ingress
   ingress:
-  # Only allow from orchestration service
+  # Only allow from the Open Agent Kit service
   - from:
     - podSelector:
         matchLabels:
-          app: orchestration-service
+          app: open-agent-kit
     ports:
     - protocol: TCP
       port: 5432
@@ -94,7 +94,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: redis-netpol
-  namespace: orchestration
+  namespace: open-agent-kit
 spec:
   podSelector:
     matchLabels:
@@ -102,11 +102,11 @@ spec:
   policyTypes:
   - Ingress
   ingress:
-  # Only allow from orchestration service
+  # Only allow from the Open Agent Kit service
   - from:
     - podSelector:
         matchLabels:
-          app: orchestration-service
+          app: open-agent-kit
     ports:
     - protocol: TCP
       port: 6379
@@ -116,7 +116,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: rabbitmq-netpol
-  namespace: orchestration
+  namespace: open-agent-kit
 spec:
   podSelector:
     matchLabels:
@@ -124,11 +124,11 @@ spec:
   policyTypes:
   - Ingress
   ingress:
-  # Allow from orchestration service
+  # Allow from the Open Agent Kit service
   - from:
     - podSelector:
         matchLabels:
-          app: orchestration-service
+          app: open-agent-kit
     ports:
     - protocol: TCP
       port: 5672

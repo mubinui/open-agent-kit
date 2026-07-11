@@ -1,5 +1,6 @@
-"""FastAPI application for the Orchestration Service."""
+"""FastAPI application package for Open Agent Kit.
 
-from src.api.main import app
-
-__all__ = ["app"]
+The ASGI app lives in ``src.api.main`` (uvicorn target: ``src.api.main:app``).
+This package intentionally avoids re-exporting it so that importing submodules
+(e.g. ``src.api.context``) does not construct the whole application.
+"""

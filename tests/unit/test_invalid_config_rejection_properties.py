@@ -148,22 +148,22 @@ class TestInvalidConfigurationRejection:
         agent_id = first_char + ''.join(rest_chars)
         """
         Property: Invalid agents configurations should be rejected.
-        
+
         For any agents configuration with validation errors,
         the configuration should be rejected with detailed error messages.
         """
-        # Create invalid config - conversable agent without llm_config
+        # Create invalid config - two agents sharing the same id
+        agent_entry = {
+            "id": agent_id,
+            "type": AgentType.CONVERSABLE.value,
+            "name": "Test Agent",
+            "system_message": "Test message",
+            "human_input_mode": HumanInputMode.NEVER.value,
+            "max_consecutive_auto_reply": 10
+        }
         invalid_config = {
             "version": "1.0",
-            "agents": [{
-                "id": agent_id,
-                "type": AgentType.CONVERSABLE.value,
-                "name": "Test Agent",
-                "system_message": "Test message",
-                "llm_config": None,  # Invalid - conversable agents require llm_config
-                "human_input_mode": HumanInputMode.NEVER.value,
-                "max_consecutive_auto_reply": 10
-            }]
+            "agents": [agent_entry, dict(agent_entry)],
         }
         
         with TemporaryDirectory() as tmpdir:
@@ -183,7 +183,7 @@ class TestInvalidConfigurationRejection:
             # Error message should be informative
             error_msg = str(exc_info.value)
             assert len(error_msg) > 0
-            assert "llm_config" in error_msg.lower() or "llm" in error_msg.lower()
+            assert "duplicate" in error_msg.lower()
     
     @settings(max_examples=100)
     @given(

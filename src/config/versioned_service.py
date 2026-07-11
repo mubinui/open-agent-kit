@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy import delete, desc, select
+from sqlalchemy import delete, desc, inspect, select
 
 from src.audit_logging.audit import AuditLogger
 from src.infrastructure.database.connection import DatabaseConnectionManager
@@ -62,6 +62,13 @@ class VersionedConfigService:
         self.db_manager = DatabaseConnectionManager(database_url=database_url)
         self.audit_logger = audit_logger or AuditLogger()
         self.max_snapshots = max_snapshots
+
+    def is_available(self) -> bool:
+        """Return whether the versioning backend schema is available."""
+        try:
+            return inspect(self.db_manager.engine).has_table(ConfigSnapshot.__tablename__)
+        except Exception:
+            return False
 
     def generate_etag(self, config_data: dict) -> str:
         """

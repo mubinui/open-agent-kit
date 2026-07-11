@@ -1,11 +1,4 @@
-"""
-AUTOGEN 0.2 RESEARCH:
-- Feature needed: Output validation for agent responses
-- Autogen provides: register_reply for custom validation hooks
-- Using: register_reply to intercept and validate agent outputs
-- Documentation: https://microsoft.github.io/autogen/0.2/docs/reference/agentchat/conversable_agent#register_reply
-- Decision: Implement custom validator that can be registered with agents using register_reply
-"""
+"""Output validation for agent responses."""
 
 import ast
 import json

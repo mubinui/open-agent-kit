@@ -2,19 +2,28 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+# Import for v0.4 topology support
+try:
+    from src.config.topology_models import TopologyConfig
+except ImportError:
+    TopologyConfig = None  # type: ignore
 
 
 class ConversationPattern(str, Enum):
     """Type of conversation pattern."""
 
+    SINGLE = "single"
     TWO_AGENT = "two_agent"
     SEQUENTIAL = "sequential"
+    PARALLEL = "parallel"
     GROUP_CHAT = "group_chat"
     NESTED = "nested"
     SELECTOR = "selector"
+    INTERACTIVE = "interactive"  # Supports @ mentions for dynamic agent selection
 
 
 class SpeakerSelectionMethod(str, Enum):
@@ -33,6 +42,155 @@ class SummaryMethod(str, Enum):
     REFLECTION_WITH_LLM = "reflection_with_llm"
 
 
+class TerminationType(str, Enum):
+    """Type of termination condition for CrewAI 0.4 teams."""
+    
+    TEXT_MENTION = "text_mention"
+    MAX_MESSAGE = "max_message"
+    COMBINED = "combined"
+
+
+class TerminationOperator(str, Enum):
+    """Operator for combining termination conditions."""
+    
+    AND = "and"
+    OR = "or"
+
+
+class TeamType(str, Enum):
+    """Type of team for CrewAI 0.4."""
+    
+    ROUND_ROBIN = "round_robin"
+    SELECTOR = "selector"
+    CUSTOM = "custom"
+
+
+class TerminationConfig(BaseModel):
+    """Configuration for team termination conditions.
+    
+    Supports three types of termination conditions:
+    - text_mention: Terminates when a specific text is mentioned
+    - max_message: Terminates after a maximum number of messages
+    - combined: Combines multiple conditions with and/or operator
+    
+    """
+    
+    type: TerminationType = Field(
+        description="Type of termination condition"
+    )
+    text_mention: Optional[str] = Field(
+        default=None,
+        description="Text to match for text_mention termination (e.g., 'TERMINATE')"
+    )
+    max_messages: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Maximum number of messages for max_message termination"
+    )
+    conditions: Optional[List["TerminationConfig"]] = Field(
+        default=None,
+        description="List of termination conditions for combined type"
+    )
+    operator: Optional[TerminationOperator] = Field(
+        default=None,
+        description="Operator for combining conditions (and/or)"
+    )
+    
+    @model_validator(mode='after')
+    def validate_termination_config(self) -> "TerminationConfig":
+        """Validate termination configuration based on type."""
+        if self.type == TerminationType.TEXT_MENTION:
+            if not self.text_mention:
+                raise ValueError(
+                    "text_mention termination requires 'text_mention' field"
+                )
+        elif self.type == TerminationType.MAX_MESSAGE:
+            if self.max_messages is None:
+                raise ValueError(
+                    "max_message termination requires 'max_messages' field"
+                )
+        elif self.type == TerminationType.COMBINED:
+            if not self.conditions or len(self.conditions) < 2:
+                raise ValueError(
+                    "combined termination requires at least 2 conditions"
+                )
+            if self.operator is None:
+                raise ValueError(
+                    "combined termination requires 'operator' field (and/or)"
+                )
+        return self
+
+
+class TeamConfig(BaseModel):
+    """Configuration for CrewAI teams.
+    
+    Teams provide structured multi-agent collaboration with built-in orchestration.
+    """
+    
+    id: str = Field(
+        pattern=r"^[a-z0-9_-]+$",
+        description="Unique team identifier"
+    )
+    type: TeamType = Field(
+        description="Type of team (round_robin, selector, custom)"
+    )
+    agents: List[str] = Field(
+        min_length=2,
+        description="List of agent IDs participating in the team"
+    )
+    termination_condition: TerminationConfig = Field(
+        description="Termination condition for the team"
+    )
+    max_turns: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Maximum number of conversation turns"
+    )
+    # Selector-specific settings
+    selector_model_client_config: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Model client configuration for SelectorGroupChat speaker selection"
+    )
+    selector_func: Optional[str] = Field(
+        default=None,
+        description="Reference to custom selector function (module.path:function_name)"
+    )
+    
+    @field_validator('agents')
+    @classmethod
+    def validate_agents(cls, v: List[str]) -> List[str]:
+        """Validate agent list."""
+        if len(v) < 2:
+            raise ValueError("Team requires at least 2 agents")
+        
+        # Check for duplicates
+        if len(v) != len(set(v)):
+            raise ValueError("Agent IDs must be unique in team")
+        
+        # Validate each agent ID
+        for agent_id in v:
+            if not agent_id or not agent_id.strip():
+                raise ValueError("Agent ID cannot be empty")
+            if not agent_id.replace('_', '').replace('-', '').isalnum():
+                raise ValueError(
+                    f"Agent ID '{agent_id}' must contain only alphanumeric characters, "
+                    "underscores, and hyphens"
+                )
+        
+        return v
+    
+    @model_validator(mode='after')
+    def validate_team_config(self) -> "TeamConfig":
+        """Validate team configuration based on type."""
+        if self.type == TeamType.SELECTOR:
+            if self.selector_model_client_config is None and self.selector_func is None:
+                raise ValueError(
+                    "Selector team requires either 'selector_model_client_config' "
+                    "or 'selector_func'"
+                )
+        return self
+
+
 class WorkflowType(str, Enum):
     """Type of workflow for classification and routing."""
 
@@ -47,6 +205,61 @@ class PersistenceMode(str, Enum):
 
     POSTGRES = "postgres"
     MONGO_ONLY = "mongo_only"
+
+
+class AgentRuntime(str, Enum):
+    """Runtime engine used to execute a workflow."""
+
+    CREWAI = "crewai"
+
+
+class CrewAIProcess(str, Enum):
+    """CrewAI process mode."""
+
+    SEQUENTIAL = "sequential"
+    HIERARCHICAL = "hierarchical"
+
+
+class CrewAIMemoryConfig(BaseModel):
+    """CrewAI memory configuration scoped to a workflow."""
+
+    enabled: bool = True
+    storage_dir: str | None = None
+    retention: str = "session"
+
+
+class CrewAIKnowledgeConfig(BaseModel):
+    """CrewAI knowledge/RAG configuration scoped to a workflow."""
+
+    enabled: bool = False
+    collections: list[str] = Field(default_factory=list)
+    top_k: int = Field(default=5, ge=1, le=50)
+
+
+class CrewAIGuardrailsConfig(BaseModel):
+    """CrewAI guardrail configuration scoped to a workflow."""
+
+    enabled: bool = True
+    human_review: bool = False
+    output_schema: str = "text"
+
+
+class CrewAITracingConfig(BaseModel):
+    """CrewAI tracing/observability configuration scoped to a workflow."""
+
+    enabled: bool = True
+    amp_enabled: bool = False
+    event_listeners: list[str] = Field(default_factory=list)
+
+
+class CrewAITaskConfig(BaseModel):
+    """Optional explicit CrewAI task configuration."""
+
+    id: str
+    node_id: str | None = None
+    agent_id: str
+    description: str
+    expected_output: str = "A useful, accurate result for the next step or user."
 
 
 class WorkflowStep(BaseModel):
@@ -201,7 +414,7 @@ class SelectorConfig(BaseModel):
     """
 
     routing_agents: dict[str, str] = Field(
-        description="Mapping of domain names to agent IDs (e.g., {'requisition': 'requisition_agent'})"
+        description="Mapping of domain names to agent IDs (e.g., {'math': 'calculator_agent'})"
     )
     default_agent: str = Field(
         description="Agent ID to use when no specific domain is matched"
@@ -234,6 +447,75 @@ class SelectorConfig(BaseModel):
         return v
 
 
+class InteractiveConfig(BaseModel):
+    """Configuration for an interactive workflow with @ mention support.
+    
+    Allows users to dynamically select agents during conversation using @ mentions.
+    Example: "Hey @calculator_agent, what is 2+2?"
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Whether interactive @ mention routing is enabled"
+    )
+    
+    available_agents: list[str] = Field(
+        min_length=1,
+        description="List of agent IDs that users can mention with @"
+    )
+    default_agent: str = Field(
+        description="Agent ID to use when no @ mention is detected"
+    )
+    mention_prefix: str = Field(
+        default="@",
+        description="Prefix character for agent mentions"
+    )
+    allow_multiple_mentions: bool = Field(
+        default=False,
+        description="Whether to allow mentioning multiple agents in one message"
+    )
+    max_turns: int = Field(
+        default=20,
+        ge=1,
+        description="Maximum number of conversation turns"
+    )
+    
+    @field_validator('available_agents')
+    @classmethod
+    def validate_available_agents(cls, v: list[str]) -> list[str]:
+        """Validate that all agent IDs are non-empty and properly formatted."""
+        if not v:
+            raise ValueError("available_agents cannot be empty")
+        
+        for agent_id in v:
+            if not agent_id or not agent_id.strip():
+                raise ValueError("Agent ID cannot be empty")
+            if not agent_id.replace('_', '').replace('-', '').isalnum():
+                raise ValueError(
+                    f"Agent ID '{agent_id}' must contain only alphanumeric characters, "
+                    "underscores, and hyphens"
+                )
+        
+        # Check for duplicates
+        if len(v) != len(set(v)):
+            raise ValueError("available_agents contains duplicate agent IDs")
+        
+        return v
+    
+    @model_validator(mode='after')
+    def validate_default_agent_in_available(self) -> 'InteractiveConfig':
+        """Validate that default_agent exists (but doesn't need to be in available_agents).
+        
+        The default_agent can be a routing/selector agent that handles classification
+        but isn't meant for direct @ mention interaction. In this case, it won't be
+        in available_agents, but that's intentional - when no @ mention is provided,
+        the workflow uses topology-based routing through the default agent.
+        """
+        # No validation needed - default_agent can be outside available_agents
+        # for routing-only agents like selector_agent
+        return self
+
+
 class WorkflowConfig(BaseModel):
     """Configuration for a complete workflow."""
 
@@ -247,44 +529,21 @@ class WorkflowConfig(BaseModel):
     description: str = Field(
         description="Description of what this workflow does"
     )
+    
     pattern: ConversationPattern = Field(
-        description="Type of conversation pattern to use"
+        default=ConversationPattern.SEQUENTIAL,
+        description="Conversation pattern: single, sequential, parallel, selector, ..."
     )
-    entry_agent_id: str = Field(
-        description="ID of the agent that starts the workflow"
-    )
-    
-    # Pattern-specific configurations
-    steps: Optional[list[WorkflowStep]] = Field(
-        default=None,
-        description="Steps for sequential workflow (required for SEQUENTIAL pattern)"
-    )
-    group_chat: Optional[GroupChatConfig] = Field(
-        default=None,
-        description="Group chat configuration (required for GROUP_CHAT pattern)"
-    )
-    nested_chats: Optional[list[NestedChatConfig]] = Field(
-        default=None,
-        description="Nested chat configurations (required for NESTED pattern)"
-    )
-    selector_config: Optional[SelectorConfig] = Field(
-        default=None,
-        description="Selector configuration (required for SELECTOR pattern)"
+
+    # v0.4 topology configuration (required - all workflows use topology)
+    topology: "TopologyConfig" = Field(
+        description="Topology configuration defining workflow structure with nodes, edges, and routing"
     )
     
-    # Two-agent pattern configuration
-    recipient_agent_id: Optional[str] = Field(
-        default=None,
-        description="ID of recipient agent (required for TWO_AGENT pattern)"
-    )
-    max_turns: int = Field(
-        default=10,
-        ge=1,
-        description="Maximum conversation turns (for TWO_AGENT pattern)"
-    )
-    summary_method: SummaryMethod = Field(
-        default=SummaryMethod.LAST_MSG,
-        description="Summary method (for TWO_AGENT pattern)"
+    # Execution strategy
+    execution_strategy: str = Field(
+        default="sequential",
+        description="Execution strategy: sequential, conditional, or parallel"
     )
     
     # Common settings
@@ -292,13 +551,15 @@ class WorkflowConfig(BaseModel):
         default=True,
         description="Whether this workflow is enabled"
     )
-    default: bool = Field(
-        default=False,
-        description="Whether this is the default workflow"
-    )
     metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional workflow metadata"
+    )
+    
+    # Interactive workflow configuration
+    interactive_config: Optional[InteractiveConfig] = Field(
+        default=None,
+        description="Configuration for interactive workflows with @ mention support"
     )
     
     # Persistence configuration (Requirement 16.4, 17.2, 17.3)
@@ -310,6 +571,26 @@ class WorkflowConfig(BaseModel):
         default=WorkflowType.SEQUENTIAL,
         description="Workflow type: 'chatbot', 'sequential', 'tree', or 'custom'"
     )
+    runtime: AgentRuntime = Field(
+        default=AgentRuntime.CREWAI,
+        description="Runtime engine for this workflow: 'crewai'"
+    )
+    process: CrewAIProcess = Field(
+        default=CrewAIProcess.SEQUENTIAL,
+        description="CrewAI process mode"
+    )
+    tasks: list[CrewAITaskConfig] = Field(
+        default_factory=list,
+        description="Explicit CrewAI task definitions. When empty, tasks are derived from topology nodes."
+    )
+    memory: CrewAIMemoryConfig = Field(default_factory=CrewAIMemoryConfig)
+    knowledge: CrewAIKnowledgeConfig = Field(default_factory=CrewAIKnowledgeConfig)
+    guardrails: CrewAIGuardrailsConfig = Field(default_factory=CrewAIGuardrailsConfig)
+    tracing: CrewAITracingConfig = Field(default_factory=CrewAITracingConfig)
+    event_listeners: list[dict[str, Any]] = Field(default_factory=list)
+    mcp_servers: list[dict[str, Any]] = Field(default_factory=list)
+    output_schema: dict[str, Any] | str | None = Field(default="text")
+    deployment_auth_mode: str = Field(default="public")
     
     # Versioning and metadata fields (Requirement 17.1, 17.2)
     version: int = Field(
@@ -322,17 +603,6 @@ class WorkflowConfig(BaseModel):
         description="Timestamp of last configuration update"
     )
 
-    @field_validator('persistence')
-    @classmethod
-    def validate_persistence(cls, v: PersistenceMode, info) -> PersistenceMode:
-        """Validate persistence mode and enforce mongo_only for chatbot workflows."""
-        # Enforce mongo_only for chatbot workflows
-        workflow_type = info.data.get('workflow_type')
-        if workflow_type == WorkflowType.CHATBOT and v != PersistenceMode.MONGO_ONLY:
-            raise ValueError("Chatbot workflows must use mongo_only persistence")
-        
-        return v
-    
     @field_validator('workflow_type')
     @classmethod
     def validate_workflow_type(cls, v: WorkflowType) -> WorkflowType:
@@ -344,83 +614,71 @@ class WorkflowConfig(BaseModel):
         return v
 
     def validate_pattern_config(self) -> None:
-        """
-        Validate that required configuration is present for the selected pattern.
-        
+        """Validate that the topology is consistent with the declared pattern.
+
         Raises:
-            ValueError: If required configuration is missing or invalid
+            ValueError: If the topology does not match the pattern's requirements
         """
-        if self.pattern == ConversationPattern.TWO_AGENT:
-            if not self.recipient_agent_id:
+        node_count = len(self.topology.nodes)
+        if node_count == 0:
+            raise ValueError(f"Workflow '{self.id}' must define at least one topology node")
+
+        if self.pattern == ConversationPattern.SINGLE and node_count != 1:
+            raise ValueError(
+                f"Workflow '{self.id}' uses pattern 'single' but defines {node_count} nodes"
+            )
+
+        if self.pattern == ConversationPattern.SELECTOR and node_count < 2:
+            raise ValueError(
+                f"Workflow '{self.id}' uses pattern 'selector' but needs an entry agent "
+                "plus at least one specialist node"
+            )
+
+        entry = getattr(self.topology, "entry_node", None)
+        if entry:
+            node_ids = {node.id for node in self.topology.nodes}
+            if entry not in node_ids:
                 raise ValueError(
-                    f"Workflow {self.id}: TWO_AGENT pattern requires recipient_agent_id"
-                )
-        
-        elif self.pattern == ConversationPattern.SEQUENTIAL:
-            if not self.steps or len(self.steps) == 0:
-                raise ValueError(
-                    f"Workflow {self.id}: SEQUENTIAL pattern requires at least one step"
-                )
-        
-        elif self.pattern == ConversationPattern.GROUP_CHAT:
-            if not self.group_chat:
-                raise ValueError(
-                    f"Workflow {self.id}: GROUP_CHAT pattern requires group_chat configuration"
-                )
-            
-            # Validate that entry_agent_id is in the group
-            if self.entry_agent_id not in self.group_chat.agents:
-                raise ValueError(
-                    f"Workflow {self.id}: entry_agent_id '{self.entry_agent_id}' "
-                    f"must be in group_chat.agents"
-                )
-        
-        elif self.pattern == ConversationPattern.NESTED:
-            if not self.nested_chats or len(self.nested_chats) == 0:
-                raise ValueError(
-                    f"Workflow {self.id}: NESTED pattern requires at least one nested chat"
-                )
-        
-        elif self.pattern == ConversationPattern.SELECTOR:
-            if not self.selector_config:
-                raise ValueError(
-                    f"Workflow {self.id}: SELECTOR pattern requires selector_config"
+                    f"Workflow '{self.id}' entry_node '{entry}' is not a topology node"
                 )
 
     def get_all_agent_ids(self) -> set[str]:
         """
         Get all agent IDs referenced in this workflow.
-        
+
         Returns:
             Set of agent IDs used in the workflow
         """
-        agent_ids = {self.entry_agent_id}
-        
-        if self.pattern == ConversationPattern.TWO_AGENT:
-            if self.recipient_agent_id:
-                agent_ids.add(self.recipient_agent_id)
-        
-        elif self.pattern == ConversationPattern.SEQUENTIAL:
-            if self.steps:
-                for step in self.steps:
-                    agent_ids.add(step.sender_id)
-                    agent_ids.add(step.recipient_id)
-        
-        elif self.pattern == ConversationPattern.GROUP_CHAT:
-            if self.group_chat:
-                agent_ids.update(self.group_chat.agents)
-        
-        elif self.pattern == ConversationPattern.NESTED:
-            if self.nested_chats:
-                for nested_chat in self.nested_chats:
-                    agent_ids.add(nested_chat.trigger_agent_id)
-        
-        elif self.pattern == ConversationPattern.SELECTOR:
-            if self.selector_config:
-                agent_ids.add(self.selector_config.default_agent)
-                agent_ids.update(self.selector_config.routing_agents.values())
-        
+        agent_ids = {node.agent_id for node in self.topology.nodes}
+
+        # Include interactive @ mention agents so they are instantiated even
+        # when they are not wired directly in the topology graph.
+        if self.interactive_config and getattr(self.interactive_config, "enabled", True):
+            agent_ids.update(self.interactive_config.available_agents)
+            agent_ids.add(self.interactive_config.default_agent)
+
         return agent_ids
+
+    @model_validator(mode='after')
+    def validate_interactive_agents_exist(self) -> "WorkflowConfig":
+        """Ensure interactive default agent participates in topology.
+
+        The interactive default agent is used when no @ mention is present and
+        the workflow falls back to topology-based routing. It must therefore be
+        present in the topology nodes so the execution engine can route
+        correctly.
+        """
+
+        if self.interactive_config:
+            topology_agents = {node.agent_id for node in self.topology.nodes}
+            default_agent = self.interactive_config.default_agent
+
+            if default_agent not in topology_agents:
+                raise ValueError(
+                    "Interactive default_agent must be present in topology nodes for routing"
+                )
+
+        return self
 
 
 class WorkflowsConfig(BaseModel):
@@ -467,6 +725,7 @@ class WorkflowsConfig(BaseModel):
             duplicates = [wid for wid in workflow_ids if workflow_ids.count(wid) > 1]
             raise ValueError(f"Duplicate workflow IDs found: {set(duplicates)}")
         
-        # Validate each workflow
+        # Validate topology structure for each workflow
         for workflow in self.workflows:
-            workflow.validate_pattern_config()
+            if not workflow.topology or len(workflow.topology.nodes) == 0:
+                raise ValueError(f"Workflow {workflow.id} must have at least one node in topology")

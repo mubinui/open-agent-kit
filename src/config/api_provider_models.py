@@ -9,9 +9,9 @@ class APIProviderCreateRequest(BaseModel):
     """Request to create an API provider."""
 
     id: str = Field(pattern=r"^[a-z0-9_]+$", description="Unique provider identifier")
-    name: str = Field(description="Provider display name")
+    name: str = Field(min_length=1, description="Provider display name")
     type: str = Field(description="Provider type (llm, tool, api)")
-    description: str = Field(description="Provider description")
+    description: str = Field(min_length=1, description="Provider description")
     base_url: Optional[str] = Field(default=None, description="Base URL for API")
     api_key: Optional[str] = Field(default=None, description="API key for authentication")
     enabled: bool = Field(default=True, description="Whether provider is enabled")

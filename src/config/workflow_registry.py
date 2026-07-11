@@ -134,51 +134,6 @@ class WorkflowRegistry:
         
         return self._workflows_config.workflows
 
-    def get_default_workflow(self) -> Optional[WorkflowConfig]:
-        """
-        Get the default workflow configuration.
-        
-        Returns:
-            Default workflow config or None if no default is set.
-            If the default workflow is disabled, falls back to the first enabled workflow.
-        """
-        if self._workflows_config is None:
-            return None
-        
-        # Find workflow marked as default
-        default_workflow = next(
-            (w for w in self._workflows_config.workflows if w.default),
-            None
-        )
-        
-        # If default workflow exists and is enabled, return it
-        if default_workflow is not None and default_workflow.enabled:
-            return default_workflow
-        
-        # If default workflow is disabled, fall back to first enabled workflow
-        if default_workflow is not None and not default_workflow.enabled:
-            logger.warning(
-                "Default workflow is disabled, falling back to first enabled workflow",
-                default_workflow_id=default_workflow.id,
-            )
-            enabled_workflows = self._workflows_config.get_enabled_workflows()
-            if enabled_workflows:
-                return enabled_workflows[0]
-        
-        # No default configured, return None
-        return None
-
-    def get_default_workflow_id(self) -> Optional[str]:
-        """
-        Get the ID of the default workflow.
-        
-        Returns:
-            Default workflow ID or None if no default is set.
-            If the default workflow is disabled, falls back to the first enabled workflow.
-        """
-        default_workflow = self.get_default_workflow()
-        return default_workflow.id if default_workflow is not None else None
-
     def validate_workflow(
         self,
         workflow: WorkflowConfig,
@@ -279,48 +234,39 @@ class WorkflowRegistry:
 
     def _check_circular_dependencies(self, workflow: WorkflowConfig) -> None:
         """
-        Check for circular dependencies in sequential workflows.
-        
-        This checks if the same agent appears as both sender and recipient
-        in consecutive steps, which could cause infinite loops.
-        
+        Check for circular dependencies in sequential workflow topologies.
+
+        Detects immediate two-node cycles (A->B and B->A) and self-loop
+        edges (A->A) in the topology graph, which would cause infinite loops
+        in a sequential pipeline.
+
         Args:
             workflow: Workflow configuration to check
-            
+
         Raises:
             ValueError: If circular dependencies are detected
         """
         if workflow.pattern != ConversationPattern.SEQUENTIAL:
             return
 
-        if not workflow.steps or len(workflow.steps) < 2:
-            return
-
-        # Check for immediate circular dependencies (A->B, B->A)
-        for i in range(len(workflow.steps) - 1):
-            current_step = workflow.steps[i]
-            next_step = workflow.steps[i + 1]
-            
-            # Check if current recipient becomes next sender
-            # and next recipient becomes current sender (circular)
-            if (
-                current_step.sender_id == next_step.recipient_id
-                and current_step.recipient_id == next_step.sender_id
-            ):
+        edges = getattr(workflow.topology, "edges", None) or []
+        edge_pairs = set()
+        for edge in edges:
+            source = getattr(edge, "source", None) or getattr(edge, "from_node", None)
+            target = getattr(edge, "target", None) or getattr(edge, "to_node", None)
+            if source is None or target is None:
+                continue
+            if source == target:
+                raise ValueError(
+                    f"Workflow {workflow.id}: Self-loop detected on node '{source}'"
+                )
+            if (target, source) in edge_pairs:
                 raise ValueError(
                     f"Workflow {workflow.id}: Circular dependency detected between "
-                    f"steps {i} and {i+1} (agents: {current_step.sender_id}, "
-                    f"{current_step.recipient_id})"
+                    f"nodes '{source}' and '{target}'"
                 )
-        
-        # Check for self-loops (agent talking to itself)
-        for i, step in enumerate(workflow.steps):
-            if step.sender_id == step.recipient_id:
-                raise ValueError(
-                    f"Workflow {workflow.id}: Self-loop detected in step {i} "
-                    f"(agent {step.sender_id} talking to itself)"
-                )
-        
+            edge_pairs.add((source, target))
+
         logger.debug(
             "No circular dependencies found",
             workflow_id=workflow.id,

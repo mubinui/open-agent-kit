@@ -2,10 +2,12 @@
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+import httpx
 
 from src.api.auth import CurrentUser, get_current_user, require_admin
 from src.api.models import (
@@ -64,8 +66,8 @@ def _get_versioned_service() -> Optional["VersionedConfigService"]:
     if database_url:
         try:
             service = VersionedConfigService(database_url=database_url)
-            # Test connection by checking if we can access it
-            return service
+            if service.is_available():
+                return service
         except Exception:
             # Database not available, return None to use file-only mode
             return None
@@ -548,13 +550,16 @@ async def test_api_provider_connection(
                 detail=f"API provider not found: {provider_id}",
             )
         
-        # Basic validation - check if provider has required fields
         provider_type = provider.get("type", "api")
         
         if provider_type == "llm":
-            if not provider.get("base_url"):
+            base_url = provider.get("base_url") or provider.get("default_base_url")
+            if provider.get("base_url_env"):
+                base_url = os.getenv(provider["base_url_env"], base_url)
+            if not base_url:
                 return ConnectionTestResponse(
                     success=False,
+                    live=False,
                     message="LLM provider missing base_url",
                     details={"provider_id": provider_id, "type": provider_type}
                 )
@@ -569,17 +574,50 @@ async def test_api_provider_connection(
             if not api_key:
                 return ConnectionTestResponse(
                     success=False,
+                    live=False,
                     message="LLM provider missing API key",
+                    checked_endpoint=f"{base_url.rstrip('/')}/models",
                     details={"provider_id": provider_id, "type": provider_type}
                 )
+
+            models = provider.get("models", [])
+            model_id = next((model.get("name") for model in models if model.get("default")), None)
+            model_id = model_id or (models[0].get("name") if models else "openai/gpt-oss-20b")
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            started = time.perf_counter()
+            models_endpoint = f"{base_url.rstrip('/')}/models"
+            chat_endpoint = f"{base_url.rstrip('/')}/chat/completions"
+            async with httpx.AsyncClient(timeout=20) as client:
+                models_response = await client.get(models_endpoint, headers=headers)
+                checked_endpoint = models_endpoint
+                if models_response.status_code >= 400:
+                    payload = {
+                        "model": model_id,
+                        "messages": [{"role": "user", "content": "Reply with ok."}],
+                        "max_tokens": 8,
+                        "stream": False,
+                    }
+                    chat_response = await client.post(chat_endpoint, headers=headers, json=payload)
+                    checked_endpoint = chat_endpoint
+                    chat_response.raise_for_status()
+                else:
+                    models_response.raise_for_status()
+            latency_ms = round((time.perf_counter() - started) * 1000)
+            capabilities = {cap for model in models for cap in model.get("capabilities", [])}
             
             return ConnectionTestResponse(
                 success=True,
-                message="LLM provider configuration is valid",
+                live=True,
+                message="LLM provider live test succeeded",
+                latency_ms=latency_ms,
+                checked_endpoint=checked_endpoint,
+                model_id=model_id,
+                supports_streaming=True,
+                supports_tools=bool({"function_calling", "tools"} & capabilities),
                 details={
                     "provider_id": provider_id,
                     "type": provider_type,
-                    "base_url": provider.get("base_url"),
+                    "base_url": base_url,
                     "has_api_key": True
                 }
             )
@@ -588,12 +626,14 @@ async def test_api_provider_connection(
             if not provider.get("entrypoint") and not provider.get("library"):
                 return ConnectionTestResponse(
                     success=False,
+                    live=False,
                     message="Tool provider missing entrypoint or library",
                     details={"provider_id": provider_id, "type": provider_type}
                 )
             
             return ConnectionTestResponse(
                 success=True,
+                live=False,
                 message="Tool provider configuration is valid",
                 details={
                     "provider_id": provider_id,
@@ -607,12 +647,14 @@ async def test_api_provider_connection(
             if not provider.get("base_url"):
                 return ConnectionTestResponse(
                     success=False,
+                    live=False,
                     message="API provider missing base_url",
                     details={"provider_id": provider_id, "type": provider_type}
                 )
             
             return ConnectionTestResponse(
                 success=True,
+                live=False,
                 message="API provider configuration is valid",
                 details={
                     "provider_id": provider_id,
@@ -633,8 +675,9 @@ async def test_api_provider_connection(
         )
         return ConnectionTestResponse(
             success=False,
+            live=False,
             message=f"Connection test failed: {str(e)}",
-            details={"provider_id": provider_id, "error": str(e)}
+            details={"provider_id": provider_id, "error": str(e)[:500]}
         )
 
 

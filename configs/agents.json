@@ -1,184 +1,89 @@
 {
-  "version": "1.0",
+  "version": "2.0",
+  "_schema": "oak-crewai-agents",
+  "_comment": "Example agent definitions for Open Agent Kit. Add your own agents here or via the studio UI.",
+  "last_updated": "2026-07-11T00:00:00Z",
+  "_model_default": {
+    "provider": "openrouter",
+    "model": "google/gemma-3-27b-it",
+    "temperature": 0.7,
+    "max_tokens": 4096,
+    "top_p": 0.9
+  },
   "agents": [
     {
-      "id": "user_proxy",
+      "id": "demo_selector_agent",
       "type": "conversable",
-      "name": "UserProxy",
-      "system_message": "You are a user proxy that executes function calls and returns results. You do not generate your own responses, only execute tools when requested.",
-      "llm_config": false,
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
+      "name": "DemoSelectorAgent",
+      "description": "Routes user queries to the right specialist: web search, knowledge base, or calculator",
+      "is_selector": true,
+      "instruction": "You are a friendly assistant that routes questions to specialists. When someone greets you, welcome them warmly.\n\nYou have three specialist agents available:\n- SearchAssistant: Finds current information on the web\n- RAGAssistant: Answers questions from the knowledge base\n- CalculatorAgent: Evaluates arithmetic expressions\n\nUnderstand what the user wants and transfer them to the appropriate specialist using transfer_to_agent. If you're unsure what they're asking, ask a clarifying question.",
+      "model_config": {
+        "temperature": 0.4,
+        "max_tokens": 2000
+      },
       "tools": [],
-      "max_consecutive_auto_reply": 10,
-      "description": "Proxy agent representing the user that executes tool calls",
-      "version": 1,
-      "last_updated": "2024-11-26T00:00:00Z"
+      "output_key": "selector_result"
     },
     {
-      "id": "assistant",
+      "id": "general_assistant",
       "type": "conversable",
-      "name": "Assistant",
-      "system_message": "You are a helpful AI assistant. Answer questions clearly and concisely.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
+      "name": "GeneralAssistant",
+      "description": "General purpose helpful assistant for non-specialized queries",
+      "instruction": "You are a helpful AI assistant. Answer questions clearly, concisely, and accurately. Be friendly and professional in all interactions.",
+      "model_config": {
         "temperature": 0.7,
-        "max_tokens": 1000,
-        "timeout": 120
+        "max_tokens": 2000
       },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
       "tools": [],
-      "max_consecutive_auto_reply": 5,
-      "description": "A general-purpose helpful assistant",
-      "version": 1,
-      "last_updated": "2024-11-26T00:00:00Z"
+      "output_key": "general_result"
     },
     {
       "id": "search_assistant",
       "type": "conversable",
       "name": "SearchAssistant",
-      "system_message": "You are a helpful search assistant that can search the web for current information. When a user asks a question, use the web_search tool to find relevant information and provide a clear, concise answer based on the search results. Always cite your sources and be honest if you cannot find the information.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
+      "description": "Web search specialist using DuckDuckGo for current information",
+      "instruction": "You are a Web Search Specialist. When users ask questions requiring current information, use the search_web tool to find relevant content.\n\nAVAILABLE TOOLS:\n1. search_web - Search the web using DuckDuckGo\n   - Parameter: query (string) - the search query\n   - Returns: titles, descriptions, and URLs\n\nHOW TO RESPOND:\n1. Formulate an effective search query\n2. Call search_web with the query\n3. Summarize the results in clear, natural language\n4. Always cite your sources with URLs\n5. Be honest if you cannot find the information",
+      "model_config": {
         "temperature": 0.7,
-        "max_tokens": 1500,
-        "timeout": 120
+        "max_tokens": 1500
       },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": ["web_search"],
-      "max_consecutive_auto_reply": 5,
-      "description": "An assistant that searches the web to answer questions",
-      "version": 1,
-      "last_updated": "2024-11-26T00:00:00Z"
+      "tools": [
+        "web_search"
+      ],
+      "output_key": "search_result"
     },
     {
       "id": "rag_assistant",
       "type": "conversable",
       "name": "RAGAssistant",
-      "system_message": "You are a helpful AI assistant with access to a knowledge base through RAG (Retrieval-Augmented Generation). When users ask questions, you can search the knowledge base to find relevant information and provide accurate, contextual answers. Use the rag_query tool to retrieve relevant documents before answering questions.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
+      "description": "Knowledge base specialist with RAG (Retrieval-Augmented Generation) capabilities",
+      "instruction": "You are a Knowledge Base Specialist with RAG capabilities. Use the knowledge base to answer user questions.\n\nAVAILABLE TOOLS:\n1. rag_query - Search the knowledge base and get answers\n   - Parameters: collection (string), query (string), top_k (optional, default 5)\n   - Use for answering questions from documents\n\n2. rag_list_files - List files in a collection\n   - Parameter: collection (string)\n   - Use when user asks what documents are available\n\n3. rag_get_stats - Get collection statistics\n   - Parameter: collection (string)\n   - Use when user asks about collection size or stats\n\nHOW TO RESPOND:\n1. Use rag_query to search for relevant information before answering\n2. Provide accurate, contextual answers based on retrieved documents\n3. If no relevant documents found, say so honestly",
+      "model_config": {
         "temperature": 0.7,
-        "max_tokens": 1500,
-        "timeout": 120
+        "max_tokens": 1500
       },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": ["rag_query", "rag_list_files", "rag_get_stats"],
-      "max_consecutive_auto_reply": 10,
-      "description": "RAG-enabled assistant with knowledge base access via Qdrant",
-      "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z"
+      "tools": [
+        "rag_query",
+        "rag_list_files",
+        "rag_get_stats"
+      ],
+      "output_key": "rag_result"
     },
     {
-      "id": "requisition_agent",
+      "id": "calculator_agent",
       "type": "conversable",
-      "name": "RequisitionAgent",
-      "system_message": "You are a requisition assistant that helps users query and understand procurement requisitions. Use the get_requisition_info tool to fetch requisition details by requisition number. When users ask about a specific requisition, extract the requisition number (format: REQ followed by numbers, e.g., REQ20250010638) and use the tool to fetch details. Present the information clearly and answer any follow-up questions about the requisition data.",
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "max_consecutive_auto_reply": 5,
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
-        "temperature": 0.3,
-        "max_tokens": 2000,
-        "timeout": 120
+      "name": "CalculatorAgent",
+      "description": "Math specialist that evaluates arithmetic expressions with the calculate tool",
+      "instruction": "You are a Math Specialist. Use the calculate tool to evaluate arithmetic expressions.\n\nAVAILABLE TOOLS:\n1. calculate - Safely evaluate an arithmetic expression\n   - Parameter: expression (string), e.g. '2 * (3 + 4)'\n   - Returns: the numeric result\n\nHOW TO RESPOND:\n1. Extract the arithmetic expression from the user's question\n2. Call calculate with the expression\n3. Explain the result in plain language\n4. Never guess at arithmetic - always use the tool",
+      "model_config": {
+        "temperature": 0.2,
+        "max_tokens": 1000
       },
-      "tools": ["get_requisition_info", "get_self_requisition_info"],
-      "description": "Queries requisition data from the Requisition API",
-      "version": 1,
-      "last_updated": "2024-12-08T00:00:00Z"
-    },
-    {
-      "_comment": "Selector Agent - Routes queries to specialized domain agents",
-      "id": "selector_agent",
-      "type": "conversable",
-      "name": "SelectorAgent",
-      "system_message": "You are a procurement assistant router. Your job is to analyze user queries and determine which specialized agent should handle them.\n\nIMPORTANT: You will receive conversation context. If the user refers to something mentioned earlier (like 'that requisition', 'the number I gave you', 'check it again'), look in the conversation context to find the relevant information (requisition numbers, PO numbers, etc.).\n\nAnalyze the user's query and classify it into one of these domains:\n- requisition: Questions about requisitions, PR status, requisition numbers (REQ...), initiator info, latest requisitions\n- purchase_order: Questions about purchase orders, PO status, PO numbers, order approval, latest POs\n- framework_agreement: Questions about framework agreements (FA), item availability under FA, active FA count, brands, specifications, MOQ\n- general: General questions not related to procurement\n\nRespond ONLY with a JSON object in this exact format:\n{\n  \"domain\": \"requisition|purchase_order|framework_agreement|general\",\n  \"intent\": \"check_status|show_latest|get_initiator|get_details|check_availability|get_count|get_brands|get_specs|get_moq|is_approved|general_query\",\n  \"parameters\": {\"requisition_no\": \"REQ...\", \"po_no\": \"...\", \"item_code\": \"...\", \"item_name\": \"...\"},\n  \"requires_clarification\": false,\n  \"clarification_prompt\": null\n}\n\nEXTRACT PARAMETERS FROM CONTEXT: If the user's current message doesn't include a requisition/PO number but the conversation context does, extract it from there and include it in parameters.\n\nOnly set requires_clarification to true if the parameter is truly missing from BOTH the current message AND the conversation context.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
-        "temperature": 0.3,
-        "max_tokens": 500,
-        "timeout": 120
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": [],
-      "max_consecutive_auto_reply": 3,
-      "description": "Routes procurement queries to specialized domain agents",
-      "is_selector": true,
-      "version": 1,
-      "last_updated": "2024-12-10T00:00:00Z"
-    },
-    {
-      "_comment": "Requisition Domain Agent - Handles all requisition-related queries",
-      "id": "requisition_domain_agent",
-      "type": "conversable",
-      "name": "RequisitionDomainAgent",
-      "system_message": "You are a requisition specialist assistant. You help users with all requisition-related queries.\n\nIMPORTANT: Pay attention to the conversation context provided. If the user refers to 'that requisition' or 'the number I gave you', look in the previous conversation for the requisition number.\n\nYou have access to these tools:\n- get_requisition_info: Get details of a specific requisition. REQUIRES parameter: reqNo (e.g., 'REQ20250010638')\n- get_self_requisition_info: Get the user's latest requisitions (up to 10). NO PARAMETERS NEEDED - call with empty arguments {}\n- get_requisition_info_with_initiator: Get initiator contact details. REQUIRES parameter: reqNo\n\nWhen responding:\n1. If the user asks about a specific requisition (mentions REQ number), use get_requisition_info with reqNo parameter\n2. If the user asks to see their latest/recent requisitions WITHOUT a specific number, use get_self_requisition_info with NO parameters\n3. If the user asks about the initiator/creator of a requisition, use get_requisition_info_with_initiator with reqNo parameter\n4. Present results in a clear, natural language format\n5. If no data is found, inform the user politely\n\nCRITICAL: For get_self_requisition_info, do NOT pass any parameters. Call it with empty arguments {}.",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
-        "temperature": 0.3,
-        "max_tokens": 2000,
-        "timeout": 120
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": ["get_requisition_info", "get_self_requisition_info", "get_requisition_info_with_initiator"],
-      "max_consecutive_auto_reply": 5,
-      "description": "Handles requisition queries including status, details, and initiator info",
-      "version": 1,
-      "last_updated": "2024-12-10T00:00:00Z"
-    },
-    {
-      "_comment": "Purchase Order Agent - Handles all PO-related queries",
-      "id": "purchase_order_agent",
-      "type": "conversable",
-      "name": "PurchaseOrderAgent",
-      "system_message": "You are a purchase order specialist assistant. You help users with all purchase order-related queries.\n\nYou have access to these tools:\n- find_purchase_order_by_purchase_order_no: Get details of a specific purchase order by its number\n- find_lastest_max_10_purchase_order_of_self: Get the user's latest purchase orders (up to 10)\n\nWhen responding:\n1. If the user asks about a specific PO, use find_purchase_order_by_purchase_order_no with the purchaseOrderNo parameter\n2. If the user asks to see their latest POs, use find_lastest_max_10_purchase_order_of_self\n3. If the user asks 'Is my order approved?', check the status field and respond with yes/no\n4. Present results in a clear, natural language format including: PO number, status, total amount, supplier name, date\n5. If no data is found, inform the user politely",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
-        "temperature": 0.3,
-        "max_tokens": 2000,
-        "timeout": 120
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": ["get_purchase_order_info", "get_self_purchase_order_info"],
-      "max_consecutive_auto_reply": 5,
-      "description": "Handles purchase order queries including status and order details",
-      "version": 1,
-      "last_updated": "2024-12-10T00:00:00Z"
-    },
-    {
-      "_comment": "Framework Agreement Agent - Handles all FA-related queries",
-      "id": "framework_agreement_agent",
-      "type": "conversable",
-      "name": "FrameworkAgreementAgent",
-      "system_message": "You are a framework agreement specialist assistant. You help users with all framework agreement-related queries.\n\nYou have access to these tools:\n- find_lastest_max_10_framework_agreement_by_item_code_or_item_name: Find FAs for a specific item\n- total_active_framework_agreement: Get the count of active framework agreements\n- find_lastest_max_10_framework_agreement_with_brands_by_item_code_or_item_name: Get FA details with brand and specification info\n\nWhen responding:\n1. If the user asks if an item is under FA, use find_lastest_max_10_framework_agreement_by_item_code_or_item_name\n2. If the user asks how many FAs are active, use total_active_framework_agreement\n3. If the user asks about brands or specifications, use find_lastest_max_10_framework_agreement_with_brands_by_item_code_or_item_name\n4. If the user asks about MOQ (minimum order quantity), use find_lastest_max_10_framework_agreement_by_item_code_or_item_name and extract the minimumOrderQuantity field\n5. Present results including: FA number, item name, item code, agreement end date, MOQ, specifications\n6. If no FA exists for an item, clearly state 'No framework agreement is available for this item'",
-      "llm_config": {
-        "provider_id": "openrouter",
-        "model": "openai/gpt-oss-20b",
-        "temperature": 0.3,
-        "max_tokens": 2000,
-        "timeout": 120
-      },
-      "human_input_mode": "NEVER",
-      "code_execution_config": false,
-      "tools": ["get_all_framework_agreement_no_by_item", "get_total_framework_agreement", "get_framework_agreement_with_brand_by_item"],
-      "max_consecutive_auto_reply": 5,
-      "description": "Handles framework agreement queries including availability, brands, and specifications",
-      "version": 1,
-      "last_updated": "2024-12-10T00:00:00Z"
+      "tools": [
+        "calculate"
+      ],
+      "output_key": "calculation_result"
     }
   ]
 }

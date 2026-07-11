@@ -1,32 +1,37 @@
 """Pydantic models for API requests and responses."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.patterns.conversation_engine import ConversationPattern
+
+class ConversationPattern(str, Enum):
+    """CrewAI conversation and orchestration patterns."""
+    SELECTOR = "selector"
+    SEQUENTIAL = "sequential"
+    PARALLEL = "parallel"
+    LOOP = "loop"
+    SINGLE = "single"
+    TWO_AGENT = "two_agent"  # Legacy compatibility
 
 
 # Session Models
 class SessionCreateRequest(BaseModel):
-    """
-    Request to create a new session.
-    
-    If workflow_id is not provided, the default workflow will be used.
-    """
+    """Request to create a new chatbot session."""
 
-    workflow_id: Optional[str] = Field(default=None, description="ID of the workflow to use (optional, uses default if not provided)")
     user_id: Optional[str] = Field(default=None, description="Optional user identifier")
+    workflow_id: Optional[str] = Field(default="demo_multi_agent", description="Workflow to use (defaults to demo_multi_agent)")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class SessionResponse(BaseModel):
-    """Response containing session information."""
+    """Response containing chatbot session information."""
 
     session_id: UUID
-    workflow_id: str
+    workflow_id: str = Field(description="Workflow used by this session")
     user_id: Optional[str]
     active: bool
     created_at: datetime
@@ -421,8 +426,21 @@ class WorkflowCreateRequest(BaseModel):
     summary_method: str = Field(default="last_msg", description="Summary method")
     enabled: bool = Field(default=True, description="Whether workflow is enabled")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    topology: Optional[Dict[str, Any]] = Field(default=None, description="CrewAI topology configuration")
+    execution_strategy: Optional[str] = Field(default="sequential", description="Workflow execution strategy")
     workflow_type: str = Field(default="sequential", description="Workflow type")
     persistence: str = Field(default="postgres", description="Persistence mode")
+    runtime: str = Field(default="crewai", description="Workflow runtime")
+    process: str = Field(default="sequential", description="CrewAI process mode")
+    tasks: List[Dict[str, Any]] = Field(default_factory=list, description="Explicit CrewAI tasks")
+    memory: Dict[str, Any] = Field(default_factory=dict, description="CrewAI memory settings")
+    knowledge: Dict[str, Any] = Field(default_factory=dict, description="CrewAI knowledge settings")
+    guardrails: Dict[str, Any] = Field(default_factory=dict, description="CrewAI guardrail settings")
+    tracing: Dict[str, Any] = Field(default_factory=dict, description="CrewAI tracing settings")
+    event_listeners: List[Dict[str, Any]] = Field(default_factory=list, description="CrewAI event listener settings")
+    mcp_servers: List[Dict[str, Any]] = Field(default_factory=list, description="MCP server settings")
+    output_schema: Dict[str, Any] | str | None = Field(default="text", description="Structured output schema")
+    deployment_auth_mode: str = Field(default="public", description="Default deployed chatbot auth mode")
     steps: Optional[list[WorkflowStepConfig]] = None
     group_chat: Optional[GroupChatConfigModel] = None
     nested_chats: Optional[List[dict]] = None
@@ -437,24 +455,25 @@ class WorkflowResponse(BaseModel):
     id: str
     name: str
     description: str
-    pattern: ConversationPattern
-    entry_agent_id: str
-    recipient_agent_id: Optional[str] = None
-    max_turns: Optional[int] = None
-    summary_method: Optional[str] = None
+    topology: Dict[str, Any]
+    execution_strategy: Optional[str] = None
     enabled: Optional[bool] = None
-    default: Optional[bool] = Field(default=False, description="Whether this is the default workflow")
-    steps: Optional[list[WorkflowStepConfig]] = None
-    group_chat: Optional[GroupChatConfigModel] = None
-    nested_chats: Optional[List[dict]] = None
-    selector_config: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
     workflow_type: Optional[str] = None
     persistence: Optional[str] = None
+    runtime: Optional[str] = None
+    process: Optional[str] = None
+    tasks: Optional[List[Dict[str, Any]]] = None
+    memory: Optional[Dict[str, Any]] = None
+    knowledge: Optional[Dict[str, Any]] = None
+    guardrails: Optional[Dict[str, Any]] = None
+    tracing: Optional[Dict[str, Any]] = None
+    event_listeners: Optional[List[Dict[str, Any]]] = None
+    mcp_servers: Optional[List[Dict[str, Any]]] = None
+    output_schema: Optional[Dict[str, Any] | str] = None
+    deployment_auth_mode: Optional[str] = None
     version: Optional[int] = None
     last_updated: Optional[str] = None
-    nodes: Optional[List[WorkflowNode]] = None
-    connections: Optional[List[WorkflowConnection]] = None
 
 
 class WorkflowUpdateRequest(BaseModel):
@@ -464,6 +483,19 @@ class WorkflowUpdateRequest(BaseModel):
     description: Optional[str] = None
     pattern: Optional[ConversationPattern] = None
     entry_agent_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    topology: Optional[Dict[str, Any]] = None
+    execution_strategy: Optional[str] = None
+    process: Optional[str] = None
+    tasks: Optional[List[Dict[str, Any]]] = None
+    memory: Optional[Dict[str, Any]] = None
+    knowledge: Optional[Dict[str, Any]] = None
+    guardrails: Optional[Dict[str, Any]] = None
+    tracing: Optional[Dict[str, Any]] = None
+    event_listeners: Optional[List[Dict[str, Any]]] = None
+    mcp_servers: Optional[List[Dict[str, Any]]] = None
+    output_schema: Optional[Dict[str, Any] | str] = None
+    deployment_auth_mode: Optional[str] = None
     steps: Optional[list[WorkflowStepConfig]] = None
     group_chat: Optional[GroupChatConfigModel] = None
     nodes: Optional[List[WorkflowNode]] = None
@@ -601,6 +633,12 @@ class ConnectionTestResponse(BaseModel):
 
     success: bool
     message: str
+    live: bool = False
+    latency_ms: Optional[int] = None
+    checked_endpoint: Optional[str] = None
+    model_id: Optional[str] = None
+    supports_streaming: Optional[bool] = None
+    supports_tools: Optional[bool] = None
     details: Optional[Dict[str, Any]] = None
 
 

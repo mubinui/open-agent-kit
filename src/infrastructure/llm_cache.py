@@ -1,4 +1,4 @@
-"""LLM caching integration with Autogen's built-in caching mechanism."""
+"""LLM caching integration with CrewAI."""
 
 import logging
 from typing import Any, Optional
@@ -43,10 +43,10 @@ class CacheMetrics:
 
 class LLMCacheMonitor:
     """
-    Monitor for LLM cache performance using Autogen's built-in caching.
-    
-    Autogen uses cache_seed in llm_config to enable caching. When cache_seed is set,
-    Autogen will cache LLM responses based on the request parameters. This monitor
+    Monitor for LLM cache performance.
+
+    Uses Redis or in-memory caching for LLM responses. When caching is enabled,
+    responses are cached based on the request parameters. This monitor
     tracks cache performance metrics.
     """
 
@@ -160,17 +160,17 @@ class LLMCacheMonitor:
             logger.error(f"Failed to load LLM cache metrics: {e}")
 
 
-class AutogenCacheConfig:
+class CrewAICacheConfig:
     """
-    Helper class for configuring Autogen's built-in caching.
-    
-    Autogen supports caching through the cache_seed parameter in llm_config.
-    When cache_seed is set to an integer, Autogen will cache LLM responses.
+    Helper class for configuring CrewAI's built-in caching.
+
+    Supports caching through Redis or in-memory backends.
+    This class provides helpers for LLM caching configuration.
     """
 
     @staticmethod
     def get_default_cache_seed() -> int:
-        """Get default cache seed for Autogen.
+        """Get default cache seed.
 
         Returns:
             Default cache seed (42)
@@ -192,7 +192,7 @@ class AutogenCacheConfig:
             temperature: Temperature for generation
             max_tokens: Maximum tokens to generate
             timeout: Request timeout in seconds
-            cache_seed: Cache seed for Autogen (None to disable caching)
+            cache_seed: Cache seed for CrewAI (None to disable caching)
 
         Returns:
             llm_config dictionary with caching enabled
@@ -223,7 +223,7 @@ class AutogenCacheConfig:
 
         Args:
             llm_config: Existing llm_config dictionary
-            cache_seed: Cache seed for Autogen
+            cache_seed: Cache seed for CrewAI
 
         Returns:
             Updated llm_config with caching enabled

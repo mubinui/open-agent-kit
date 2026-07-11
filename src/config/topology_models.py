@@ -1,14 +1,12 @@
-"""
-AUTOGEN 0.2 RESEARCH:
-- Feature needed: Graph-based workflow topology with nodes and edges
-- Autogen provides: GroupChat for multi-agent, initiate_chats for sequential
-- Using: Custom topology models to represent arbitrary graph structures
-- Documentation: https://microsoft.github.io/autogen/0.2/docs/Use-Cases/agent_chat
-- Decision: Custom implementation - Autogen provides patterns but not graph topology abstraction
+"""CrewAI workflow topology models.
+
+These models describe graph-style crews and flows in product configuration.
+The runtime maps them into CrewAI agents, tasks, process modes, and traceable
+execution plans while keeping the REST API stable.
 """
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -37,6 +35,7 @@ class TerminationConditionType(str, Enum):
     MESSAGE_PATTERN = "message_pattern"
     AGENT_DECISION = "agent_decision"
     TIMEOUT = "timeout"
+    MAX_ROUTING_ATTEMPTS = "max_routing_attempts"
 
 
 class AgentNode(BaseModel):
@@ -49,6 +48,10 @@ class AgentNode(BaseModel):
     agent_id: str = Field(
         pattern=r"^[a-z0-9_]+$",
         description="ID of the agent to execute at this node"
+    )
+    is_router: bool = Field(
+        default=False,
+        description="Whether this node performs routing/selection for downstream agents"
     )
     config_override: Optional[dict[str, Any]] = Field(
         default=None,
@@ -86,9 +89,9 @@ class AgentEdge(BaseModel):
     to_node: str = Field(
         description="Destination node ID"
     )
-    condition: Optional[str] = Field(
+    condition: Optional[Union[str, dict[str, Any]]] = Field(
         default=None,
-        description="Optional condition for conditional routing (Python expression)"
+        description="Optional condition for conditional routing (Python expression or condition dict)"
     )
     context_strategy: ContextStrategy = Field(
         default=ContextStrategy.FULL,
@@ -142,6 +145,9 @@ class TerminationCondition(BaseModel):
         elif condition_type == TerminationConditionType.TIMEOUT:
             if not isinstance(v, (int, float)) or v <= 0:
                 raise ValueError("timeout value must be a positive number")
+        elif condition_type == TerminationConditionType.MAX_ROUTING_ATTEMPTS:
+            if not isinstance(v, int) or v < 1:
+                raise ValueError("max_routing_attempts value must be a positive integer")
         
         return v
 

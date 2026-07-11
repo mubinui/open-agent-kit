@@ -76,9 +76,14 @@ def two_agent_workflow(draw, entry_agent_id, recipient_agent_id):
         "name": f"Workflow {workflow_id}",
         "description": "Test workflow",
         "pattern": ConversationPattern.TWO_AGENT.value,
-        "entry_agent_id": entry_agent_id,
-        "recipient_agent_id": recipient_agent_id,
-        "max_turns": 10,
+        "topology": {
+            "type": "sequential",
+            "nodes": [
+                {"id": "entry", "agent_id": entry_agent_id, "description": "Entry"},
+                {"id": "recipient", "agent_id": recipient_agent_id, "description": "Recipient"},
+            ],
+            "entry_node": "entry",
+        },
         "enabled": True,
         "metadata": {}
     }
@@ -99,25 +104,27 @@ def sequential_workflow(draw, agent_ids):
     ))
     workflow_id = first_char + ''.join(rest_chars)
     
-    # Create steps using the agent IDs
-    steps = []
-    for i in range(len(agent_ids) - 1):
-        steps.append({
-            "sender_id": agent_ids[i],
-            "recipient_id": agent_ids[i + 1],
-            "max_turns": 5,
-            "summary_method": "last_msg",
-            "carryover": True,
-            "clear_history": False
-        })
-    
+    # Create topology nodes and edges from the agent IDs
+    nodes = [
+        {"id": f"node_{i}", "agent_id": agent_id, "description": f"Step {i}"}
+        for i, agent_id in enumerate(agent_ids)
+    ]
+    edges = [
+        {"from_node": f"node_{i}", "to_node": f"node_{i + 1}", "context_strategy": "full"}
+        for i in range(len(agent_ids) - 1)
+    ]
+
     return {
         "id": workflow_id,
         "name": f"Workflow {workflow_id}",
         "description": "Test sequential workflow",
         "pattern": ConversationPattern.SEQUENTIAL.value,
-        "entry_agent_id": agent_ids[0],
-        "steps": steps,
+        "topology": {
+            "type": "sequential",
+            "nodes": nodes,
+            "edges": edges,
+            "entry_node": "node_0",
+        },
         "enabled": True,
         "metadata": {}
     }
@@ -143,13 +150,13 @@ def group_chat_workflow(draw, agent_ids):
         "name": f"Workflow {workflow_id}",
         "description": "Test group chat workflow",
         "pattern": ConversationPattern.GROUP_CHAT.value,
-        "entry_agent_id": agent_ids[0],
-        "group_chat": {
-            "agents": agent_ids,
-            "max_round": 10,
-            "speaker_selection_method": "auto",
-            "send_introductions": False,
-            "admin_name": "GroupChatManager"
+        "topology": {
+            "type": "graph",
+            "nodes": [
+                {"id": f"node_{i}", "agent_id": agent_id, "description": f"Member {i}"}
+                for i, agent_id in enumerate(agent_ids)
+            ],
+            "entry_node": "node_0",
         },
         "enabled": True,
         "metadata": {}

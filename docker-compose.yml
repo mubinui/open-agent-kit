@@ -1,93 +1,71 @@
-version: "3.8"
+# Open Agent Kit (OAK) — Docker Compose
+#
+# Default:      docker compose up            -> single container, SQLite (zero config)
+# Postgres:     docker compose --profile postgres up
+# Vector DB:    docker compose --profile qdrant up
+# Everything:   docker compose --profile postgres --profile qdrant --profile redis up
 
 services:
-  # Orchestration Service - Main application
-  orchestration-service:
+  # Open Agent Kit — API + Studio UI in one container
+  oak:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: orchestration-service
+    image: open-agent-kit:latest
+    container_name: open-agent-kit
     ports:
-      - "8000:8000"  # API port
-      - "9090:9090"  # Metrics port
+      - "${APP_PORT:-8000}:8000" # API + Studio UI — override with APP_PORT
+      - "${METRICS_PORT:-9090}:9090" # Prometheus metrics
     environment:
-      # LLM Providers
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      
-      # Database
-      - DATABASE_URL=postgresql://orchestrator:orchestrator_pass@postgres:5432/orchestration
-      - MEMORY_BACKEND=${MEMORY_BACKEND:-mongodb}
-      - MONGODB_URL=mongodb://orchestrator:orchestrator_pass@mongodb:27017/${MONGODB_DATABASE:-orchestration}
-      - MONGODB_DATABASE=${MONGODB_DATABASE:-orchestration}
-      
-      # Redis Cache
-      - REDIS_URL=redis://redis:6379/0
-      
-      # RabbitMQ
-      - RABBITMQ_URL=amqp://orchestrator:orchestrator_pass@rabbitmq:5672/
-      
-      # Vector Database (ChromaDB)
-      - CHROMADB_PATH=/app/data/chromadb
-      
-      # Vector Database (Qdrant - local instance for development)
-      - QDRANT_URL=http://qdrant:6333
+      # LLM Provider (OpenRouter by default; any LiteLLM-supported provider works)
+      - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
+      - LLM_MODEL=${LLM_MODEL:-openai/gpt-oss-20b}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OR_SITE_URL=${OR_SITE_URL:-}
+      - OR_APP_NAME=${OR_APP_NAME:-Open Agent Kit}
+
+      # Database — SQLite on the data volume by default.
+      # With the postgres profile: DATABASE_URL=postgresql://oak:oak_pass@postgres:5432/oak
+      - DATABASE_URL=${DATABASE_URL:-}
+      - OAK_AUTO_MIGRATE=${OAK_AUTO_MIGRATE:-true}
+
+      # Optional initial admin account (created on first boot if no users exist)
+      - OAK_ADMIN_USERNAME=${OAK_ADMIN_USERNAME:-}
+      - OAK_ADMIN_PASSWORD=${OAK_ADMIN_PASSWORD:-}
+
+      # Optional Redis cache (redis profile)
+      - REDIS_URL=${REDIS_URL:-}
+
+      # Optional Qdrant vector store (qdrant profile)
+      - QDRANT_URL=${QDRANT_URL:-}
       - QDRANT_API_KEY=${QDRANT_API_KEY:-}
-      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-rag_documents}
-      
-      # RAG Pipeline Configuration (External Remote Service)
-      # The RAG Pipeline is hosted externally at http://10.42.65.199:8000
-      # and is not included in this docker-compose stack
-      # See: http://10.42.65.199:8000/docs for API documentation
-      - RAG_PIPELINE_BASE_URL=${RAG_PIPELINE_BASE_URL:-http://10.42.65.199:8000}
-      - RAG_PIPELINE_TIMEOUT=${RAG_PIPELINE_TIMEOUT:-60}
-      - RAG_PIPELINE_ENABLED=${RAG_PIPELINE_ENABLED:-true}
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-knowledge_base}
+
+      # Optional external RAG pipeline service
+      - RAG_PIPELINE_BASE_URL=${RAG_PIPELINE_BASE_URL:-}
+      - RAG_PIPELINE_ENABLED=${RAG_PIPELINE_ENABLED:-false}
       - RAG_PIPELINE_API_KEY=${RAG_PIPELINE_API_KEY:-}
       - RAG_PIPELINE_DEFAULT_COLLECTION=${RAG_PIPELINE_DEFAULT_COLLECTION:-knowledge_base}
-      
-      # Application Settings
+
+      # Application
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - MAX_CONCURRENT_SESSIONS=${MAX_CONCURRENT_SESSIONS:-100}
-      - AGENT_TIMEOUT_SECONDS=${AGENT_TIMEOUT_SECONDS:-300}
-      
-      # Keycloak Configuration
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - APP_PORT=8000
+      - FRONTEND_URL=${FRONTEND_URL:-*}
+
+      # Optional Keycloak SSO (disabled by default)
       - KEYCLOAK_ENABLED=${KEYCLOAK_ENABLED:-false}
-      - KEYCLOAK_SERVER_URL=${KEYCLOAK_SERVER_URL:-http://keycloak:8080}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-demo-realm}
-      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-frontend-client}
+      - KEYCLOAK_SERVER_URL=${KEYCLOAK_SERVER_URL:-}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
-      - KEYCLOAK_ADMIN_CLIENT_ID=${KEYCLOAK_ADMIN_CLIENT_ID:-admin-client}
-      - KEYCLOAK_ADMIN_CLIENT_SECRET=${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
-      - KEYCLOAK_VERIFY_AUDIENCE=${KEYCLOAK_VERIFY_AUDIENCE:-true}
-      - KEYCLOAK_JWKS_CACHE_TTL=${KEYCLOAK_JWKS_CACHE_TTL:-3600}
-      
-      # External Services Configuration
-      - SERVICE1_ENABLED=${SERVICE1_ENABLED:-false}
-      - SERVICE1_BASE_URL=${SERVICE1_BASE_URL:-http://service1:8001}
-      - SERVICE1_API_PATH=${SERVICE1_API_PATH:-/api/v1}
-      - SERVICE1_TIMEOUT=${SERVICE1_TIMEOUT:-30}
-      - SERVICE2_ENABLED=${SERVICE2_ENABLED:-false}
-      - SERVICE2_BASE_URL=${SERVICE2_BASE_URL:-http://service2:8002}
-      - SERVICE2_API_PATH=${SERVICE2_API_PATH:-/api/v1}
-      - SERVICE2_TIMEOUT=${SERVICE2_TIMEOUT:-30}
-      
+
       # Observability
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
-      - OTEL_SERVICE_NAME=orchestration-service
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
+      - OTEL_SERVICE_NAME=open-agent-kit
     volumes:
-      - ./configs:/app/configs
-      - chromadb_data:/app/data/chromadb
+      - ./configs:/app/configs # agent/workflow/tool definitions (editable)
+      - oak_data:/app/data # SQLite DB, sessions, deployments
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -96,30 +74,31 @@ services:
       retries: 3
       start_period: 40s
 
-  # PostgreSQL - Conversation store and configuration
+  # PostgreSQL — production database (optional)
   postgres:
     image: postgres:16-alpine
-    container_name: orchestration-postgres
+    container_name: oak-postgres
+    profiles: ["postgres"]
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=orchestrator
-      - POSTGRES_PASSWORD=orchestrator_pass
-      - POSTGRES_DB=orchestration
+      - POSTGRES_USER=${POSTGRES_USER:-oak}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-oak_pass}
+      - POSTGRES_DB=${POSTGRES_DB:-oak}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U orchestrator"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oak}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Redis - Caching layer
+  # Redis — caching layer (optional)
   redis:
     image: redis:7-alpine
-    container_name: orchestration-redis
+    container_name: oak-redis
+    profiles: ["redis"]
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
@@ -132,53 +111,14 @@ services:
       timeout: 5s
       retries: 5
 
-  # RabbitMQ - Message broker for async processing
-  rabbitmq:
-    image: rabbitmq:3.12-management-alpine
-    container_name: orchestration-rabbitmq
-    ports:
-      - "5672:5672"   # AMQP port
-      - "15672:15672" # Management UI
-    environment:
-      - RABBITMQ_DEFAULT_USER=orchestrator
-      - RABBITMQ_DEFAULT_PASS=orchestrator_pass
-      - RABBITMQ_DEFAULT_VHOST=/
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  # MongoDB - Primary session store
-  mongodb:
-    image: mongo:7.0
-    container_name: orchestration-mongodb
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGODB_ROOT_USER:-mongo_root}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_ROOT_PASSWORD:-mongo_root_pass}
-      - MONGO_INITDB_DATABASE=${MONGODB_DATABASE:-orchestration}
-    volumes:
-      - mongodb_data:/data/db
-      - ./scripts/init-mongodb.js:/docker-entrypoint-initdb.d/init-mongodb.js:ro
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
-
-  # Qdrant - Vector database for RAG
+  # Qdrant — vector database for RAG (optional)
   qdrant:
-    image: qdrant/qdrant:v1.7.4
-    container_name: orchestration-qdrant
+    image: qdrant/qdrant:latest
+    container_name: oak-qdrant
+    profiles: ["qdrant"]
     ports:
-      - "6333:6333"  # HTTP API
-      - "6334:6334"  # gRPC API
+      - "6333:6333" # HTTP API
+      - "6334:6334" # gRPC API
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
       - QDRANT__SERVICE__HTTP_PORT=6333
@@ -192,49 +132,17 @@ services:
       retries: 5
       start_period: 20s
 
-  # ChromaDB - Optional standalone vector database
-  # Uncomment if you want to use ChromaDB as a separate service
-  # chromadb:
-  #   image: chromadb/chroma:latest
-  #   container_name: orchestration-chromadb
-  #   ports:
-  #     - "8001:8000"
-  #   environment:
-  #     - IS_PERSISTENT=TRUE
-  #     - ANONYMIZED_TELEMETRY=FALSE
-  #   volumes:
-  #     - chromadb_data:/chroma/chroma
-  #   restart: unless-stopped
-
-  # Admin UI - Angular frontend (optional, build separately)
-  # admin-ui:
-  #   build:
-  #     context: ./admin-ui
-  #     dockerfile: Dockerfile
-  #   container_name: orchestration-admin-ui
-  #   ports:
-  #     - "4200:80"
-  #   environment:
-  #     - API_URL=http://orchestration-service:8000
-  #   depends_on:
-  #     - orchestration-service
-  #   restart: unless-stopped
-
 volumes:
+  oak_data:
+    driver: local
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  rabbitmq_data:
-    driver: local
-  chromadb_data:
-    driver: local
-  mongodb_data:
     driver: local
   qdrant_data:
     driver: local
 
 networks:
   default:
-    name: orchestration-network
+    name: oak-network
     driver: bridge

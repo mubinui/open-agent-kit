@@ -1,11 +1,4 @@
-"""
-AUTOGEN 0.2 RESEARCH:
-- Feature needed: Execution configuration for async worker pools and resource limits
-- Autogen provides: Basic agent configuration via llm_config, but no execution engine config
-- Using: Custom models extending Pydantic for validation
-- Documentation: https://microsoft.github.io/autogen/0.2/docs/topics/llm_configuration
-- Decision: Custom implementation needed - Autogen doesn't provide execution engine configuration
-"""
+"""Execution configuration for async worker pools and resource limits."""
 
 from enum import Enum
 from typing import Optional

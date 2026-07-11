@@ -34,47 +34,34 @@ async def create_session(
     current_user: CurrentUser = Depends(require_user),
 ) -> SessionResponse:
     """
-    Create a new conversation session.
+    Create a new chatbot session.
     
-    If workflow_id is not provided in the request, the default workflow will be used.
+    The service supports multiple workflows with:
+    - Automatic domain routing (selector agent analyzes queries)
+    - @ mention support to directly target specific agents
+    - Durable persistence for all conversations
     
     Args:
         request: FastAPI request object
-        body: Session creation request
+        body: Session creation request (workflow_id, user_id, metadata)
         
     Returns:
         Created session information
         
-    Requirements: 1.1, 1.3, 2.2, 2.3
+    Requirements: 1.1, 1.3
     """
-    from src.config.workflow_registry import get_workflow_registry
-    
     request_id = getattr(request.state, "request_id", None)
+    workflow_id = body.workflow_id or "demo_multi_agent"  # Default to the demo workflow
     
     # Set request context
     set_request_user(current_user)
     
-    # Use default workflow if not specified
-    workflow_id = body.workflow_id
-    if not workflow_id:
-        workflow_registry = get_workflow_registry()
-        workflow_id = workflow_registry.get_default_workflow_id()
-        if not workflow_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No workflow_id provided and no default workflow configured",
-            )
-        logger.info(
-            "Using default workflow",
-            request_id=request_id,
-            workflow_id=workflow_id,
-        )
-    
     logger.info(
-        "Creating session",
+        "Creating chatbot session",
         request_id=request_id,
         workflow_id=workflow_id,
         user_id=body.user_id,
+        username=current_user.username if current_user else None,
     )
     
     try:
@@ -519,7 +506,7 @@ async def send_message(
     set_request_user(current_user)
     
     # Set tool execution context (thread-local - persists through agent execution)
-    # This ensures tools like get_requisition can access user info
+    # This ensures tools that forward user context can access user info
     set_tool_execution_context(
         username=current_user.username,
         roles=current_user.roles,
@@ -665,7 +652,7 @@ async def query_session(
     set_request_user(current_user)
     
     # Set tool execution context (thread-local - persists through agent execution)
-    # This ensures tools like get_requisition can access user info
+    # This ensures tools that forward user context can access user info
     set_tool_execution_context(
         username=current_user.username,
         roles=current_user.roles,

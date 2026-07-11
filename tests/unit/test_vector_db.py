@@ -179,46 +179,6 @@ class TestVectorDBModels:
         assert config_qdrant.get_connection_string() == "http://localhost:6333"
 
 
-class TestVectorDBFactory:
-    """Tests for VectorDBFactory."""
-
-    def test_create_chromadb_client(self) -> None:
-        """Test creating ChromaDB client."""
-        from src.infrastructure.vector_db import VectorDBFactory
-        
-        config = VectorDBConfig(
-            type=VectorDBType.CHROMADB,
-            collection_name="test_collection",
-            embedding_model="all-mpnet-base-v2",
-            embedding_dimensions=768,
-            distance_metric="cosine"
-        )
-        
-        client = VectorDBFactory.create_client(config)
-        
-        assert client is not None
-        assert hasattr(client, "get_client")
-        assert hasattr(client, "create_collection")
-        
-        # Cleanup
-        client.close()
-
-    def test_create_unsupported_database(self) -> None:
-        """Test creating client for unsupported database type."""
-        from src.config.vector_db_models import MongoDBConfig
-        from src.infrastructure.vector_db import VectorDBFactory
-        
-        config = VectorDBConfig(
-            type=VectorDBType.MONGODB,
-            collection_name="test_collection",
-            embedding_model="all-mpnet-base-v2",
-            embedding_dimensions=768,
-            distance_metric="cosine",
-            mongodb_config=MongoDBConfig(
-                connection_string="mongodb://localhost:27017",
-                database_name="test_db"
-            )
-        )
-        
-        with pytest.raises(NotImplementedError, match="MongoDB vector database support"):
-            VectorDBFactory.create_client(config)
+# Note: local vector DB clients (VectorDBFactory) were removed in favor of the
+# external RAG pipeline service (src/tools/rag_pipeline.py). Only the config
+# models above remain in use for validating vector database settings.

@@ -58,7 +58,7 @@ def to_snake_case(text: str) -> str:
     Examples:
         - "Total active framework agreement" -> "total_active_framework_agreement"
         - "GetUserById" -> "get_user_by_id"
-        - "Find requisition by requisition no" -> "find_requisition_by_requisition_no"
+        - "Find order by order no" -> "find_order_by_order_no"
     """
     if not text:
         return ""
@@ -87,7 +87,7 @@ def sanitize_tool_id(operation_id: str, path: str, method: str) -> str:
     
     Converts camelCase/PascalCase to snake_case for better readability.
     Examples:
-        - getRequisitionInfo -> get_requisition_info
+        - getOrderInfo -> get_order_info
         - GetUserById -> get_user_by_id
         - POST /api/users -> post_api_users
     """

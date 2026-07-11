@@ -6,7 +6,7 @@ from src.infrastructure.session_cache import SessionCache
 from src.infrastructure.embedding_cache import EmbeddingCache
 from src.infrastructure.llm_cache import (
     LLMCacheMonitor,
-    AutogenCacheConfig,
+    CrewAICacheConfig,
     get_llm_cache_monitor,
 )
 from src.infrastructure.cache_manager import CacheManager, get_cache_manager
@@ -40,7 +40,7 @@ __all__ = [
     'SessionCache',
     'EmbeddingCache',
     'LLMCacheMonitor',
-    'AutogenCacheConfig',
+    'CrewAICacheConfig',
     'CacheManager',
     'get_llm_cache_monitor',
     'get_cache_manager',

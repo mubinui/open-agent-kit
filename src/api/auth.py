@@ -1,4 +1,4 @@
-"""Authentication and authorization module for the Orchestration Service."""
+"""Authentication and authorization module for Open Agent Kit."""
 
 import hashlib
 import secrets
@@ -25,21 +25,69 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
 
 
-# Import MongoDB auth store types
-from src.infrastructure.database.mongo_auth_store import (
-    APIKeyCreate,
-    APIKeyInfo,
-    APIKeyResponse,
-    MongoAuthStore,
-    UserCreate,
-    UserDocument,
-    UserResponse,
-    UserRole,
+from enum import Enum
+
+from src.infrastructure.database.auth_store import (
+    API_KEY_PREFIX,
+    AuthStore,
     generate_api_key,
-    get_mongo_auth_store,
+    get_auth_store,
     hash_api_key,
-    init_mongo_auth_store,
 )
+
+
+class UserRole(str, Enum):
+    """User roles enum."""
+    ADMIN = "admin"
+    USER = "user"
+    READONLY = "readonly"
+
+
+class APIKeyCreate(BaseModel):
+    """Request payload for creating an API key."""
+    name: str = ""
+    user_id: Optional[UUID] = None
+    role: UserRole = UserRole.USER
+    expires_at: Optional[datetime] = None
+
+
+class APIKeyResponse(BaseModel):
+    """API key response — includes the plaintext key exactly once (at creation/rotation)."""
+    id: UUID
+    name: str
+    key: str
+    user_id: Optional[UUID] = None
+    role: UserRole
+    active: bool = True
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+
+
+class APIKeyInfo(BaseModel):
+    """API key metadata (never includes the key itself)."""
+    id: UUID
+    name: str
+    user_id: Optional[UUID] = None
+    role: UserRole
+    active: bool = True
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+
+
+class UserCreate(BaseModel):
+    """Request payload for creating a user."""
+    username: str
+    password: str
+    email: Optional[str] = None
+    role: UserRole = UserRole.USER
+
+
+class UserResponse(BaseModel):
+    """Public user representation."""
+    id: UUID
+    username: str
+    role: UserRole
+    created_at: datetime
 
 
 class Token(BaseModel):
@@ -146,75 +194,55 @@ def verify_token(token: str) -> TokenData:
         )
 
 
-def _get_auth_store() -> Optional[MongoAuthStore]:
-    """Get or initialize the MongoDB auth store."""
-    store = get_mongo_auth_store()
-    if store is None:
-        settings = get_settings()
-        if settings.memory.mongodb_url:
-            try:
-                store = init_mongo_auth_store(
-                    settings.memory.mongodb_url,
-                    settings.memory.mongodb_database
-                )
-            except Exception as e:
-                logger.error(f"Failed to initialize MongoDB auth store: {e}")
-                return None
-    return store
-
-
 async def authenticate_api_key(
     credentials: HTTPAuthorizationCredentials,
 ) -> CurrentUser:
     """Authenticate using API key."""
-    if not credentials.credentials.startswith("orc_"):
+    if not credentials.credentials.startswith(API_KEY_PREFIX):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key format",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    store = _get_auth_store()
-    if not store:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service not available (MongoDB not configured)",
-        )
-    
+
+    store = get_auth_store()
+
     # Hash the provided key to compare with stored hash
     key_hash = hash_api_key(credentials.credentials)
-    
+
     # Find matching API key in database
-    api_key_doc = store.get_api_key_by_hash(key_hash)
-    if not api_key_doc:
+    api_key = store.get_api_key_by_hash(key_hash)
+    if not api_key:
         logger.warning("api_key_authentication_failed", key_prefix=credentials.credentials[:10])
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Check if key is expired
-    if api_key_doc.get("expires_at") and api_key_doc["expires_at"] < datetime.utcnow():
-        logger.warning("api_key_expired", api_key_id=api_key_doc["_id"])
+    if api_key.expires_at and api_key.expires_at < datetime.utcnow():
+        logger.warning("api_key_expired", api_key_id=str(api_key.id))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="API key expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Update last used timestamp
-    store.update_api_key_last_used(api_key_doc["_id"])
-    
-    logger.info("api_key_authentication_successful", 
-               api_key_id=api_key_doc["_id"], 
-               role=api_key_doc["role"])
-    
+    store.update_api_key_last_used(api_key.id)
+
+    logger.info(
+        "api_key_authentication_successful",
+        api_key_id=str(api_key.id),
+        role=api_key.role,
+    )
+
     return CurrentUser(
-        api_key_id=UUID(api_key_doc["_id"]),
-        user_id=UUID(api_key_doc["user_id"]) if api_key_doc.get("user_id") else None,
-        role=UserRole(api_key_doc["role"]),
-        auth_method="api_key"
+        api_key_id=api_key.id,
+        user_id=api_key.user_id,
+        role=UserRole(api_key.role),
+        auth_method="api_key",
     )
 
 
@@ -223,21 +251,15 @@ async def authenticate_jwt(
 ) -> CurrentUser:
     """Authenticate using JWT token."""
     token_data = verify_token(credentials.credentials)
-    
+
     if not token_data.user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    store = _get_auth_store()
-    if not store:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service not available (MongoDB not configured)",
-        )
-    
+
+    store = get_auth_store()
     user = store.get_active_user(token_data.user_id)
     if not user:
         raise HTTPException(
@@ -245,17 +267,19 @@ async def authenticate_jwt(
             detail="User not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    logger.info("jwt_authentication_successful", 
-               user_id=str(user.id), 
-               username=user.username,
-               role=user.role.value)
-    
+
+    logger.info(
+        "jwt_authentication_successful",
+        user_id=str(user.id),
+        username=user.username,
+        role=user.role,
+    )
+
     return CurrentUser(
         user_id=user.id,
         username=user.username,
-        role=user.role,
-        auth_method="jwt"
+        role=UserRole(user.role),
+        auth_method="jwt",
     )
 
 
@@ -293,7 +317,7 @@ async def get_current_user(
         )
     
     # Try API key authentication first
-    if credentials.credentials.startswith("orc_"):
+    if credentials.credentials.startswith(API_KEY_PREFIX):
         return await authenticate_api_key(credentials)
     else:
         # Try JWT authentication
@@ -330,71 +354,137 @@ require_user = require_role(UserRole.USER)
 require_readonly = require_role(UserRole.READONLY)
 
 
-class APIKeyManager:
-    """Manager class for API key operations using MongoDB."""
-    
-    def __init__(self, store: Optional[MongoAuthStore] = None):
-        self.store = store or _get_auth_store()
-        if not self.store:
-            raise ValueError("MongoDB auth store not available")
-    
-    def create_api_key(self, api_key_data: APIKeyCreate) -> APIKeyResponse:
-        """Create a new API key."""
-        api_key = generate_api_key()
-        encrypted_key = credential_manager.encrypt_credential(api_key)
-        
-        # Create the key (store will generate its own key)
-        response = self.store.create_api_key(api_key_data, encrypted_key)
-        
-        # Override with the generated key for return
-        return APIKeyResponse(
-            id=response.id,
-            name=response.name,
-            key=api_key,
-            user_id=response.user_id,
-            role=response.role,
-            active=response.active,
-            created_at=response.created_at,
-            expires_at=response.expires_at,
-        )
-    
-    def list_api_keys(self, user_id: Optional[str] = None) -> list[APIKeyInfo]:
-        """List API keys (without the actual keys)."""
-        return self.store.list_api_keys(user_id)
-    
-    def revoke_api_key(self, api_key_id: UUID) -> bool:
-        """Revoke (deactivate) an API key."""
-        return self.store.revoke_api_key(api_key_id)
-    
-    def rotate_api_key(self, api_key_id: UUID) -> Optional[APIKeyResponse]:
-        """Rotate an API key (generate new key, keep same metadata)."""
-        new_key = generate_api_key()
-        new_encrypted_key = credential_manager.encrypt_credential(new_key)
-        return self.store.rotate_api_key(api_key_id, new_encrypted_key)
-
-
 class UserManager:
-    """Manager class for user operations using MongoDB."""
-    
-    def __init__(self, store: Optional[MongoAuthStore] = None):
-        self.store = store or _get_auth_store()
-        if not self.store:
-            raise ValueError("MongoDB auth store not available")
-    
+    """Manages local user accounts backed by the SQL database."""
+
+    def __init__(self, store: Optional[AuthStore] = None):
+        self.store = store or get_auth_store()
+
     def create_user(self, user_data: UserCreate) -> UserResponse:
-        """Create a new user."""
-        try:
-            return self.store.create_user(user_data)
-        except ValueError as e:
+        """Create a new user with a bcrypt-hashed password."""
+        if self.store.get_user_by_username(user_data.username):
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e)
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Username already exists: {user_data.username}",
             )
-    
-    def authenticate_user(self, username: str, password: str) -> Optional[UserDocument]:
-        """Authenticate a user with username and password."""
-        return self.store.authenticate_user(username, password)
-    
-    def get_user(self, user_id: UUID) -> Optional[UserResponse]:
-        """Get user by ID."""
-        return self.store.get_user(user_id)
+        user = self.store.create_user(
+            username=user_data.username,
+            password_hash=pwd_context.hash(user_data.password),
+            role=user_data.role.value,
+            email=user_data.email,
+        )
+        logger.info("user_created", user_id=str(user.id), username=user.username)
+        return UserResponse(
+            id=user.id,
+            username=user.username,
+            role=UserRole(user.role),
+            created_at=user.created_at,
+        )
+
+    def authenticate_user(self, username: str, password: str) -> Optional[UserResponse]:
+        """Verify username/password; return the user or None."""
+        user = self.store.get_user_by_username(username)
+        if user is None or not user.active:
+            return None
+        if not pwd_context.verify(password, user.password_hash):
+            return None
+        self.store.record_login(user.id)
+        return UserResponse(
+            id=user.id,
+            username=user.username,
+            role=UserRole(user.role),
+            created_at=user.created_at,
+        )
+
+
+class APIKeyManager:
+    """Manages API keys backed by the SQL database."""
+
+    def __init__(self, store: Optional[AuthStore] = None):
+        self.store = store or get_auth_store()
+
+    def create_api_key(self, api_key_data: APIKeyCreate) -> APIKeyResponse:
+        """Create a new API key; the plaintext key is returned only here."""
+        plaintext = generate_api_key()
+        api_key = self.store.create_api_key(
+            name=api_key_data.name or "api-key",
+            key_hash=hash_api_key(plaintext),
+            role=api_key_data.role.value,
+            user_id=api_key_data.user_id,
+            expires_at=api_key_data.expires_at,
+        )
+        logger.info("api_key_created", api_key_id=str(api_key.id), name=api_key.name)
+        return APIKeyResponse(
+            id=api_key.id,
+            name=api_key.name,
+            key=plaintext,
+            user_id=api_key.user_id,
+            role=UserRole(api_key.role),
+            active=api_key.active,
+            created_at=api_key.created_at,
+            expires_at=api_key.expires_at,
+        )
+
+    def list_api_keys(self, user_id: Optional[str] = None) -> list[APIKeyInfo]:
+        """List active API keys, optionally filtered by owner."""
+        parsed_user_id = UUID(user_id) if user_id else None
+        return [
+            APIKeyInfo(
+                id=key.id,
+                name=key.name,
+                user_id=key.user_id,
+                role=UserRole(key.role),
+                active=key.active,
+                created_at=key.created_at,
+                expires_at=key.expires_at,
+            )
+            for key in self.store.list_api_keys(parsed_user_id)
+        ]
+
+    def revoke_api_key(self, api_key_id: UUID) -> bool:
+        """Deactivate an API key."""
+        revoked = self.store.revoke_api_key(api_key_id)
+        if revoked:
+            logger.info("api_key_revoked", api_key_id=str(api_key_id))
+        return revoked
+
+    def rotate_api_key(self, api_key_id: UUID) -> Optional[APIKeyResponse]:
+        """Replace an API key's secret; the new plaintext key is returned only here."""
+        plaintext = generate_api_key()
+        api_key = self.store.rotate_api_key(api_key_id, hash_api_key(plaintext))
+        if api_key is None:
+            return None
+        logger.info("api_key_rotated", api_key_id=str(api_key_id))
+        return APIKeyResponse(
+            id=api_key.id,
+            name=api_key.name,
+            key=plaintext,
+            user_id=api_key.user_id,
+            role=UserRole(api_key.role),
+            active=api_key.active,
+            created_at=api_key.created_at,
+            expires_at=api_key.expires_at,
+        )
+
+
+def bootstrap_admin_user() -> None:
+    """Create the initial admin user from env vars if no users exist.
+
+    Set OAK_ADMIN_USERNAME and OAK_ADMIN_PASSWORD to enable; skipped otherwise.
+    """
+    import os
+
+    username = os.environ.get("OAK_ADMIN_USERNAME")
+    password = os.environ.get("OAK_ADMIN_PASSWORD")
+    if not username or not password:
+        return
+    try:
+        store = get_auth_store()
+        if store.count_users() > 0:
+            return
+        UserManager(store).create_user(
+            UserCreate(username=username, password=password, role=UserRole.ADMIN)
+        )
+        logger.info("bootstrap_admin_created", username=username)
+    except Exception as exc:
+        logger.warning("bootstrap_admin_failed", error=str(exc))

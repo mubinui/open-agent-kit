@@ -344,6 +344,9 @@ class ProviderAdapter:
 
     def _load_configurations(self) -> None:
         """Load configurations from JSON files."""
+        # Drop providers removed from the config file since the last load
+        self._providers.clear()
+
         # Load API providers
         if self.config_path.exists():
             with open(self.config_path, "r") as f:

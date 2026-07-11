@@ -1,4 +1,4 @@
-"""Factory module for creating agents dynamically."""
+"""CrewAI factory helpers."""
 
 from src.factory.agent_factory import AgentFactory
 

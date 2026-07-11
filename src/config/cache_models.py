@@ -1,11 +1,4 @@
-"""
-AUTOGEN 0.2 RESEARCH:
-- Feature needed: Multi-layer cache configuration with TTL and eviction policies
-- Autogen provides: cache_seed parameter in llm_config for response caching
-- Using: Custom cache configuration models extending Autogen's basic caching
-- Documentation: https://microsoft.github.io/autogen/0.2/docs/reference/agentchat/conversable_agent
-- Decision: Custom implementation - Autogen only provides basic cache_seed, we need fine-grained control
-"""
+"""Multi-layer cache configuration with TTL and eviction policies."""
 
 from enum import Enum
 from typing import Optional

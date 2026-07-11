@@ -1,1 +1,5 @@
-"""Utility modules for the orchestration service."""
+"""Utility modules for Open Agent Kit."""
+
+from src.utils.message_converter import MessageConverter
+
+__all__ = ["MessageConverter"]

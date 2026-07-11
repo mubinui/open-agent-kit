@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: orchestration
+  name: open-agent-kit
   labels:
-    name: orchestration
-    app: orchestration-service
+    name: open-agent-kit
+    app: open-agent-kit

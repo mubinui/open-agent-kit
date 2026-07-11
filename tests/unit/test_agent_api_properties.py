@@ -44,7 +44,7 @@ def valid_llm_config(draw):
     """Generate a valid LLM configuration."""
     return {
         "provider_id": draw(st.sampled_from(["openrouter", "openai", "anthropic"])),
-        "model": draw(st.sampled_from(["openai/gpt-oss-20b"])),
+        "model": draw(st.sampled_from(["google/gemma-3-27b-it"])),
         "temperature": draw(st.floats(min_value=0.0, max_value=2.0)),
         "max_tokens": draw(st.one_of(st.none(), st.integers(min_value=1, max_value=4096))),
         "cache_seed": draw(st.one_of(st.none(), st.integers(min_value=0, max_value=1000))),
@@ -81,17 +81,16 @@ def valid_agent_config(draw, require_llm=True):
 def invalid_agent_config(draw):
     """Generate an invalid agent configuration (missing required fields)."""
     agent_id = draw(valid_agent_id())
-    agent_type = draw(st.sampled_from([AgentType.CONVERSABLE.value]))
     name = draw(st.text(min_size=1, max_size=50).filter(lambda x: " " not in x))
-    
-    # Create config missing required fields
+
+    # retrieve_user_proxy agents require retrieve_config or memory_config,
+    # so omitting both makes the config invalid
     config = {
         "id": agent_id,
-        "type": agent_type,
+        "type": AgentType.RETRIEVE_USER_PROXY.value,
         "name": name,
-        # Missing system_message and llm_config for conversable agent
     }
-    
+
     return config
 
 
@@ -279,9 +278,15 @@ def test_referential_integrity_enforcement(agent_id: str):
         "id": "test_workflow",
         "name": "Test Workflow",
         "description": "Test",
-        "pattern": "two_agent",
-        "entry_agent_id": agent_id,
-        "recipient_agent_id": "other_agent",
+        "pattern": "sequential",
+        "topology": {
+            "type": "sequential",
+            "nodes": [
+                {"id": "entry", "agent_id": agent_id, "description": "Entry"},
+                {"id": "recipient", "agent_id": "other_agent", "description": "Recipient"},
+            ],
+            "entry_node": "entry",
+        },
         "enabled": True,
     }
     
@@ -315,7 +320,7 @@ def test_referential_integrity_allows_deletion_without_dependencies():
         "system_message": "Test",
         "llm_config": {
             "provider_id": "openrouter",
-            "model": "openai/gpt-oss-20b",
+            "model": "google/gemma-3-27b-it",
             "temperature": 0.7,
         },
     }
@@ -354,7 +359,7 @@ def test_agent_update_with_invalid_tools():
         "system_message": "Test",
         "llm_config": {
             "provider_id": "openrouter",
-            "model": "openai/gpt-oss-20b",
+            "model": "google/gemma-3-27b-it",
             "temperature": 0.7,
         },
         "tools": [],

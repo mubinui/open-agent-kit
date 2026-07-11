@@ -1,11 +1,4 @@
-"""
-AUTOGEN 0.2 RESEARCH:
-- Feature needed: Property-based testing for cache bypass behavior
-- Autogen provides: cache_seed for basic caching, no testing utilities
-- Using: Hypothesis for property-based testing of custom cache bypass logic
-- Documentation: N/A - testing custom cache layer
-- Decision: Custom property tests - testing our cache manager's bypass logic
-"""
+"""Property-based testing for cache bypass behavior."""
 
 import pytest
 from hypothesis import given, strategies as st, settings, assume

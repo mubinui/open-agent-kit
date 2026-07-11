@@ -39,7 +39,7 @@ class KeycloakTokenData(BaseModel):
     family_name: Optional[str] = None
     realm_access: Optional[dict[str, Any]] = None
     resource_access: Optional[dict[str, Any]] = None
-    authorities: Optional[list[str]] = None  # Direct authorities claim (BRAC Keycloak)
+    authorities: Optional[list[str]] = None  # Direct authorities claim (custom Keycloak mappers)
     scope: Optional[str] = None
     azp: Optional[str] = None  # Authorized party (client_id)
     iss: Optional[str] = None  # Issuer
@@ -49,7 +49,7 @@ class KeycloakTokenData(BaseModel):
     @property
     def roles(self) -> list[str]:
         """Extract roles from token - checks authorities first, then realm_access."""
-        # Check authorities claim first (BRAC Keycloak setup)
+        # Check authorities claim first (custom Keycloak setups)
         if self.authorities:
             return self.authorities
         # Fall back to realm_access.roles
@@ -289,7 +289,7 @@ async def get_admin_token() -> str:
     """
     Obtain admin token from Keycloak using client_credentials grant.
 
-    This is used for Service2-style calls where the orchestration service
+    This is used for Service2-style calls where Open Agent Kit
     needs to call downstream services with an admin/service account.
 
     Returns:

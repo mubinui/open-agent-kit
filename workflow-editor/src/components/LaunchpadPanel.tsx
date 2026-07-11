@@ -1,0 +1,665 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Bot, Cable, ChevronLeft, ChevronRight, Code2, ExternalLink, PlayCircle, Rocket, Send, Trash2, Wand2, Wrench } from 'lucide-react';
+import { applyBuilderPlan, generateBuilderConfig, generateFrontend, listBuilderModels, normalizeApi, planChatbot, streamBuilderChat } from '../api/builderApi';
+import type { BuilderType, ChatMessage, ModelInfo } from '../api/builderApi';
+import { useLibraryStore } from '../stores/libraryStore';
+import { useWorkflowStore } from '../stores/workflowStore';
+
+type Tab = 'build' | 'api' | 'triggers' | 'frontend' | 'deploy';
+type BuildKind = BuilderType | 'chatbot' | 'api' | 'frontend';
+
+const compactJson = (value: unknown) => JSON.stringify(value, null, 2);
+const FRONTEND_MODEL_ID = 'google/gemini-3.1-pro-preview';
+
+const GeneratingBubble = () => (
+    <div className="inline-flex items-center gap-2 text-slate-500">
+        <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-40 animate-ping" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-blue-500" />
+        </span>
+        <span className="text-sm">Generating</span>
+        <span className="flex gap-0.5" aria-hidden="true">
+            <span className="h-1 w-1 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.24s]" />
+            <span className="h-1 w-1 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.12s]" />
+            <span className="h-1 w-1 rounded-full bg-slate-400 animate-bounce" />
+        </span>
+    </div>
+);
+
+export const LaunchpadPanel = () => {
+    const [collapsed, setCollapsed] = useState(false);
+    const [tab, setTab] = useState<Tab>('build');
+    const [buildKind, setBuildKind] = useState<BuildKind>('chatbot');
+    const [buildMessages, setBuildMessages] = useState<ChatMessage[]>([]);
+    const [buildInput, setBuildInput] = useState('Build a helpful admissions chatbot that can answer student questions and call APIs when needed.');
+    const [models, setModels] = useState<ModelInfo[]>([]);
+    const [providerId, setProviderId] = useState('openrouter');
+    const [modelId, setModelId] = useState('openai/gpt-oss-20b');
+    const [rawApi, setRawApi] = useState('GET https://api.example.com/students/{id}\\nAuthorization: Bearer token\\nReturn student profile by id');
+    const [specification, setSpecification] = useState('Create a tool that agents can use safely. Infer path/query params and auth.');
+    const [plan, setPlan] = useState<Record<string, any> | null>(null);
+    const [normalizedTool, setNormalizedTool] = useState<Record<string, any> | null>(null);
+    const [frontendPrompt, setFrontendPrompt] = useState('Create a premium university admissions chatbot UI with a clean welcome panel, suggested questions, and a fast mobile layout.');
+    const [frontendMessages, setFrontendMessages] = useState<ChatMessage[]>([]);
+    const [frontendHtml, setFrontendHtml] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [message, setMessage] = useState('');
+
+    const { currentWorkflowId, workflowName } = useWorkflowStore();
+    const {
+        triggers,
+        deployments,
+        createTrigger,
+        deleteTrigger,
+        flashDeploy,
+        deleteDeployment,
+        fetchOperationsData,
+    } = useLibraryStore();
+
+    const workflowId = currentWorkflowId || plan?.workflow?.id || '';
+    const workflowLabel = workflowName || plan?.workflow?.name || 'Current workflow';
+
+    useEffect(() => {
+        listBuilderModels()
+            .then((result) => {
+                setModels(result.models);
+                const preferred = result.models.find((model) => model.model_id === FRONTEND_MODEL_ID) ?? result.models[0];
+                if (preferred) {
+                    setProviderId(preferred.provider_id);
+                    setModelId(preferred.model_id);
+                }
+            })
+            .catch(() => undefined);
+        fetchOperationsData();
+    }, []);
+
+    const providerModels = useMemo(
+        () => models.filter((model) => model.provider_id === providerId),
+        [models, providerId],
+    );
+
+    const readBuilderStream = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let text = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const frames = buffer.split('\n\n');
+            buffer = frames.pop() ?? '';
+            for (const frame of frames) {
+                const dataLine = frame.split('\n').find((line) => line.startsWith('data: '));
+                if (!dataLine) continue;
+                const raw = dataLine.slice(6);
+                if (raw === '[DONE]') continue;
+                const data = JSON.parse(raw);
+                text += data.token ?? '';
+                setBuildMessages((items) => {
+                    const next = [...items];
+                    const last = next[next.length - 1];
+                    if (last?.role === 'assistant') {
+                        next[next.length - 1] = { ...last, content: text };
+                    }
+                    return next;
+                });
+            }
+        }
+        return text;
+    };
+
+    const runChatBuilder = async () => {
+        const requestText = buildInput.trim();
+        if (!requestText) return;
+        setBuildInput('');
+        setBusy(true);
+        setMessage('');
+        const nextMessages: ChatMessage[] = [...buildMessages, { role: 'user', content: requestText }];
+        setBuildMessages([...nextMessages, { role: 'assistant', content: '' }]);
+        try {
+            if (buildKind === 'chatbot') {
+                const result = await planChatbot({ prompt: requestText, provider_id: providerId, model_id: modelId });
+                setPlan(result);
+                setBuildMessages([...nextMessages, { role: 'assistant', content: `I built a full chatbot plan.\n\n${compactJson(result)}` }]);
+            } else if (buildKind === 'api') {
+                const result = await normalizeApi({ raw_api: requestText, specification, provider_id: providerId, model_id: modelId });
+                setNormalizedTool(result);
+                setBuildMessages([...nextMessages, { role: 'assistant', content: `I normalized this API into a tool config.\n\n${compactJson(result)}` }]);
+            } else if (buildKind === 'frontend') {
+                if (!workflowId) {
+                    setBuildMessages([...nextMessages, { role: 'assistant', content: 'Save or load a workflow first so I know which backend this frontend should talk to.' }]);
+                    return;
+                }
+                const result = await generateFrontend({
+                    prompt: requestText,
+                    workflow_id: workflowId,
+                    title: workflowLabel,
+                    greeting: 'Hi, I am ready.',
+                    provider_id: providerId,
+                    model_id: modelId,
+                    history: buildMessages,
+                });
+                setFrontendHtml(result.html);
+                setBuildMessages([...nextMessages, { role: 'assistant', content: `${result.summary}\n\nReady to flash deploy from the Frontend tab.` }]);
+            } else {
+                const reader = await streamBuilderChat({
+                    builder_type: buildKind,
+                    message: requestText,
+                    history: buildMessages,
+                    provider_id: providerId,
+                    model_id: modelId,
+                });
+                await readBuilderStream(reader);
+            }
+        } catch (error) {
+            setBuildMessages([...nextMessages, { role: 'assistant', content: (error as Error).message }]);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const finalizeChatBuilder = async () => {
+        if (!['agent', 'tool', 'function', 'workflow'].includes(buildKind)) {
+            setMessage('Use Generate for agent, tool, function, or workflow conversations. Chatbot, API, and frontend modes already create structured output directly.');
+            return;
+        }
+        setBusy(true);
+        setMessage('');
+        try {
+            const result = await generateBuilderConfig({
+                builder_type: buildKind as BuilderType,
+                history: buildMessages,
+                provider_id: providerId,
+                model_id: modelId,
+            });
+            if (typeof result.config === 'string') {
+                setMessage(result.config);
+            } else if (buildKind === 'workflow') {
+                setPlan({ workflow: result.config });
+                setMessage(compactJson(result.config));
+            } else {
+                setMessage(compactJson(result.config));
+            }
+        } catch (error) {
+            setMessage((error as Error).message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const runPlan = async () => {
+        setBusy(true);
+        setMessage('');
+        try {
+            const seed = buildInput.trim() || 'Build a helpful admissions chatbot that can answer student questions and call APIs when needed.';
+            const result = await planChatbot({ prompt: seed, provider_id: providerId, model_id: modelId });
+            setPlan(result);
+            setMessage('Build plan ready. Review it, then apply when it looks right.');
+        } catch (error) {
+            setMessage((error as Error).message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const applyPlan = async () => {
+        if (!plan) return;
+        setBusy(true);
+        try {
+            const result = await applyBuilderPlan(plan);
+            setMessage(`Applied plan: ${compactJson(result)}`);
+            await fetchOperationsData();
+        } catch (error) {
+            setMessage((error as Error).message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const runNormalizeApi = async () => {
+        setBusy(true);
+        setMessage('');
+        try {
+            const result = await normalizeApi({ raw_api: rawApi, specification, provider_id: providerId, model_id: modelId });
+            setNormalizedTool(result);
+            setMessage('API normalized. You can copy this config or apply it through the builder plan flow.');
+        } catch (error) {
+            setMessage((error as Error).message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const useGeminiFrontendModel = () => {
+        const gemini = models.find((model) => model.model_id === FRONTEND_MODEL_ID);
+        setProviderId(gemini?.provider_id ?? 'openrouter');
+        setModelId(FRONTEND_MODEL_ID);
+    };
+
+    const runFrontendGenerate = async () => {
+        if (!workflowId) {
+            setMessage('Save or load a workflow first.');
+            return;
+        }
+        const requestText = frontendPrompt.trim();
+        if (!requestText) return;
+        const nextMessages: ChatMessage[] = [...frontendMessages, { role: 'user', content: requestText }];
+        setFrontendMessages([...nextMessages, { role: 'assistant', content: '' }]);
+        setFrontendPrompt('');
+        setBusy(true);
+        setMessage('');
+        try {
+            const result = await generateFrontend({
+                prompt: requestText,
+                workflow_id: workflowId,
+                title: workflowLabel,
+                greeting: 'Hi, I am ready.',
+                provider_id: providerId,
+                model_id: modelId,
+                history: frontendMessages,
+            });
+            setFrontendHtml(result.html);
+            setFrontendMessages([
+                ...nextMessages,
+                {
+                    role: 'assistant',
+                    content: result.used_fallback
+                        ? `${result.summary} Add an OpenRouter API key to use ${result.model_id}.`
+                        : `${result.summary} Ready to flash deploy.`,
+                },
+            ]);
+        } catch (error) {
+            setFrontendMessages([...nextMessages, { role: 'assistant', content: (error as Error).message }]);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const createChatTrigger = async () => {
+        if (!workflowId) {
+            setMessage('Save or load a workflow first.');
+            return;
+        }
+        setBusy(true);
+        try {
+            await createTrigger({
+                workflow_id: workflowId,
+                type: 'chat',
+                name: `${workflowLabel} chat`,
+                auth_mode: 'public',
+                provider_id: providerId,
+                model_id: modelId,
+                greeting: 'Hi, how can I help?',
+            });
+            await fetchOperationsData();
+            setMessage('Chat trigger created.');
+        } catch (error) {
+            setMessage((error as Error).message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const createWebhookTrigger = async () => {
+        if (!workflowId) {
+            setMessage('Save or load a workflow first.');
+            return;
+        }
+        setBusy(true);
+        try {
+            await createTrigger({
+                workflow_id: workflowId,
+                type: 'webhook',
+                name: `${workflowLabel} webhook`,
+                auth_mode: 'api_key',
+                provider_id: providerId,
+                model_id: modelId,
+                input_mapping: { message: '$.message' },
+                response_mapping: { response: '$.response' },
+            });
+            await fetchOperationsData();
+            setMessage('Webhook trigger created with a secret.');
+        } catch (error) {
+            setMessage((error as Error).message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const runFlashDeploy = async () => {
+        if (!workflowId) {
+            setMessage('Save or load a workflow first.');
+            return;
+        }
+        setBusy(true);
+        try {
+            const deployment = await flashDeploy({
+                workflow_id: workflowId,
+                name: workflowId,
+                title: workflowLabel,
+                greeting: 'Hi, I am ready.',
+                provider_id: providerId,
+                model_id: modelId,
+                auth_mode: 'public',
+            });
+            setMessage(`Flash deployed at ${deployment.url}`);
+        } catch (error) {
+            setMessage((error as Error).message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const runGeneratedFlashDeploy = async () => {
+        if (!workflowId) {
+            setMessage('Save or load a workflow first.');
+            return;
+        }
+        if (!frontendHtml) {
+            setMessage('Generate a frontend first.');
+            return;
+        }
+        setBusy(true);
+        try {
+            const deployment = await flashDeploy({
+                workflow_id: workflowId,
+                name: `${workflowId}-custom-frontend`,
+                title: workflowLabel,
+                greeting: 'Hi, I am ready.',
+                provider_id: providerId,
+                model_id: modelId,
+                auth_mode: 'public',
+                frontend_html: frontendHtml,
+                frontend_source: 'ai_frontend_builder',
+            });
+            setMessage(`Generated frontend deployed at ${deployment.url}`);
+        } catch (error) {
+            setMessage((error as Error).message);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const tabs = [
+        { id: 'build' as const, label: 'Build', icon: Wand2 },
+        { id: 'api' as const, label: 'API Fix', icon: Wrench },
+        { id: 'triggers' as const, label: 'Triggers', icon: Cable },
+        { id: 'frontend' as const, label: 'Frontend', icon: Code2 },
+        { id: 'deploy' as const, label: 'Deploy', icon: Rocket },
+    ];
+
+    if (collapsed) {
+        return (
+            <aside className="w-14 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b111b] flex flex-col items-center py-3 gap-2 shrink-0">
+                <button onClick={() => setCollapsed(false)} className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400" title="Open AI Launchpad">
+                    <ChevronRight size={18} />
+                </button>
+                {tabs.map(({ id, label, icon: Icon }) => (
+                    <button
+                        key={id}
+                        onClick={() => {
+                            setTab(id);
+                            setCollapsed(false);
+                        }}
+                        className={`p-2 rounded-md ${tab === id ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        title={label}
+                    >
+                        <Icon size={17} />
+                    </button>
+                ))}
+            </aside>
+        );
+    }
+
+    return (
+        <aside className="w-[340px] border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b111b] flex flex-col shrink-0">
+            <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold">
+                            <Bot size={18} className="text-blue-600" />
+                            AI Launchpad
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{workflowId ? `Target: ${workflowId}` : 'No saved workflow selected'}</div>
+                    </div>
+                    <button onClick={() => setCollapsed(true)} className="p-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400" title="Collapse">
+                        <ChevronLeft size={17} />
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-5 gap-1 p-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b111b]">
+                {tabs.map(({ id, label, icon: Icon }) => (
+                    <button
+                        key={id}
+                        onClick={() => setTab(id)}
+                        className={`h-12 rounded-md text-[11px] font-semibold flex flex-col items-center justify-center gap-1 ${
+                            tab === id ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                    >
+                        <Icon size={16} />
+                        {label}
+                    </button>
+                ))}
+            </div>
+
+            <div className="p-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
+                <select
+                    value={providerId}
+                    onChange={(event) => {
+                        setProviderId(event.target.value);
+                        const first = models.find((model) => model.provider_id === event.target.value);
+                        if (first) setModelId(first.model_id);
+                    }}
+                    className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200"
+                >
+                    {[...new Set(models.map((model) => model.provider_id))].map((provider) => (
+                        <option key={provider} value={provider}>{provider}</option>
+                    ))}
+                </select>
+                <select
+                    value={modelId}
+                    onChange={(event) => setModelId(event.target.value)}
+                    className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200"
+                >
+                    {providerModels.map((model) => (
+                        <option key={`${model.provider_id}:${model.model_id}`} value={model.model_id}>{model.model_id}</option>
+                    ))}
+                </select>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                {tab === 'build' && (
+                    <>
+                        <select
+                            value={buildKind}
+                            onChange={(event) => setBuildKind(event.target.value as BuildKind)}
+                            className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200"
+                        >
+                            <option value="chatbot">Complete chatbot</option>
+                            <option value="agent">Agent</option>
+                            <option value="tool">Tool</option>
+                            <option value="function">Function tool</option>
+                            <option value="workflow">Workflow</option>
+                            <option value="api">Raw API to tool</option>
+                            <option value="frontend">Chatbot frontend</option>
+                        </select>
+                        <div className="border border-slate-200 dark:border-slate-800 rounded-md bg-slate-50 dark:bg-slate-900/40 h-64 overflow-y-auto p-3 space-y-3">
+                            {buildMessages.length === 0 && (
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                    Tell the builder what to create. Switch the type above for agents, tools, functions, workflows, APIs, full chatbots, or frontend.
+                                </div>
+                            )}
+                            {buildMessages.map((chatMessage, index) => (
+                                <div
+                                    key={`${chatMessage.role}-${index}`}
+                                    className={`text-sm rounded-md p-3 whitespace-pre-wrap ${
+                                        chatMessage.role === 'user'
+                                            ? 'bg-blue-600 text-white ml-5'
+                                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 mr-5'
+                                    }`}
+                                >
+                                    {chatMessage.content || <GeneratingBubble />}
+                                </div>
+                            ))}
+                        </div>
+                        <textarea
+                            value={buildInput}
+                            onChange={(event) => setBuildInput(event.target.value)}
+                            className="w-full min-h-24 border border-slate-300 dark:border-slate-700 rounded-md p-3 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200"
+                            placeholder="Describe what you want to build..."
+                        />
+                        <div className="grid grid-cols-3 gap-2">
+                            <button onClick={runChatBuilder} disabled={busy} className="col-span-2 bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+                                <Send size={15} /> Send
+                            </button>
+                            <button onClick={finalizeChatBuilder} disabled={busy || buildMessages.length === 0} className="bg-slate-900 dark:bg-slate-700 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
+                                Generate
+                            </button>
+                            <button onClick={runPlan} disabled={busy} className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-md py-2 text-xs font-semibold disabled:opacity-50">
+                                Quick Plan
+                            </button>
+                            <button onClick={applyPlan} disabled={busy || !plan} className="col-span-2 bg-slate-900 dark:bg-slate-700 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
+                                Apply
+                            </button>
+                        </div>
+                        {plan && <pre className="text-xs bg-slate-950 text-slate-100 p-3 rounded-md overflow-auto max-h-96">{compactJson(plan)}</pre>}
+                    </>
+                )}
+
+                {tab === 'api' && (
+                    <>
+                        <textarea value={specification} onChange={(event) => setSpecification(event.target.value)} className="w-full min-h-20 border border-slate-300 dark:border-slate-700 rounded-md p-3 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200" />
+                        <textarea value={rawApi} onChange={(event) => setRawApi(event.target.value)} className="w-full min-h-44 border border-slate-300 dark:border-slate-700 rounded-md p-3 text-sm font-mono bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200" />
+                        <button onClick={runNormalizeApi} disabled={busy} className="w-full bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
+                            Normalize API
+                        </button>
+                        {normalizedTool && <pre className="text-xs bg-slate-950 text-slate-100 p-3 rounded-md overflow-auto max-h-96">{compactJson(normalizedTool)}</pre>}
+                    </>
+                )}
+
+                {tab === 'triggers' && (
+                    <>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button onClick={createChatTrigger} disabled={busy} className="bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">Chat Trigger</button>
+                            <button onClick={createWebhookTrigger} disabled={busy} className="bg-slate-900 dark:bg-slate-700 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">Webhook</button>
+                        </div>
+                        {triggers.map((trigger) => (
+                            <div key={trigger.id} className="border border-slate-200 dark:border-slate-800 rounded-md p-3 bg-slate-50 dark:bg-slate-900/40">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{trigger.name}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">{trigger.type} · {trigger.workflow_id}</div>
+                                        {trigger.public_slug && <div className="text-xs font-mono mt-1">/api/v1/webhooks/{trigger.public_slug}</div>}
+                                    </div>
+                                    <button onClick={() => deleteTrigger(trigger.id)} className="text-red-600 p-1"><Trash2 size={14} /></button>
+                                </div>
+                            </div>
+                        ))}
+                    </>
+                )}
+
+                {tab === 'frontend' && (
+                    <>
+                        <button onClick={useGeminiFrontendModel} className="w-full bg-slate-900 dark:bg-slate-700 text-white rounded-md py-2 text-sm font-semibold">
+                            Use Gemini Pro
+                        </button>
+                        <div className="border border-slate-200 dark:border-slate-800 rounded-md bg-slate-50 dark:bg-slate-900/40 h-72 overflow-y-auto p-3 space-y-3">
+                            {frontendMessages.length === 0 && (
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                    Describe the exact customer-facing chatbot UI you want. This lane generates a deployable frontend and keeps the workflow backend intact.
+                                </div>
+                            )}
+                            {frontendMessages.map((chatMessage, index) => (
+                                <div
+                                    key={`${chatMessage.role}-${index}`}
+                                    className={`text-sm rounded-md p-3 whitespace-pre-wrap ${
+                                        chatMessage.role === 'user'
+                                            ? 'bg-blue-600 text-white ml-6'
+                                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 mr-6'
+                                    }`}
+                                >
+                                    {chatMessage.content || <GeneratingBubble />}
+                                </div>
+                            ))}
+                        </div>
+                        <textarea
+                            value={frontendPrompt}
+                            onChange={(event) => setFrontendPrompt(event.target.value)}
+                            className="w-full min-h-28 border border-slate-300 dark:border-slate-700 rounded-md p-3 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200"
+                            placeholder="Ask Gemini to build or revise the chatbot frontend..."
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                            <button onClick={runFrontendGenerate} disabled={busy} className="bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
+                                Generate UI
+                            </button>
+                            <button onClick={runGeneratedFlashDeploy} disabled={busy || !frontendHtml} className="bg-slate-900 dark:bg-slate-700 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
+                                Flash Deploy
+                            </button>
+                        </div>
+                        {frontendHtml && (
+                            <div className="space-y-3">
+                                <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-3 py-2">
+                                        <div>
+                                            <div className="text-sm font-semibold text-slate-900 dark:text-white">Live Preview</div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">Rendered custom chatbot frontend</div>
+                                        </div>
+                                        <a
+                                            href={`data:text/html;charset=utf-8,${encodeURIComponent(frontendHtml)}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600"
+                                        >
+                                            Open Preview <ExternalLink size={12} />
+                                        </a>
+                                    </div>
+                                    <iframe
+                                        key={frontendHtml}
+                                        title="Generated chatbot frontend preview"
+                                        srcDoc={frontendHtml}
+                                        sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts"
+                                        className="h-[28rem] w-full bg-white"
+                                    />
+                                </div>
+                                <details className="rounded-lg border border-slate-200 bg-slate-950 text-slate-100">
+                                    <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
+                                        View HTML Source
+                                    </summary>
+                                    <pre className="max-h-96 overflow-auto border-t border-slate-800 p-3 text-xs">{frontendHtml}</pre>
+                                </details>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {tab === 'deploy' && (
+                    <>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Deployments are served by this app at <span className="font-mono">/d/&lt;name&gt;/</span> — same origin, no extra ports.
+                        </p>
+                        <button onClick={runFlashDeploy} disabled={busy} className="w-full bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+                            <PlayCircle size={16} /> Flash Deploy
+                        </button>
+                        {deployments.map((deployment) => (
+                            <div key={deployment.id} className="border border-slate-200 dark:border-slate-800 rounded-md p-3 bg-slate-50 dark:bg-slate-900/40">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{deployment.title}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">{deployment.status} · {deployment.workflow_id}</div>
+                                        <a href={deployment.url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 inline-flex items-center gap-1 mt-1">
+                                            {deployment.url}<ExternalLink size={11} />
+                                        </a>
+                                    </div>
+                                    <button onClick={() => deleteDeployment(deployment.id)} className="text-red-600 p-1"><Trash2 size={14} /></button>
+                                </div>
+                            </div>
+                        ))}
+                    </>
+                )}
+
+                {message && <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-900 dark:text-amber-300 rounded-md p-3 whitespace-pre-wrap">{message}</div>}
+            </div>
+        </aside>
+    );
+};

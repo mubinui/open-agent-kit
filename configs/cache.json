@@ -1,5 +1,5 @@
 {
-  "global_enabled": true,
+  "global_enabled": false,
   "layers": {
     "llm_response": {
       "enabled": true,

@@ -49,17 +49,17 @@ class ConfigValidator:
         workflow_type: Union[str, WorkflowType]
     ) -> PersistenceMode:
         """
-        Validate persistence mode and enforce mongo_only for chatbot workflows.
-        
+        Validate the persistence mode value.
+
         Args:
             persistence: Persistence mode as string or enum
-            workflow_type: Workflow type as string or enum
-            
+            workflow_type: Workflow type as string or enum (kept for signature stability)
+
         Returns:
             PersistenceMode enum value
-            
+
         Raises:
-            ValueError: If persistence mode is invalid or incompatible with workflow type
+            ValueError: If persistence mode is invalid
         """
         # Convert to enum if string
         if isinstance(persistence, str):
@@ -71,17 +71,7 @@ class ConfigValidator:
                     f"Invalid persistence mode '{persistence}'. "
                     f"Must be one of: {', '.join(valid_modes)}"
                 )
-        
-        if isinstance(workflow_type, str):
-            workflow_type = WorkflowType(workflow_type)
-        
-        # Enforce mongo_only for chatbot workflows
-        if workflow_type == WorkflowType.CHATBOT and persistence != PersistenceMode.MONGO_ONLY:
-            raise ValueError(
-                f"Chatbot workflows must use '{PersistenceMode.MONGO_ONLY.value}' persistence. "
-                f"Got '{persistence.value}' instead."
-            )
-        
+
         return persistence
     
     @staticmethod

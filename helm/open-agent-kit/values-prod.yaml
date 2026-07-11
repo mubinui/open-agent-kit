@@ -1,0 +1,125 @@
+# Production environment values
+replicaCount: 5
+
+image:
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+config:
+  logLevel: "INFO"
+  maxConcurrentSessions: 500
+  agentTimeoutSeconds: 600
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 5
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "500"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+  hosts:
+    - host: oak.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: api.oak.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: oak-prod-tls
+      hosts:
+        - oak.example.com
+        - api.oak.example.com
+
+postgresql:
+  primary:
+    persistence:
+      size: 100Gi
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 4Gi
+        cpu: 2000m
+
+redis:
+  master:
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 2Gi
+        cpu: 1000m
+
+rabbitmq:
+  persistence:
+    size: 50Gi
+  resources:
+    requests:
+        memory: 512Mi
+        cpu: 500m
+    limits:
+      memory: 2Gi
+      cpu: 2000m
+
+chromadb:
+  persistence:
+    size: 50Gi
+
+# Use external secret management in production
+externalSecrets:
+  enabled: true
+  backend: aws-secrets-manager
+  region: us-east-1
+  secretName: oak/prod/secrets
+
+networkPolicy:
+  enabled: true
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    scrapeTimeout: 10s
+
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: app.kubernetes.io/name
+          operator: In
+          values:
+          - open-agent-kit
+      topologyKey: kubernetes.io/hostname
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      preference:
+        matchExpressions:
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+          - c5.xlarge
+          - c5.2xlarge

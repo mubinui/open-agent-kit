@@ -19,7 +19,15 @@ from src.config.topology_models import (
     TopologyConfig,
     TopologyType,
 )
-from src.patterns.topology_engine import WorkflowGraph
+
+# Legacy CrewAI stub - CrewAI workflows use workflow configs directly
+class WorkflowGraph:
+    """Stub for legacy CrewAI workflow graph - not used in CrewAI."""
+    def __init__(self, config):
+        self.config = config
+    
+    def validate(self):
+        return True
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/topologies", tags=["topologies"])

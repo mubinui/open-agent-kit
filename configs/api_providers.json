@@ -1,73 +1,190 @@
 {
-  "version": "1.0",
-  "last_updated": "2025-11-04T00:00:00Z",
+  "version": "2.0",
+  "last_updated": "2026-01-08T00:00:00Z",
+  "_comment": "CrewAI 1.14.4 with LiteLLM provider configuration",
+  "_model_info": {
+    "primary_model": "openai/gpt-oss-20b",
+    "release_date": "2025-08-07",
+    "features": [
+      "Function calling support",
+      "131K context window",
+      "Efficient MoE architecture",
+      "Apache 2.0 license",
+      "Structured outputs"
+    ],
+    "notes": "GPT-OSS-20B - proven reliable model for function calling and agentic tasks."
+  },
   "providers": [
     {
       "id": "openrouter",
       "name": "OpenRouter",
       "type": "llm",
-      "description": "Primary LLM provider routed through OpenRouter.",
+      "description": "Primary LLM provider via OpenRouter for GPT-OSS-20B.",
       "base_url": "https://openrouter.ai/api/v1",
+      "enabled": true,
+      "priority": 1,
       "auth": {
         "scheme": "bearer",
-        "env_var": "OPENROUTER_API_KEY"
+        "env_var": "OPENROUTER_API_KEY",
+        "required": true
+      },
+      "optional_headers": {
+        "HTTP-Referer": {
+          "env_var": "OR_SITE_URL",
+          "description": "Your site URL for OpenRouter rankings"
+        },
+        "X-Title": {
+          "env_var": "OR_APP_NAME",
+          "description": "Your app name for OpenRouter tracking"
+        }
       },
       "models": [
         {
           "name": "openai/gpt-oss-20b",
-          "default": false,
-          "capabilities": ["chat", "reasoning"],
+          "default": true,
+          "litellm_string": "openrouter/openai/gpt-oss-20b",
+          "capabilities": [
+            "chat",
+            "function_calling",
+            "reasoning",
+            "structured_outputs"
+          ],
+          "context_window": 131072,
+          "max_output_tokens": 131072,
           "pricing": {
-            "input_per_million_tokens": 2.0,
-            "output_per_million_tokens": 2.0,
-            "currency": "USD"
-          }
+            "input_per_million_tokens": 0.02,
+            "output_per_million_tokens": 0.1,
+            "currency": "USD",
+            "note": "Cost-effective open-weight model with proven function calling"
+          },
+          "recommended_for": [
+            "production",
+            "function_calling",
+            "agentic_tasks"
+          ]
+        },
+        {
+          "name": "google/gemini-3.1-flash-lite",
+          "default": false,
+          "litellm_string": "openrouter/google/gemini-3.1-flash-lite",
+          "capabilities": [
+            "chat",
+            "function_calling",
+            "structured_outputs"
+          ],
+          "context_window": 1048576,
+          "max_output_tokens": 65536,
+          "pricing": {
+            "input_per_million_tokens": 0.1,
+            "output_per_million_tokens": 0.4,
+            "currency": "USD",
+            "note": "Lightweight Gemini option for fast, lower-cost chatbot messaging and UI generation"
+          },
+          "recommended_for": [
+            "lightweight",
+            "chatbot_messaging",
+            "low_latency"
+          ]
+        },
+        {
+          "name": "google/gemini-3.1-flash",
+          "default": false,
+          "litellm_string": "openrouter/google/gemini-3.1-flash",
+          "capabilities": [
+            "chat",
+            "function_calling",
+            "vision",
+            "structured_outputs"
+          ],
+          "context_window": 1048576,
+          "max_output_tokens": 65536,
+          "pricing": {
+            "input_per_million_tokens": 0.3,
+            "output_per_million_tokens": 2.5,
+            "currency": "USD",
+            "note": "Fast Gemini model for responsive chatbot messaging and multimodal prompts"
+          },
+          "recommended_for": [
+            "lightweight",
+            "chatbot_messaging",
+            "multimodal"
+          ]
         }
       ],
       "request_defaults": {
         "timeout_seconds": 120,
-        "max_retries": 2,
-        "headers": {
-          "HTTP-Referer": "https://github.com/mubinuiislam/MicrosoftAutogen",
-          "X-Title": "Autogen Sequential Chatbot"
+        "max_retries": 3
+      }
+    },
+    {
+      "id": "vllm",
+      "name": "vLLM (Self-hosted)",
+      "type": "llm",
+      "description": "Self-hosted vLLM server for Gemma 3 12B with function calling.",
+      "base_url_env": "VLLM_API_BASE",
+      "default_base_url": "http://localhost:8000",
+      "enabled": true,
+      "priority": 2,
+      "auth": {
+        "scheme": "bearer",
+        "env_var": "VLLM_API_KEY",
+        "required": false,
+        "gcloud_auth_env": "VLLM_USE_GCLOUD_AUTH"
+      },
+      "models": [
+        {
+          "name": "openai/gpt-oss-20b",
+          "default": true,
+          "litellm_string": "hosted_vllm/openai/gpt-oss-20b",
+          "capabilities": [
+            "chat",
+            "function_calling",
+            "reasoning"
+          ],
+          "deployment_flags": [
+            "--enable-auto-tool-choice",
+            "--tool-call-parser hermes",
+            "--max-model-len 131072"
+          ],
+          "docker_image": "vllm/vllm-openai:latest",
+          "gpu_requirements": "24GB+ VRAM (single A10/A100 or 2xRTX4090)",
+          "notes": "Function calling requires --enable-auto-tool-choice flag"
         }
+      ],
+      "request_defaults": {
+        "timeout_seconds": 180,
+        "max_retries": 2
       }
     },
     {
       "id": "duckduckgo",
       "name": "DuckDuckGo Search",
       "type": "tool",
-      "description": "DuckDuckGo Search API wrapper for real-time knowledge lookups.",
+      "description": "DuckDuckGo Search API wrapper for real-time web search.",
       "library": "duckduckgo-search",
       "entrypoint": "src.agents.connectors.duckduckgo:DuckDuckGoConnector",
+      "enabled": true,
       "settings": {
-        "max_results": 3
-      }
-    },
-    {
-      "id": "mock_api",
-      "name": "Mock External API",
-      "type": "api",
-      "description": "Mock API provider that you can replace with your actual API integration.",
-      "base_url": "https://api.example.com/v1",
-      "auth": {
-        "scheme": "bearer",
-        "env_var": "MOCK_API_KEY"
-      },
-      "request_defaults": {
-        "timeout_seconds": 30,
-        "max_retries": 3,
-        "headers": {
-          "Content-Type": "application/json",
-          "User-Agent": "Autogen-Chatbot/1.0"
-        }
-      },
-      "enabled": false,
-      "settings": {
-        "rate_limit_per_minute": 60,
-        "max_payload_size_kb": 1024,
-        "supports_streaming": false
+        "max_results": 3,
+        "region": "wt-wt",
+        "safesearch": "moderate"
       }
     }
-  ]
+  ],
+  "provider_selection": {
+    "primary": "openrouter",
+    "fallback": "vllm",
+    "strategy": "failover",
+    "env_var": "LLM_PROVIDER"
+  },
+  "caching": {
+    "backend": "redis",
+    "enabled_env": "LITELLM_CACHE_ENABLED",
+    "redis": {
+      "host_env": "REDIS_HOST",
+      "port_env": "REDIS_PORT",
+      "password_env": "REDIS_PASSWORD"
+    },
+    "ttl_seconds": 3600
+  }
 }

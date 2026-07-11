@@ -1,15 +1,28 @@
-# Multi-stage Dockerfile for Orchestration Service
-# Stage 1: Builder - Install dependencies using uv
+# Multi-stage Dockerfile for Open Agent Kit (OAK)
+# Stage 1: Build the Studio SPA
+FROM node:22-alpine AS frontend
+
+WORKDIR /fe
+
+COPY workflow-editor/package.json workflow-editor/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY workflow-editor/ ./
+RUN npm run build
+
+# Stage 2: Install Python dependencies using uv
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install system build tools and uv (via pip so it's on PATH)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir uv
+# Install minimal build tools - clean apt cache BEFORE downloading
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends -o Acquire::Languages=none \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* && \
+    pip install --no-cache-dir uv
 
 # Copy dependency files
 COPY pyproject.toml uv.lock* ./
@@ -17,7 +30,7 @@ COPY pyproject.toml uv.lock* ./
 # Install dependencies using uv (much faster than pip)
 RUN uv sync --frozen --no-dev
 
-# Stage 2: Production - Minimal runtime image
+# Stage 3: Production - minimal runtime image
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -37,25 +50,32 @@ COPY configs/ ./configs/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
 
-# Create non-root user
-RUN useradd -m -u 1000 orchestrator && \
-    chown -R orchestrator:orchestrator /app && \
-    mkdir -p /app/data/chromadb && \
-    chown -R orchestrator:orchestrator /app/data
+# Copy the built Studio SPA — served by FastAPI at /
+COPY --from=frontend /fe/dist ./static
 
-USER orchestrator
+# Create non-root user; /app/data holds the SQLite DB, sessions, and deployments
+RUN useradd -m -u 1000 oak && \
+    mkdir -p /app/data && \
+    chown -R oak:oak /app
+
+USER oak
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PATH="/app/.venv/bin:$PATH"
+# development = open access out of the box; set ENVIRONMENT=production
+# (plus auth) before exposing the instance publicly — see SECURITY.md
+ENV ENVIRONMENT=development
 
-# Expose API and metrics ports
+VOLUME /app/data
+
+# Expose API (+ Studio UI) and metrics ports
 EXPOSE 8000 9090
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${APP_PORT:-8000}/health || exit 1
 
-# Run the FastAPI application
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the FastAPI application — APP_PORT env var controls the listening port
+CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port ${APP_PORT:-8000}"]

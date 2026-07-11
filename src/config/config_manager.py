@@ -1,11 +1,4 @@
-"""
-AUTOGEN 0.2 RESEARCH:
-- Feature needed: Multi-layer configuration manager with hot reload
-- Autogen provides: Static configuration via llm_config dictionaries
-- Using: Custom ConfigurationManager with file watching and validation
-- Documentation: https://microsoft.github.io/autogen/0.2/docs/topics/llm_configuration
-- Decision: Custom implementation - Autogen doesn't provide configuration management infrastructure
-"""
+"""Multi-layer configuration manager with hot reload."""
 
 import asyncio
 import json

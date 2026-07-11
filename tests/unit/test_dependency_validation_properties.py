@@ -241,9 +241,15 @@ def test_agent_deletion_validation(agent_id, dependent_workflows):
                     "id": workflow_id,
                     "name": workflow_id,
                     "description": f"Workflow {workflow_id}",
-                    "pattern": "two_agent",
-                    "entry_agent_id": agent_id,  # This workflow uses the agent
-                    "recipient_agent_id": "other_agent",
+                    "pattern": "sequential",
+                    "topology": {
+                        "type": "sequential",
+                        "nodes": [
+                            {"id": "entry", "agent_id": agent_id, "description": "Entry"},
+                            {"id": "recipient", "agent_id": "other_agent", "description": "Recipient"},
+                        ],
+                        "entry_node": "entry",
+                    },
                     "enabled": True,
                 }
                 for workflow_id in dependent_workflows

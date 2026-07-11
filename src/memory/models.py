@@ -89,3 +89,19 @@ class ConversationState(BaseModel):
     def get_notes_by_agent(self, agent_type: AgentType) -> list[AgentNote]:
         """Get all notes from a specific agent."""
         return [note for note in self.agent_notes if note.agent_type == agent_type]
+    
+    @property
+    def conversation_history(self) -> list[dict[str, Any]]:
+        """Get conversation history in dict format for ExecutionContext compatibility.
+        
+        Returns messages as list of dicts with role, content, and timestamp.
+        This property provides backward compatibility with code expecting dict format.
+        """
+        return [
+            {
+                "role": msg.role.value,
+                "content": msg.content,
+                "timestamp": msg.timestamp.isoformat(),
+            }
+            for msg in self.messages
+        ]

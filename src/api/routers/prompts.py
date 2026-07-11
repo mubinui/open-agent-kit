@@ -61,7 +61,9 @@ def _get_versioned_service() -> Optional["VersionedConfigService"]:
         return None
     database_url = os.getenv("DATABASE_URL")
     if database_url:
-        return VersionedConfigService(database_url=database_url)
+        service = VersionedConfigService(database_url=database_url)
+        if service.is_available():
+            return service
     return None
 
 

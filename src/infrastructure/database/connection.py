@@ -71,6 +71,7 @@ class DatabaseConnectionManager:
             self._session_factory = sessionmaker(
                 autocommit=False,
                 autoflush=False,
+                expire_on_commit=False,
                 bind=self.engine,
             )
         return self._session_factory
@@ -81,15 +82,36 @@ class DatabaseConnectionManager:
         Returns:
             Configured SQLAlchemy Engine
         """
-        engine = create_engine(
-            self.database_url,
-            pool_size=self.pool_size,
-            max_overflow=self.max_overflow,
-            pool_timeout=self.pool_timeout,
-            pool_recycle=self.pool_recycle,
-            pool_pre_ping=True,  # Enable connection health checks
-            echo=self.echo,
-        )
+        # SQLAlchemy create_engine requires a sync driver (e.g. psycopg2)
+        # If the URL is configured for asyncpg (postgresql+asyncpg://), we need to maintain compatibility
+        # by converting it to a standard postgresql:// URL which defaults to psycopg2
+        sync_db_url = self.database_url
+        if sync_db_url and sync_db_url.startswith("postgresql+asyncpg://"):
+            sync_db_url = sync_db_url.replace("postgresql+asyncpg://", "postgresql://")
+
+        if sync_db_url.startswith("sqlite"):
+            # Ensure the parent directory of the SQLite file exists
+            from pathlib import Path
+
+            db_path = sync_db_url.replace("sqlite:///", "", 1)
+            if db_path and db_path != ":memory:":
+                Path(db_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+            # SQLite: no server-side pool; allow cross-thread use for FastAPI
+            engine = create_engine(
+                sync_db_url,
+                connect_args={"check_same_thread": False},
+                echo=self.echo,
+            )
+        else:
+            engine = create_engine(
+                sync_db_url,
+                pool_size=self.pool_size,
+                max_overflow=self.max_overflow,
+                pool_timeout=self.pool_timeout,
+                pool_recycle=self.pool_recycle,
+                pool_pre_ping=True,  # Enable connection health checks
+                echo=self.echo,
+            )
 
         # Register event listeners
         self._register_event_listeners(engine)
@@ -197,29 +219,31 @@ class DatabaseConnectionManager:
 
 
 def get_db_manager() -> DatabaseConnectionManager:
-    """Get or create the global database connection manager."""
+    """Get or create the global database connection manager.
+
+    Falls back to a local SQLite database when DATABASE_URL is unset, so the
+    platform works out of the box with zero configuration.
+    """
     global _db_manager
     if _db_manager is None:
         settings = get_settings()
-        database_url = settings.memory.database_url
-        if not database_url:
-            raise ValueError("DATABASE_URL is required for database operations")
-        
         _db_manager = DatabaseConnectionManager(
-            database_url=database_url,
+            database_url=settings.database_url,
             echo=settings.app.log_level.upper() == "DEBUG"
         )
     return _db_manager
 
 
+def reset_db_manager() -> None:
+    """Reset the global connection manager (useful for tests)."""
+    global _db_manager
+    if _db_manager is not None:
+        _db_manager.close()
+        _db_manager = None
+
+
 def get_db() -> Generator[Session, None, None]:
     """FastAPI dependency for getting database sessions."""
-    settings = get_settings()
-    if not settings.memory.database_url:
-        # In development mode without DATABASE_URL, yield None
-        yield None
-        return
-        
     db_manager = get_db_manager()
     with db_manager.get_session() as session:
         yield session

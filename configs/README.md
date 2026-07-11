@@ -1,6 +1,6 @@
 # Configuration Guide
 
-This directory contains all JSON configuration files for the Autogen chatbot system. Configurations are loaded dynamically and can be modified via the Admin UI or directly through the REST API.
+This directory contains all JSON configuration files for the CrewAI chatbot system. Configurations are loaded dynamically and can be modified via the Admin UI or directly through the REST API.
 
 ## Configuration Files
 
@@ -447,7 +447,7 @@ POST /api/v1/configs/reload
 1. Verify tool is `"enabled": true`
 2. Check `entrypoint` path is correct
 3. Ensure tool module is installed
-4. Verify tool function signature matches Autogen requirements
+4. Verify tool function signature matches CrewAI requirements
 
 ### Workflow Errors
 1. Verify all agent IDs exist in `agents.json`

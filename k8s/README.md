@@ -1,6 +1,6 @@
 # Kubernetes Deployment Manifests
 
-This directory contains Kubernetes manifests for deploying the Orchestration Service.
+This directory contains Kubernetes manifests for deploying the Open Agent Kit.
 
 ## Quick Start
 
@@ -35,7 +35,7 @@ kubectl apply -f networkpolicy.yaml
 
 ## Files
 
-- **namespace.yaml** - Creates the `orchestration` namespace
+- **namespace.yaml** - Creates the `open-agent-kit` namespace
 - **configmap.yaml** - Application configuration (non-sensitive)
 - **secret.yaml** - Sensitive configuration (API keys, passwords)
 - **deployment.yaml** - Main application deployment with init containers
@@ -66,12 +66,12 @@ Before deploying, update `secret.yaml` with your actual credentials:
 echo -n "your-api-key" | base64
 
 # Or use kubectl to create secret
-kubectl create secret generic orchestration-secrets \
+kubectl create secret generic oak-secrets \
   --from-literal=OPENROUTER_API_KEY=your-key \
   --from-literal=OPENAI_API_KEY=your-key \
   --from-literal=JWT_SECRET_KEY=your-secret \
   --from-literal=ENCRYPTION_KEY=your-key \
-  -n orchestration --dry-run=client -o yaml > secret.yaml
+  -n open-agent-kit --dry-run=client -o yaml > secret.yaml
 ```
 
 ### Update Ingress
@@ -83,7 +83,7 @@ spec:
   tls:
   - hosts:
     - your-domain.com
-    secretName: orchestration-tls
+    secretName: oak-tls
   rules:
   - host: your-domain.com
 ```
@@ -92,19 +92,19 @@ spec:
 
 ```bash
 # Check all pods are running
-kubectl get pods -n orchestration
+kubectl get pods -n open-agent-kit
 
 # Check services
-kubectl get svc -n orchestration
+kubectl get svc -n open-agent-kit
 
 # Check ingress
-kubectl get ingress -n orchestration
+kubectl get ingress -n open-agent-kit
 
 # View logs
-kubectl logs -n orchestration -l app=orchestration-service -f
+kubectl logs -n open-agent-kit -l app=open-agent-kit -f
 
 # Test health endpoint
-kubectl port-forward -n orchestration svc/orchestration-service 8000:8000
+kubectl port-forward -n open-agent-kit svc/open-agent-kit 8000:8000
 curl http://localhost:8000/health
 ```
 
@@ -113,7 +113,7 @@ curl http://localhost:8000/health
 ### Manual Scaling
 
 ```bash
-kubectl scale deployment orchestration-service -n orchestration --replicas=5
+kubectl scale deployment open-agent-kit -n open-agent-kit --replicas=5
 ```
 
 ### Autoscaling
@@ -122,10 +122,10 @@ The HPA automatically scales based on CPU and memory:
 
 ```bash
 # Check HPA status
-kubectl get hpa -n orchestration
+kubectl get hpa -n open-agent-kit
 
 # Describe HPA
-kubectl describe hpa orchestration-service-hpa -n orchestration
+kubectl describe hpa open-agent-kit-hpa -n open-agent-kit
 ```
 
 ## Maintenance
@@ -134,36 +134,36 @@ kubectl describe hpa orchestration-service-hpa -n orchestration
 
 ```bash
 # Run migrations
-kubectl exec -n orchestration -it deployment/orchestration-service -- alembic upgrade head
+kubectl exec -n open-agent-kit -it deployment/open-agent-kit -- alembic upgrade head
 
 # Check current version
-kubectl exec -n orchestration -it deployment/orchestration-service -- alembic current
+kubectl exec -n open-agent-kit -it deployment/open-agent-kit -- alembic current
 ```
 
 ### Backup
 
 ```bash
 # Backup PostgreSQL
-kubectl exec -n orchestration statefulset/postgres -- pg_dump -U orchestrator orchestration > backup.sql
+kubectl exec -n open-agent-kit statefulset/postgres -- pg_dump -U oak oak > backup.sql
 
 # Backup Redis
-kubectl exec -n orchestration statefulset/redis -- redis-cli SAVE
-kubectl cp orchestration/redis-0:/data/dump.rdb ./redis-backup.rdb
+kubectl exec -n open-agent-kit statefulset/redis -- redis-cli SAVE
+kubectl cp open-agent-kit/redis-0:/data/dump.rdb ./redis-backup.rdb
 ```
 
 ### Updates
 
 ```bash
 # Update image
-kubectl set image deployment/orchestration-service \
-  orchestration-service=orchestration-service:v1.1.0 \
-  -n orchestration
+kubectl set image deployment/open-agent-kit \
+  open-agent-kit=open-agent-kit:v1.1.0 \
+  -n open-agent-kit
 
 # Check rollout status
-kubectl rollout status deployment/orchestration-service -n orchestration
+kubectl rollout status deployment/open-agent-kit -n open-agent-kit
 
 # Rollback if needed
-kubectl rollout undo deployment/orchestration-service -n orchestration
+kubectl rollout undo deployment/open-agent-kit -n open-agent-kit
 ```
 
 ## Monitoring
@@ -176,12 +176,12 @@ Add ServiceMonitor for Prometheus Operator:
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: orchestration-service
-  namespace: orchestration
+  name: open-agent-kit
+  namespace: open-agent-kit
 spec:
   selector:
     matchLabels:
-      app: orchestration-service
+      app: open-agent-kit
   endpoints:
   - port: metrics
     interval: 30s
@@ -192,8 +192,8 @@ spec:
 Import the dashboard:
 
 ```bash
-kubectl create configmap grafana-dashboard-orchestration \
-  --from-file=../dashboards/orchestration-service.json \
+kubectl create configmap grafana-dashboard-open-agent-kit \
+  --from-file=../dashboards/open-agent-kit.json \
   -n monitoring
 ```
 
@@ -205,26 +205,26 @@ See [Troubleshooting Guide](../docs/troubleshooting.md) for common issues.
 
 ```bash
 # Check pod status
-kubectl get pods -n orchestration
+kubectl get pods -n open-agent-kit
 
 # View pod logs
-kubectl logs -n orchestration <pod-name>
+kubectl logs -n open-agent-kit <pod-name>
 
 # Describe pod
-kubectl describe pod -n orchestration <pod-name>
+kubectl describe pod -n open-agent-kit <pod-name>
 
 # Check events
-kubectl get events -n orchestration --sort-by='.lastTimestamp'
+kubectl get events -n open-agent-kit --sort-by='.lastTimestamp'
 
 # Execute commands in pod
-kubectl exec -n orchestration -it deployment/orchestration-service -- /bin/sh
+kubectl exec -n open-agent-kit -it deployment/open-agent-kit -- /bin/sh
 ```
 
 ## Cleanup
 
 ```bash
 # Delete all resources
-kubectl delete namespace orchestration
+kubectl delete namespace open-agent-kit
 
 # Or delete individually
 kubectl delete -f .
@@ -241,7 +241,7 @@ Network policies restrict traffic between pods:
 kubectl apply -f networkpolicy.yaml
 
 # Test connectivity
-kubectl run -n orchestration test-pod --image=busybox --rm -it -- sh
+kubectl run -n open-agent-kit test-pod --image=busybox --rm -it -- sh
 ```
 
 ### RBAC

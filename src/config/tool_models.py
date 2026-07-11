@@ -36,6 +36,10 @@ class ToolConfig(BaseModel):
         default_factory=dict,
         description="Tool-specific settings. For API tools, must include 'type': 'api' and 'api_url'."
     )
+    is_async: bool = Field(
+        default=False,
+        description="Whether the tool function is async (True) or sync (False). For v0.4 compatibility."
+    )
     
     # Versioning and metadata fields
     version: int = Field(

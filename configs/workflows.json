@@ -1,112 +1,254 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "_schema": "oak-crewai-workflows",
+  "_comment": "Example workflow definitions for Open Agent Kit.",
+  "last_updated": "2026-07-11T00:00:00Z",
   "workflows": [
     {
-      "id": "simple_assistant",
-      "name": "Simple Assistant",
-      "description": "A simple two-agent conversation between user and assistant",
-      "pattern": "two_agent",
-      "entry_agent_id": "user_proxy",
-      "recipient_agent_id": "assistant",
-      "max_turns": 10,
-      "summary_method": "last_msg",
+      "id": "demo_multi_agent",
+      "name": "Demo Multi-Agent Assistant",
+      "description": "Multi-agent assistant that routes to web search, knowledge base, or calculator specialists",
       "enabled": true,
-      "metadata": {
-        "use_case": "general_conversation",
-        "complexity": "simple"
-      },
-      "workflow_type": "sequential",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "web_search_assistant",
-      "name": "WebSearchAssistant",
-      "description": "An assistant that searches the web using DuckDuckGo to answer your questions with current information",
-      "pattern": "two_agent",
-      "entry_agent_id": "user_proxy",
-      "recipient_agent_id": "search_assistant",
-      "max_turns": 6,
-      "summary_method": "last_msg",
-      "enabled": true,
-      "metadata": {
-        "use_case": "general_conversation",
-        "complexity": "simple"
-      },
-      "workflow_type": "sequential",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-11-16T00:00:00Z"
-    },
-    {
-      "id": "rag_qa_assistant",
-      "name": "RAG Q&A Assistant",
-      "description": "Knowledge base Q&A using RAG with Qdrant vector database",
-      "pattern": "two_agent",
-      "entry_agent_id": "user_proxy",
-      "recipient_agent_id": "rag_assistant",
-      "max_turns": 10,
-      "summary_method": "last_msg",
-      "enabled": true,
-      "metadata": {
-        "use_case": "knowledge_base_qa",
-        "complexity": "simple",
-        "vector_db": "qdrant",
-        "collection": "knowledge_base"
-      },
-      "workflow_type": "sequential",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-12-03T00:00:00Z"
-    },
-    {
-      "id": "requisition_assistant",
-      "name": "Requisition Assistant",
-      "description": "An assistant that queries the Requisition API to fetch and explain procurement requisition details. Ask about any requisition by number (e.g., REQ20250010638).",
-      "pattern": "two_agent",
-      "entry_agent_id": "user_proxy",
-      "recipient_agent_id": "requisition_agent",
-      "max_turns": 6,
-      "summary_method": "last_msg",
-      "enabled": true,
-      "metadata": {
-        "use_case": "procurement",
-        "complexity": "simple",
-        "external_api": "requisition"
-      },
-      "workflow_type": "sequential",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-12-08T00:00:00Z"
-    },
-    {
-      "id": "procurement_chatbot",
-      "name": "Procurement Chatbot",
-      "description": "Multi-agent chatbot for procurement queries. Routes to specialized agents for requisitions, purchase orders, and framework agreements.",
       "pattern": "selector",
-      "entry_agent_id": "selector_agent",
-      "max_turns": 10,
-      "summary_method": "last_msg",
+      "topology": {
+        "type": "graph",
+        "nodes": [
+          {
+            "id": "demo_selector_agent",
+            "agent_id": "demo_selector_agent",
+            "description": "Routes to specialists"
+          },
+          {
+            "id": "search_assistant",
+            "agent_id": "search_assistant",
+            "description": "Web search specialist"
+          },
+          {
+            "id": "rag_assistant",
+            "agent_id": "rag_assistant",
+            "description": "Knowledge base specialist"
+          },
+          {
+            "id": "calculator_agent",
+            "agent_id": "calculator_agent",
+            "description": "Math specialist"
+          }
+        ],
+        "edges": [],
+        "entry_node": "demo_selector_agent",
+        "domain_agents": [
+          {
+            "id": "search_assistant",
+            "name": "SearchAssistant",
+            "domain": "web_search"
+          },
+          {
+            "id": "rag_assistant",
+            "name": "RAGAssistant",
+            "domain": "knowledge_base"
+          },
+          {
+            "id": "calculator_agent",
+            "name": "CalculatorAgent",
+            "domain": "math"
+          }
+        ],
+        "routing_method": "llm"
+      },
+      "execution_config": {
+        "max_turns": 15,
+        "timeout_seconds": 300,
+        "enable_streaming": false
+      },
+      "persistence": "postgres",
+      "workflow_type": "chatbot"
+    },
+    {
+      "id": "simple_search",
+      "name": "Simple Search Assistant",
+      "description": "Single agent for web search",
       "enabled": true,
-      "default": true,
-      "selector_config": {
-        "routing_agents": {
-          "requisition": "requisition_domain_agent",
-          "purchase_order": "purchase_order_agent",
-          "framework_agreement": "framework_agreement_agent"
-        },
-        "default_agent": "selector_agent",
-        "max_routing_attempts": 3
+      "pattern": "single",
+      "topology": {
+        "type": "single",
+        "nodes": [
+          {
+            "id": "search_assistant",
+            "agent_id": "search_assistant",
+            "description": "Web search agent"
+          }
+        ],
+        "entry_node": "search_assistant"
       },
-      "metadata": {
-        "use_case": "procurement",
-        "complexity": "medium"
+      "execution_config": {
+        "max_turns": 10,
+        "timeout_seconds": 120
       },
-      "workflow_type": "chatbot",
-      "persistence": "mongo_only",
-      "version": 1,
-      "last_updated": "2024-12-10T00:00:00Z"
+      "persistence": "postgres",
+      "workflow_type": "chatbot"
+    },
+    {
+      "id": "rag_assistant",
+      "name": "RAG Knowledge Assistant",
+      "description": "Single agent with RAG capabilities",
+      "enabled": true,
+      "pattern": "single",
+      "topology": {
+        "type": "single",
+        "nodes": [
+          {
+            "id": "rag_assistant",
+            "agent_id": "rag_assistant",
+            "description": "RAG assistant"
+          }
+        ],
+        "entry_node": "rag_assistant"
+      },
+      "execution_config": {
+        "max_turns": 10,
+        "timeout_seconds": 180
+      },
+      "persistence": "postgres",
+      "workflow_type": "chatbot"
+    },
+    {
+      "id": "pipeline_example",
+      "name": "Sequential Pipeline Example",
+      "description": "Example of sequential agent execution",
+      "enabled": false,
+      "_comment": "Example workflow showing CrewAI's SequentialAgent pattern",
+      "pattern": "sequential",
+      "topology": {
+        "type": "sequential",
+        "nodes": [
+          {
+            "id": "search_assistant",
+            "agent_id": "search_assistant",
+            "description": "Search step"
+          },
+          {
+            "id": "general_assistant",
+            "agent_id": "general_assistant",
+            "description": "Summary step"
+          }
+        ],
+        "entry_node": "search_assistant",
+        "pipeline": [
+          {
+            "agent_id": "search_assistant",
+            "output_key": "search_results"
+          },
+          {
+            "agent_id": "general_assistant",
+            "instruction_override": "Summarize the search results: {search_results}"
+          }
+        ]
+      },
+      "execution_config": {
+        "max_turns": 5,
+        "timeout_seconds": 180
+      },
+      "persistence": "postgres",
+      "workflow_type": "sequential"
+    },
+    {
+      "id": "parallel_example",
+      "name": "Parallel Execution Example",
+      "description": "Example of parallel agent execution",
+      "enabled": false,
+      "_comment": "Example workflow showing CrewAI's ParallelAgent pattern",
+      "pattern": "parallel",
+      "topology": {
+        "type": "graph",
+        "nodes": [
+          {
+            "id": "search_assistant",
+            "agent_id": "search_assistant",
+            "description": "Search agent"
+          },
+          {
+            "id": "rag_assistant",
+            "agent_id": "rag_assistant",
+            "description": "RAG agent"
+          },
+          {
+            "id": "general_assistant",
+            "agent_id": "general_assistant",
+            "description": "Synthesis agent"
+          }
+        ],
+        "entry_node": "general_assistant",
+        "concurrent_agents": [
+          {
+            "agent_id": "search_assistant",
+            "output_key": "web_results"
+          },
+          {
+            "agent_id": "rag_assistant",
+            "output_key": "kb_results"
+          }
+        ],
+        "synthesizer": {
+          "agent_id": "general_assistant",
+          "instruction_override": "Combine results from web ({web_results}) and knowledge base ({kb_results})."
+        }
+      },
+      "execution_config": {
+        "max_turns": 3,
+        "timeout_seconds": 240
+      },
+      "persistence": "postgres",
+      "workflow_type": "custom"
+    },
+    {
+      "id": "echo_test",
+      "name": "Echo Test Workflow",
+      "description": "Simple workflow for testing - echoes back user input",
+      "enabled": true,
+      "pattern": "single",
+      "_comment": "Test workflow using general assistant without tools",
+      "topology": {
+        "type": "single",
+        "nodes": [
+          {
+            "id": "general_assistant",
+            "agent_id": "general_assistant",
+            "description": "Echo test agent"
+          }
+        ],
+        "entry_node": "general_assistant"
+      },
+      "execution_config": {
+        "max_turns": 3,
+        "timeout_seconds": 30
+      },
+      "persistence": "postgres",
+      "workflow_type": "chatbot"
+    },
+    {
+      "id": "tool_test",
+      "name": "Tool Test Workflow",
+      "description": "Test workflow verifying tool calling functionality",
+      "enabled": true,
+      "pattern": "single",
+      "_comment": "Test workflow using search assistant with web_search tool",
+      "topology": {
+        "type": "single",
+        "nodes": [
+          {
+            "id": "search_assistant",
+            "agent_id": "search_assistant",
+            "description": "Tool test agent"
+          }
+        ],
+        "entry_node": "search_assistant"
+      },
+      "execution_config": {
+        "max_turns": 5,
+        "timeout_seconds": 60
+      },
+      "persistence": "postgres",
+      "workflow_type": "chatbot"
     }
   ]
 }

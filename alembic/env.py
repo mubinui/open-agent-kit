@@ -16,6 +16,12 @@ config = context.config
 # Override sqlalchemy.url from environment variable if present
 database_url = os.getenv("DATABASE_URL")
 if database_url:
+    # Convert async database URLs to sync for Alembic migrations
+    # Alembic doesn't support async drivers
+    if database_url.startswith("sqlite+aiosqlite://"):
+        database_url = database_url.replace("sqlite+aiosqlite://", "sqlite://")
+    elif database_url.startswith("postgresql+asyncpg://"):
+        database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
     config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging.

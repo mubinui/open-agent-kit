@@ -2,9 +2,7 @@
 
 import json
 from contextvars import ContextVar
-from typing import Dict, List, Optional
-
-from src.api.context import get_request_user
+from typing import Any, Dict, List, Optional
 
 # Use ContextVar with copy_context for async propagation
 # This is the recommended approach for asyncio
@@ -13,7 +11,7 @@ _tool_roles: ContextVar[Optional[List[str]]] = ContextVar('tool_roles', default=
 _tool_raw_token: ContextVar[Optional[str]] = ContextVar('tool_raw_token', default=None)
 
 # Also maintain a simple module-level fallback (for sync tool execution)
-_global_context: Dict[str, any] = {
+_global_context: Dict[str, Any] = {
     "username": None,
     "roles": None,
     "raw_token": None,
@@ -63,8 +61,10 @@ def get_user_context_headers() -> Dict[str, str]:
         x-client-ref contains roles as JSON array.
     """
     headers = {}
+    from src.api.context import get_request_user  # local import to avoid circular dependency
+
     current_user = get_request_user()
-    
+
     if current_user:
         if current_user.username:
             headers["x-client-username"] = current_user.username
@@ -113,8 +113,10 @@ def get_user_context_info() -> Dict[str, Optional[str | List[str]]]:
         }
     
     # Fall back to request context (ContextVar from middleware)
+    from src.api.context import get_request_user  # local import to avoid circular dependency
+
     current_user = get_request_user()
-    
+
     if current_user:
         # Use roles list if available, otherwise fall back to single role
         roles = current_user.roles if current_user.roles else (
@@ -127,12 +129,6 @@ def get_user_context_info() -> Dict[str, Optional[str | List[str]]]:
             "raw_token": current_user.raw_token,  # JWT token for external service calls
         }
     
-    return {
-        "username": None,
-        "roles": [],
-        "user_id": None,
-        "raw_token": None,
-    }
     return {
         "username": None,
         "roles": [],

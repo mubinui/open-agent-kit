@@ -65,3 +65,6 @@ configs/*.yml
 # Cache
 .cache/
 .hypothesis/
+static/
+.crewai/
+tmp/
