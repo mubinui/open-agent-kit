@@ -38,20 +38,43 @@ export const getToolSummary = (config: ConfigLike) => {
     const type = String(config?.type ?? 'function');
     const method = String(config?.http_method ?? 'GET');
     const auth = String(config?.auth_type ?? 'none');
-    const missingEndpoint = type === 'api' && !config?.api_url;
-    const missingEntrypoint = type !== 'api' && !config?.entrypoint;
+
+    // Per-type readiness: which required field is missing, and what to show as
+    // the "endpoint" (the thing this tool points at).
+    let missing = '';
+    let endpoint = String(config?.api_url ?? config?.entrypoint ?? '');
+    if (type === 'api') {
+        if (!config?.api_url) missing = 'Missing API URL';
+    } else if (type === 'mcp') {
+        const transport = String(config?.transport ?? 'stdio');
+        endpoint = transport === 'stdio'
+            ? [config?.command, ...(config?.args ?? [])].filter(Boolean).join(' ')
+            : String(config?.url ?? '');
+        if (transport === 'stdio' && !config?.command) missing = 'Missing command';
+        if (transport !== 'stdio' && !config?.url) missing = 'Missing server URL';
+    } else if (type === 'database') {
+        endpoint = String(config?.db_uri_env_var ? `env:${config.db_uri_env_var}` : (config?.db_uri ?? ''));
+        if (!config?.db_uri && !config?.db_uri_env_var) missing = 'Missing database URI';
+    } else if (type === 'gmail') {
+        endpoint = String(config?.account_email ?? '');
+        if (!config?.account_email) missing = 'Missing account email';
+    } else if (type === 'memory' || type === 'knowledge') {
+        // Canvas helper nodes — always configured enough to display.
+        endpoint = type;
+    } else if (!config?.entrypoint) {
+        missing = 'Missing entrypoint';
+    }
 
     return {
         type,
         method,
         auth,
-        endpoint: String(config?.api_url ?? config?.entrypoint ?? ''),
+        endpoint,
+        transport: String(config?.transport ?? ''),
+        accountEmail: String(config?.account_email ?? ''),
         enabled: config?.enabled !== false,
-        health: missingEndpoint || missingEntrypoint ? 'warning' as const : 'ready' as const,
-        issues: [
-            missingEndpoint ? 'Missing API URL' : '',
-            missingEntrypoint ? 'Missing entrypoint' : '',
-        ].filter(Boolean),
+        health: missing ? 'warning' as const : 'ready' as const,
+        issues: missing ? [missing] : [],
     };
 };
 

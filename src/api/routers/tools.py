@@ -1,12 +1,14 @@
 """Tool management endpoints."""
 
+import asyncio
 import json
 import inspect
+import time
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 from fastapi import APIRouter, HTTPException, Request, status
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from src.api.models import (
     ToolRegisterRequest,
@@ -114,9 +116,11 @@ async def register_tool(
         # Save config
         _save_tools_config(config)
         
-        # Register with tool registry if enabled (only for function tools)
+        # Register with tool registry if enabled. register_tool_from_entrypoint
+        # branches internally on settings['type'] (function/api/mcp/database/gmail),
+        # so every type becomes live immediately, not just function tools.
         tool_type = body.settings.get('type', 'function')
-        if body.enabled and tool_type == 'function':
+        if body.enabled:
             try:
                 tool_registry = get_tool_registry()
                 tool_registry.register_tool_from_entrypoint(
@@ -124,6 +128,7 @@ async def register_tool(
                     entrypoint=body.entrypoint,
                     name=body.name,
                     description=body.description,
+                    settings=body.settings,
                 )
             except Exception as e:
                 logger.warning(
@@ -481,6 +486,57 @@ async def execute_tool(
             result=None,
             error=str(e),
         )
+
+
+class McpInspectRequest(BaseModel):
+    """Request to connect to an MCP server and list its tools (works pre-save)."""
+
+    settings: dict[str, Any] = Field(description="MCP tool settings (type/transport/command/url/...)")
+
+
+@router.post("/mcp/inspect")
+async def inspect_mcp_server(request: Request, body: McpInspectRequest) -> dict[str, Any]:
+    """Connect to an MCP server described by `settings`, list its tools, disconnect.
+
+    Used by the studio's tool tester so users can verify a server (and discover
+    its tool names for `tool_filter`) before saving the tool config.
+    """
+    request_id = getattr(request.state, "request_id", None)
+
+    # Validate settings through the canonical schema first.
+    settings = {**body.settings, "type": "mcp"}
+    try:
+        from src.config.tool_models import ToolConfig
+
+        ToolConfig(
+            id="mcp_inspect_probe",
+            name="mcp_inspect_probe",
+            description="inspect probe",
+            settings=settings,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    from src.tools.runtime_tool_factories import McpToolFactory
+
+    factory = McpToolFactory("mcp_inspect_probe", "mcp_inspect_probe", "inspect probe", settings)
+    started = time.perf_counter()
+    try:
+        # Adapter start is blocking (spawns subprocess / opens connection) — keep it
+        # off the event loop.
+        tools = await asyncio.to_thread(factory.inspect)
+    except Exception as e:
+        logger.warning("mcp_inspect_failed", request_id=request_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to connect to MCP server: {e}",
+        )
+
+    return {
+        "status": "connected",
+        "latency_ms": round((time.perf_counter() - started) * 1000),
+        "tools": tools,
+    }
 
 
 @router.post("/import-swagger/preview", response_model=SwaggerPreviewResponse)

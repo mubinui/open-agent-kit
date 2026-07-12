@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Trash2, Save, ChevronDown, ChevronRight, Check, Activity, FlaskConical, Gauge, Settings2, Sparkles, Wrench, Layers } from 'lucide-react';
+import { X, Trash2, Save, ChevronDown, ChevronRight, Check, Activity, FlaskConical, Gauge, Settings2, Sparkles, Wrench, Layers, Mail, Server, BookmarkPlus, ExternalLink } from 'lucide-react';
 import { useStoreWithEqualityFn } from 'zustand/traditional';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkflowStore } from '../stores/workflowStore';
@@ -7,6 +7,13 @@ import { useLibraryStore } from '../stores/libraryStore';
 import { InspectorTabs } from './studio/InspectorTabs';
 import { StatusBadge } from './studio/StatusBadge';
 import { getAgentSummary, getToolSummary } from '../utils/studioDerivedState';
+import { api } from '../api/client';
+
+interface GmailStatus {
+    configured: boolean;
+    connected: boolean;
+    accounts: Array<{ account_email: string }>;
+}
 
 // CrewAI & Model Definitions
 const AGENT_TYPES = [
@@ -51,7 +58,26 @@ export const PropertiesPanel = () => {
         })),
     );
     const isNodeDragging = useWorkflowStore((state) => state.isNodeDragging);
-    const { savedTools, executeTool } = useLibraryStore();
+    const { savedTools, executeTool, saveItem, updateItem } = useLibraryStore();
+
+    // Integration state (gmail tools)
+    const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null);
+    const [gmailConnecting, setGmailConnecting] = useState(false);
+    // MCP inspection + library persistence state
+    const [mcpInspection, setMcpInspection] = useState<string>('');
+    const [isInspecting, setIsInspecting] = useState(false);
+    const [librarySaveState, setLibrarySaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+    const refreshGmailStatus = async () => {
+        try {
+            const status = await api<GmailStatus>('/api/v1/integrations/gmail/status');
+            setGmailStatus(status);
+            return status;
+        } catch {
+            setGmailStatus(null);
+            return null;
+        }
+    };
 
     // Core State
     const [label, setLabel] = useState('');
@@ -77,6 +103,11 @@ export const PropertiesPanel = () => {
             setConfig(initialConfig);
             setActiveInspectorTab('overview');
             setTestResult('');
+            setMcpInspection('');
+            setLibrarySaveState('idle');
+            if (initialConfig.type === 'gmail') {
+                refreshGmailStatus();
+            }
         }
     }, [selectedNode?.id]);
 
@@ -121,6 +152,77 @@ export const PropertiesPanel = () => {
         if (selectedNode) {
             // @ts-ignore
             onNodesChange([{ id: selectedNode.id, type: 'remove' }]);
+        }
+    };
+
+    // --- New tool-type integrations -------------------------------------------
+
+    const connectGmail = async () => {
+        setGmailConnecting(true);
+        try {
+            const { auth_url } = await api<{ auth_url: string }>('/api/v1/integrations/gmail/auth-url');
+            window.open(auth_url, '_blank', 'noopener,width=520,height=680');
+            // Poll until the callback lands (or give up after ~2 minutes).
+            for (let attempt = 0; attempt < 40; attempt++) {
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+                const status = await refreshGmailStatus();
+                if (status?.connected) {
+                    // Convenience: adopt the first connected account if none typed yet.
+                    if (!config.account_email && status.accounts[0]) {
+                        updateConfig('account_email', status.accounts[0].account_email);
+                    }
+                    break;
+                }
+            }
+        } catch (error) {
+            setGmailStatus(null);
+            console.error('Gmail connect failed', error);
+        } finally {
+            setGmailConnecting(false);
+        }
+    };
+
+    const inspectMcpServer = async () => {
+        setIsInspecting(true);
+        setMcpInspection('');
+        try {
+            const result = await api<{ status: string; latency_ms: number; tools: Array<{ name: string; description: string }> }>(
+                '/api/v1/tools/mcp/inspect',
+                { method: 'POST', body: JSON.stringify({ settings: config }) },
+            );
+            const lines = result.tools.map((t) => `• ${t.name}`).join('\n');
+            setMcpInspection(`Connected in ${result.latency_ms}ms — ${result.tools.length} tools:\n${lines}`);
+        } catch (error) {
+            setMcpInspection(`Connection failed: ${(error as Error).message}`);
+        } finally {
+            setIsInspecting(false);
+        }
+    };
+
+    const saveToolToLibrary = async () => {
+        const toolName = String(config.name || label || 'untitled_tool');
+        const toolId = String(config.id || toolName).toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+        setLibrarySaveState('saving');
+        try {
+            const item = {
+                id: toolId,
+                name: toolName,
+                description: description || `${config.type} tool`,
+                config: { ...config, id: toolId, name: toolName },
+            };
+            const exists = savedTools.some((t) => t.id === toolId || t.name === toolName);
+            if (exists) {
+                await updateItem('tool', toolId, item);
+            } else {
+                await saveItem('tool', item);
+            }
+            updateConfig('id', toolId);
+            setLibrarySaveState('saved');
+            setTimeout(() => setLibrarySaveState('idle'), 2500);
+        } catch (error) {
+            console.error('Save to library failed', error);
+            setLibrarySaveState('error');
+            setTimeout(() => setLibrarySaveState('idle'), 4000);
         }
     };
 
@@ -579,8 +681,11 @@ export const PropertiesPanel = () => {
                             onChange={(e) => updateConfig('type', e.target.value)}
                             className="w-full px-3 py-2 bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all h-9"
                         >
-                            <option value="function">Local Python Thread Execution</option>
-                            <option value="api">External Network Resource Fetch</option>
+                            <option value="function">Python Function</option>
+                            <option value="api">REST API</option>
+                            <option value="mcp">MCP Server</option>
+                            <option value="database">Database (NL2SQL)</option>
+                            <option value="gmail">Gmail</option>
                         </select>
                     </div>
 
@@ -638,10 +743,272 @@ export const PropertiesPanel = () => {
                             </div>
                         </div>
                     )}
+
+                    {config.type === 'mcp' && renderMcpConfig()}
+                    {config.type === 'database' && renderDatabaseConfig()}
+                    {config.type === 'gmail' && renderGmailConfig()}
+
+                    {['mcp', 'database', 'gmail'].includes(config.type) && (
+                        <button
+                            onClick={saveToolToLibrary}
+                            disabled={librarySaveState === 'saving'}
+                            type="button"
+                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-500/40 py-2.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all disabled:opacity-60"
+                        >
+                            <BookmarkPlus size={14} />
+                            {librarySaveState === 'saving' ? 'Saving to library…'
+                                : librarySaveState === 'saved' ? 'Saved — attachable to agents'
+                                    : librarySaveState === 'error' ? 'Save failed — check backend'
+                                        : 'Save to Library (registers on backend)'}
+                        </button>
+                    )}
                 </>
             ))}
         </>
     );
+
+    const fieldCls = 'w-full px-3 py-2 bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all h-9';
+    const labelCls = 'text-[10px] font-extrabold text-slate-500 uppercase tracking-wider';
+
+    function renderMcpConfig() {
+        const transport = config.transport || 'stdio';
+        return (
+            <div className="space-y-4">
+                <div className="space-y-1.5">
+                    <label className={labelCls}>Transport</label>
+                    <select value={transport} onChange={(e) => updateConfig('transport', e.target.value)} className={fieldCls}>
+                        <option value="stdio">stdio (local command)</option>
+                        <option value="sse">SSE (remote URL)</option>
+                        <option value="streamable-http">Streamable HTTP (remote URL)</option>
+                    </select>
+                </div>
+
+                {transport === 'stdio' ? (
+                    <>
+                        <div className="space-y-1.5">
+                            <label className={labelCls}>Command</label>
+                            <input type="text" value={config.command || ''} onChange={(e) => updateConfig('command', e.target.value)} className={`${fieldCls} font-mono`} placeholder="npx" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className={labelCls}>Arguments (space-separated)</label>
+                            <input
+                                type="text"
+                                value={(config.args || []).join(' ')}
+                                onChange={(e) => updateConfig('args', e.target.value.split(/\s+/).filter(Boolean))}
+                                className={`${fieldCls} font-mono`}
+                                placeholder="-y @modelcontextprotocol/server-filesystem /tmp"
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="space-y-1.5">
+                            <label className={labelCls}>Server URL</label>
+                            <input type="text" value={config.url || ''} onChange={(e) => updateConfig('url', e.target.value)} className={`${fieldCls} font-mono`} placeholder="https://mcp.example.com/sse" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>Auth</label>
+                                <select value={config.auth_type || 'none'} onChange={(e) => updateConfig('auth_type', e.target.value)} className={fieldCls}>
+                                    <option value="none">None</option>
+                                    <option value="bearer">Bearer token</option>
+                                </select>
+                            </div>
+                            {config.auth_type === 'bearer' && (
+                                <div className="space-y-1.5">
+                                    <label className={labelCls}>Token env var</label>
+                                    <input type="text" value={config.auth_env_var || ''} onChange={(e) => updateConfig('auth_env_var', e.target.value)} className={`${fieldCls} font-mono`} placeholder="MY_MCP_TOKEN" />
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                <div className="space-y-1.5">
+                    <label className={labelCls}>Tool filter (comma-separated, empty = all)</label>
+                    <input
+                        type="text"
+                        value={(config.tool_filter || []).join(', ')}
+                        onChange={(e) => updateConfig('tool_filter', e.target.value.split(',').map((t) => t.trim()).filter(Boolean))}
+                        className={`${fieldCls} font-mono`}
+                        placeholder="read_file, list_directory"
+                    />
+                </div>
+
+                <button
+                    onClick={inspectMcpServer}
+                    disabled={isInspecting}
+                    type="button"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 py-2.5 text-xs font-bold text-white transition-all disabled:opacity-60"
+                >
+                    <Server size={14} className="text-blue-400" />
+                    {isInspecting ? 'Connecting to server…' : 'Inspect Server (list tools)'}
+                </button>
+                {mcpInspection && (
+                    <pre className="max-h-48 overflow-auto rounded-lg bg-slate-950 p-3 font-mono text-[11px] text-emerald-400 leading-relaxed whitespace-pre-wrap">{mcpInspection}</pre>
+                )}
+            </div>
+        );
+    }
+
+    function renderDatabaseConfig() {
+        const useEnvVar = config.db_uri_env_var !== undefined && config.db_uri === undefined
+            ? true
+            : Boolean(config.db_uri_env_var) || !config.db_uri;
+        return (
+            <div className="space-y-4">
+                <div className="space-y-1.5">
+                    <label className={labelCls}>Connection source</label>
+                    <select
+                        value={useEnvVar ? 'env' : 'inline'}
+                        onChange={(e) => {
+                            if (e.target.value === 'env') {
+                                setConfig((prev) => ({ ...prev, db_uri: undefined, db_uri_env_var: prev.db_uri_env_var || '' }));
+                            } else {
+                                setConfig((prev) => ({ ...prev, db_uri_env_var: undefined, db_uri: prev.db_uri || '' }));
+                            }
+                        }}
+                        className={fieldCls}
+                    >
+                        <option value="env">Environment variable (for URIs with credentials)</option>
+                        <option value="inline">Inline URI (credential-free, e.g. SQLite)</option>
+                    </select>
+                </div>
+
+                {useEnvVar ? (
+                    <div className="space-y-1.5">
+                        <label className={labelCls}>Env var holding the SQLAlchemy URI</label>
+                        <input type="text" value={config.db_uri_env_var || ''} onChange={(e) => updateConfig('db_uri_env_var', e.target.value)} className={`${fieldCls} font-mono`} placeholder="SALES_DB_URI" />
+                        <p className="text-[9px] text-slate-400 font-medium">e.g. SALES_DB_URI=postgresql://user:pass@host:5432/sales in the backend .env</p>
+                    </div>
+                ) : (
+                    <div className="space-y-1.5">
+                        <label className={labelCls}>Database URI (no embedded credentials)</label>
+                        <input type="text" value={config.db_uri || ''} onChange={(e) => updateConfig('db_uri', e.target.value)} className={`${fieldCls} font-mono`} placeholder="sqlite:///./data/demo.db" />
+                    </div>
+                )}
+
+                <div className="space-y-1.5">
+                    <label className={labelCls}>Table allowlist (comma-separated, empty = all)</label>
+                    <input
+                        type="text"
+                        value={(config.tables || []).join(', ')}
+                        onChange={(e) => updateConfig('tables', e.target.value.split(',').map((t) => t.trim()).filter(Boolean))}
+                        className={`${fieldCls} font-mono`}
+                        placeholder="orders, customers"
+                    />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/40 rounded-lg border border-slate-200/80 dark:border-slate-800/80">
+                    <div>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Allow write operations (DML)</span>
+                        <span className="text-[9px] text-slate-400">Off = read-only SELECT queries only (recommended)</span>
+                    </div>
+                    <input
+                        type="checkbox"
+                        checked={config.allow_dml || false}
+                        onChange={(e) => updateConfig('allow_dml', e.target.checked)}
+                        className="accent-blue-600 w-4 h-4 rounded"
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    function renderGmailConfig() {
+        const connectedAccounts = gmailStatus?.accounts ?? [];
+        const isAccountConnected = connectedAccounts.some((a) => a.account_email === config.account_email);
+        const capabilities: string[] = config.capabilities || ['send', 'search', 'read'];
+        const toggleCapability = (cap: string) => {
+            const next = capabilities.includes(cap) ? capabilities.filter((c) => c !== cap) : [...capabilities, cap];
+            if (next.length > 0) updateConfig('capabilities', next);
+        };
+
+        return (
+            <div className="space-y-4">
+                {/* Connection state */}
+                <div className="rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-900/40 p-3 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Google account</span>
+                        {gmailStatus === null ? (
+                            <StatusBadge tone="muted" label="Status unknown" compact />
+                        ) : !gmailStatus.configured ? (
+                            <StatusBadge tone="error" label="Not configured" compact />
+                        ) : isAccountConnected ? (
+                            <StatusBadge tone="ready" label="Connected" compact />
+                        ) : (
+                            <StatusBadge tone="warning" label="Not connected" compact />
+                        )}
+                    </div>
+
+                    {gmailStatus !== null && !gmailStatus.configured ? (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            Set <code className="font-mono">GOOGLE_OAUTH_CLIENT_ID</code>, <code className="font-mono">GOOGLE_OAUTH_CLIENT_SECRET</code> and{' '}
+                            <code className="font-mono">ENCRYPTION_KEY</code> in the backend .env, then restart the API.
+                        </p>
+                    ) : (
+                        <button
+                            onClick={connectGmail}
+                            disabled={gmailConnecting}
+                            type="button"
+                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] py-2 text-xs font-bold text-white transition-all disabled:opacity-60"
+                        >
+                            <Mail size={13} />
+                            {gmailConnecting ? 'Waiting for Google consent…' : isAccountConnected ? 'Reconnect account' : 'Connect Gmail'}
+                            <ExternalLink size={11} />
+                        </button>
+                    )}
+
+                    {connectedAccounts.length > 0 && (
+                        <div className="space-y-1">
+                            {connectedAccounts.map((account) => (
+                                <button
+                                    key={account.account_email}
+                                    onClick={() => updateConfig('account_email', account.account_email)}
+                                    type="button"
+                                    className={`w-full truncate rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-mono transition-colors ${config.account_email === account.account_email
+                                        ? 'border-blue-500/50 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400'
+                                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                        }`}
+                                >
+                                    {account.account_email}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className={labelCls}>Account email</label>
+                    <input type="text" value={config.account_email || ''} onChange={(e) => updateConfig('account_email', e.target.value)} className={`${fieldCls} font-mono`} placeholder="support@yourdomain.com" />
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className={labelCls}>Capabilities</label>
+                    <div className="flex gap-2">
+                        {['send', 'search', 'read'].map((cap) => (
+                            <button
+                                key={cap}
+                                onClick={() => toggleCapability(cap)}
+                                type="button"
+                                className={`flex-1 rounded-lg border py-2 text-xs font-bold capitalize transition-colors ${capabilities.includes(cap)
+                                    ? 'border-blue-500/50 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400'
+                                    : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900'
+                                    }`}
+                            >
+                                {cap}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className={labelCls}>Max search results</label>
+                    <input type="number" value={config.max_results || 10} onChange={(e) => updateConfig('max_results', parseInt(e.target.value) || 10)} className={fieldCls} />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-[400px] shrink-0 h-full bg-white dark:bg-[#0b111b] border-l border-[var(--color-ui-border)] shadow-xl flex flex-col antialiased animate-in slide-in-from-right duration-200">

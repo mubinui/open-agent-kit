@@ -26,7 +26,7 @@ const FeatureCard = ({ icon: Icon, title, description, onClick }: {
         className="group w-full rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 text-left transition-colors hover:border-white/[0.12] hover:bg-white/[0.04]"
     >
         <div className="flex items-start gap-4">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-400">
                 <Icon size={16} />
             </div>
             <div className="min-w-0 flex-grow">
@@ -42,7 +42,7 @@ const FeatureCard = ({ icon: Icon, title, description, onClick }: {
 
 const Step = ({ index, title, caption }: { index: string; title: string; caption: string }) => (
     <div>
-        <div className="font-mono text-xs text-emerald-500/80">{index}</div>
+        <div className="font-mono text-xs text-blue-500/80">{index}</div>
         <div className="mt-2 text-sm font-semibold text-white">{title}</div>
         <div className="mt-1 text-xs leading-relaxed text-slate-500">{caption}</div>
     </div>
@@ -91,7 +91,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return (
         <div className="absolute inset-0 z-30 flex flex-col overflow-y-auto bg-[#0a0e16] font-sans text-slate-300 antialiased">
             {/* Single restrained glow */}
-            <div className="pointer-events-none absolute -top-40 left-1/2 h-[480px] w-[720px] -translate-x-1/2 rounded-full bg-emerald-500/[0.07] blur-[160px]" />
+            <div className="pointer-events-none absolute -top-40 left-1/2 h-[480px] w-[720px] -translate-x-1/2 rounded-full bg-blue-500/[0.07] blur-[160px]" />
 
             {/* Nav */}
             <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-8 py-6">
@@ -111,7 +111,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </button>
                     <button
                         onClick={onEnterStudio}
-                        className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-500"
+                        className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-500"
                     >
                         Enter Studio
                     </button>
@@ -132,7 +132,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         <h1 className="text-5xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
                             Build, test, and ship
                             <br />
-                            <span className="text-emerald-400">multi-agent workflows.</span>
+                            <span className="text-blue-400">multi-agent workflows.</span>
                         </h1>
 
                         <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-slate-400">
@@ -144,7 +144,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         <div className="mt-10 flex flex-wrap items-center gap-3">
                             <button
                                 onClick={onEnterStudio}
-                                className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+                                className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500"
                             >
                                 Open the Studio
                             </button>

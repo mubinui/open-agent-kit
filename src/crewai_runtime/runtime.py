@@ -9,6 +9,7 @@ such as Flows, Knowledge Sources, and Memory databases natively.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import os
 import time
@@ -90,6 +91,21 @@ class CrewAIWorkflowRuntime:
         user_id: str,
         metadata: dict[str, Any],
     ) -> CrewAIRuntimeResult:
+        # The ExitStack owns the lifecycle of per-run tool resources (notably MCP
+        # server connections/subprocesses): they are closed when this method
+        # returns or raises, no matter where the failure happens.
+        with contextlib.ExitStack() as stack:
+            return self._run_message_inner(workflow, message, session_id, user_id, metadata, stack)
+
+    def _run_message_inner(
+        self,
+        workflow: WorkflowConfig,
+        message: str,
+        session_id: str,
+        user_id: str,
+        metadata: dict[str, Any],
+        stack: contextlib.ExitStack,
+    ) -> CrewAIRuntimeResult:
         try:
             from crewai import Agent, Crew, Process, Task
         except Exception as exc:
@@ -107,12 +123,15 @@ class CrewAIWorkflowRuntime:
 
         crew_agents: list[Any] = []
         crew_agent_by_id: dict[str, Any] = {}
+        # One factory build per tool id per run: agents sharing an MCP tool share
+        # one live server connection instead of spawning one each.
+        run_tool_cache: dict[str, list[Any]] = {}
         for agent_id in workflow_agent_ids:
             config = agent_configs.get(agent_id)
             if config is None:
                 logger.warning("crewai_agent_config_missing", workflow_id=workflow.id, agent_id=agent_id)
                 continue
-            crew_agent = self._create_agent(Agent, config)
+            crew_agent = self._create_agent(Agent, config, stack, run_tool_cache)
             crew_agents.append(crew_agent)
             crew_agent_by_id[agent_id] = crew_agent
 
@@ -128,6 +147,7 @@ class CrewAIWorkflowRuntime:
             session_id=session_id,
             user_id=user_id,
             metadata=metadata,
+            agent_configs=agent_configs,
         )
 
         process = self._resolve_process(Process, workflow)
@@ -151,10 +171,18 @@ class CrewAIWorkflowRuntime:
             "process": process,
             "memory": memory_active,
             "verbose": False,
+            "cache": bool(getattr(workflow, "cache", True)),
         }
-        
+
         if knowledge_sources:
             crew_kwargs["knowledge"] = knowledge_sources
+
+        if getattr(workflow, "planning", False):
+            crew_kwargs["planning"] = True
+            crew_kwargs["planning_llm"] = self._resolve_llm_model({})
+
+        if getattr(workflow, "max_rpm", None):
+            crew_kwargs["max_rpm"] = int(workflow.max_rpm)
 
         if (process.value if hasattr(process, "value") else str(process)).lower().endswith("hierarchical"):
             crew_kwargs["manager_llm"] = self._resolve_llm_model({})
@@ -254,33 +282,74 @@ class CrewAIWorkflowRuntime:
             
         return sources
 
-    def _create_agent(self, agent_cls: type[Any], config: AgentConfig) -> Any:
+    def _create_agent(
+        self,
+        agent_cls: type[Any],
+        config: AgentConfig,
+        stack: contextlib.ExitStack | None = None,
+        run_tool_cache: dict[str, list[Any]] | None = None,
+    ) -> Any:
         model_config = config.model_config_override or {}
-        tools = self._get_crewai_tools(config.tools)
-        
-        # Configure native memory and delegation parameters for modern CrewAI
-        return agent_cls(
-            role=config.name,
-            goal=config.description or f"Help users with {config.name} requests.",
-            backstory=config.system_message or config.description or "You are a highly capable enterprise AI assistant.",
-            llm=self._resolve_llm_model(model_config),
-            tools=tools,
-            allow_delegation=bool(config.is_selector),
-            max_iter=int(model_config.get("max_iter") or 20),
-            verbose=False,
-        )
+        tools = self._get_crewai_tools(config.tools, stack, run_tool_cache)
 
-    def _resolve_llm_model(self, model_config: dict[str, Any]) -> str | None:
+        agent_kwargs: dict[str, Any] = {
+            "role": config.name,
+            "goal": config.description or f"Help users with {config.name} requests.",
+            "backstory": config.system_message or config.description or "You are a highly capable enterprise AI assistant.",
+            "llm": self._resolve_llm_model(model_config),
+            "tools": tools,
+            "allow_delegation": bool(config.is_selector),
+            "max_iter": int(model_config.get("max_iter") or 20),
+            "verbose": False,
+        }
+        if model_config.get("max_rpm"):
+            agent_kwargs["max_rpm"] = int(model_config["max_rpm"])
+        if model_config.get("max_execution_time"):
+            agent_kwargs["max_execution_time"] = int(model_config["max_execution_time"])
+
+        return agent_cls(**agent_kwargs)
+
+    def _resolve_llm_model(self, model_config: dict[str, Any]) -> Any:
         model = model_config.get("model")
         if not model:
-            return os.getenv("LLM_MODEL", "openrouter/google/gemma-3-27b-it")
-        if "/" in model and not model.startswith(("openrouter/", "ollama/", "azure/", "gemini/")):
+            model = os.getenv("LLM_MODEL", "openrouter/google/gemma-3-27b-it")
+        elif "/" in model and not model.startswith(("openrouter/", "ollama/", "azure/", "gemini/")):
             provider = os.getenv("LLM_PROVIDER", "openrouter")
             if provider == "openrouter":
-                return f"openrouter/{model}"
-        return str(model)
+                model = f"openrouter/{model}"
+        model = str(model)
 
-    def _get_crewai_tools(self, tool_ids: list[str]) -> list[Any]:
+        # When the studio config carries actual sampling/limit parameters, build a
+        # full LLM object so they're honored; a bare model string otherwise keeps
+        # existing behavior byte-for-byte.
+        llm_params = {
+            "temperature": model_config.get("temperature"),
+            "max_tokens": model_config.get("max_tokens"),
+            "base_url": model_config.get("base_url") or None,
+            "timeout": model_config.get("timeout"),
+            "top_p": model_config.get("top_p"),
+        }
+        api_key_env = model_config.get("api_key_env")
+        if api_key_env:
+            llm_params["api_key"] = os.environ.get(str(api_key_env))
+        llm_params = {k: v for k, v in llm_params.items() if v is not None}
+        if not llm_params:
+            return model
+
+        try:
+            from crewai import LLM
+
+            return LLM(model=model, **llm_params)
+        except Exception as e:
+            logger.warning("crewai_llm_params_ignored", error=str(e), model=model)
+            return model
+
+    def _get_crewai_tools(
+        self,
+        tool_ids: list[str],
+        stack: contextlib.ExitStack | None = None,
+        run_tool_cache: dict[str, list[Any]] | None = None,
+    ) -> list[Any]:
         if not tool_ids:
             return []
         try:
@@ -295,6 +364,22 @@ class CrewAIWorkflowRuntime:
             if tool_def is None:
                 logger.warning("crewai_tool_missing", tool_id=tool_id)
                 continue
+
+            factory = getattr(tool_def, "factory", None)
+            if factory is not None and stack is not None:
+                # Factory-backed tools (mcp/database/gmail) yield native BaseTool
+                # instances with real argument schemas — they must NOT be re-wrapped
+                # by _wrap_tool, which would clobber the schema with **kwargs.
+                cache = run_tool_cache if run_tool_cache is not None else {}
+                if tool_id not in cache:
+                    try:
+                        cache[tool_id] = factory.build(stack)
+                    except Exception as e:
+                        logger.error("crewai_tool_factory_failed", tool_id=tool_id, error=str(e))
+                        cache[tool_id] = []
+                crew_tools.extend(cache[tool_id])
+                continue
+
             crew_tools.append(self._wrap_tool(tool, tool_def))
         return crew_tools
 
@@ -352,6 +437,47 @@ class CrewAIWorkflowRuntime:
         ordered.extend(node for node in topology.nodes if node.id not in seen)
         return ordered
 
+    @staticmethod
+    def _human_input_enabled(agent_config: Any) -> bool:
+        """Task-level human input, gated behind an explicit opt-in env var.
+
+        CrewAI's human input blocks on stdin, which would hang a headless API
+        worker — so honoring human_input_mode=ALWAYS requires
+        OAK_ALLOW_HUMAN_INPUT=true.
+        """
+        mode = str(getattr(getattr(agent_config, "human_input_mode", ""), "value", getattr(agent_config, "human_input_mode", ""))).upper()
+        if mode != "ALWAYS":
+            return False
+        if os.getenv("OAK_ALLOW_HUMAN_INPUT", "false").lower() == "true":
+            return True
+        logger.warning("crewai_human_input_suppressed", reason="OAK_ALLOW_HUMAN_INPUT is not enabled")
+        return False
+
+    @staticmethod
+    def _make_output_guardrail(output_schema: str) -> Callable[[Any], tuple[bool, Any]]:
+        """Simple final-output validator used when workflow.guardrails.enabled."""
+
+        def guardrail(task_output: Any) -> tuple[bool, Any]:
+            raw = str(getattr(task_output, "raw", task_output) or "").strip()
+            if not raw:
+                return False, "The output was empty. Produce a complete answer."
+            if str(output_schema).lower() == "json":
+                import json as _json
+
+                candidate = raw
+                if candidate.startswith("```"):
+                    candidate = candidate.strip("`")
+                    candidate = candidate.split("\n", 1)[1] if "\n" in candidate else candidate
+                    if candidate.rstrip().endswith("```"):
+                        candidate = candidate.rstrip().removesuffix("```")
+                try:
+                    _json.loads(candidate)
+                except Exception as exc:
+                    return False, f"The output must be valid JSON (parse error: {exc}). Re-emit as pure JSON with no prose."
+            return True, task_output
+
+        return guardrail
+
     def _create_tasks(
         self,
         task_cls: type[Any],
@@ -362,7 +488,20 @@ class CrewAIWorkflowRuntime:
         session_id: str,
         user_id: str,
         metadata: dict[str, Any],
+        agent_configs: dict[str, Any] | None = None,
     ) -> list[Any]:
+        agent_configs = agent_configs or {}
+        guardrails_enabled = bool(getattr(getattr(workflow, "guardrails", None), "enabled", False))
+        guardrail_schema = str(getattr(getattr(workflow, "guardrails", None), "output_schema", "text"))
+
+        def apply_task_extras(task_kwargs: dict[str, Any], agent_id: str | None, is_final: bool) -> None:
+            config = agent_configs.get(agent_id) if agent_id else None
+            if config is not None and self._human_input_enabled(config):
+                task_kwargs["human_input"] = True
+            if is_final and guardrails_enabled:
+                task_kwargs["guardrail"] = self._make_output_guardrail(guardrail_schema)
+                task_kwargs["guardrail_max_retries"] = 2
+
         explicit_tasks = getattr(workflow, "tasks", []) or []
         if explicit_tasks:
             tasks = []
@@ -386,6 +525,7 @@ class CrewAIWorkflowRuntime:
                 }
                 if tasks:
                     task_kwargs["context"] = tasks[:]
+                apply_task_extras(task_kwargs, task_config.agent_id, is_final=index == len(explicit_tasks) - 1)
                 tasks.append(task_cls(**task_kwargs))
             if tasks:
                 return tasks
@@ -416,6 +556,7 @@ class CrewAIWorkflowRuntime:
             upstream_tasks = self._upstream_tasks(workflow, node.id, ordered_nodes, tasks)
             if upstream_tasks:
                 task_kwargs["context"] = upstream_tasks
+            apply_task_extras(task_kwargs, node.agent_id, is_final=index == len(ordered_nodes) - 1)
             tasks.append(task_cls(**task_kwargs))
         return tasks
 

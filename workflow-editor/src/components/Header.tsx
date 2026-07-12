@@ -320,7 +320,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
                         onClick={onToggleBuilder}
                         className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${builderOpen
                             ? 'bg-[var(--color-primary)] text-white shadow-sm'
-                            : 'border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                            : 'border border-blue-500/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40'
                             }`}
                         title={builderOpen ? 'Close the AI Builder' : 'Open the AI Builder — generate agents, tools, and workflows'}
                     >

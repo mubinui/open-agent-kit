@@ -4,12 +4,15 @@ import type { Node, Edge } from '@xyflow/react';
 const dagreGraph = new dagre.graphlib.Graph();
 dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-const NODE_WIDTH = 250;
-const NODE_HEIGHT = 100;
+// Reserve the real rendered footprint of the largest node type (agent cards run
+// ~250px wide and ~140px tall with badges), plus generous rank/node gaps —
+// undersizing these is what made auto-formatted nodes touch each other.
+const NODE_WIDTH = 290;
+const NODE_HEIGHT = 170;
 
 /** Left-to-right dagre auto-layout, shared by the Format button and workflow drops. */
 export const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-    dagreGraph.setGraph({ rankdir: 'LR', ranksep: 80, nodesep: 40 });
+    dagreGraph.setGraph({ rankdir: 'LR', ranksep: 140, nodesep: 90 });
 
     nodes.forEach((node) => {
         dagreGraph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });

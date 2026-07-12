@@ -24,7 +24,7 @@ export const AgentNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeDa
 
     return (
         <div
-            className={`group relative min-w-[230px] max-w-[270px] ag-surface-raised rounded-xl border transition-all duration-200 shadow-sm
+            className={`group relative min-w-[210px] max-w-[250px] ag-surface-raised rounded-xl border transition-all duration-200 shadow-sm
             ${liveClass || (selected
                     ? `border-blue-500 dark:border-sky-400 ${tone.ring}`
                     : `${tone.border} ${tone.borderHover} hover:shadow-md`
@@ -37,7 +37,7 @@ export const AgentNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeDa
                 className={`!w-3 !h-3 !-left-1.5 !bg-gray-400 dark:!bg-slate-600 !border-2 !border-[var(--color-surface-raised)] ${tone.handleHover} transition-colors`}
             />
 
-            <div className="flex flex-col gap-2.5 p-3">
+            <div className="flex flex-col gap-2 p-2.5">
                 {/* Header: Icon + Type */}
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-2">

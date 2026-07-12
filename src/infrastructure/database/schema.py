@@ -233,6 +233,31 @@ class ToolDefinition(Base):
     )
 
 
+class IntegrationCredential(Base):
+    """Encrypted OAuth credentials for external integrations (e.g. Gmail).
+
+    The token blob is Fernet-encrypted JSON ({token, refresh_token, token_uri,
+    scopes, expiry}); OAuth client id/secret stay in environment variables and
+    are never stored here.
+    """
+
+    __tablename__ = "integration_credentials"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    provider = Column(String(50), nullable=False, default="gmail")
+    account_email = Column(String(255), nullable=False)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    encrypted_token = Column(Text, nullable=False)
+    scopes = Column(JSON, nullable=False, default=list)
+    token_expiry = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_integration_provider_email", "provider", "account_email", unique=True),
+    )
+
+
 class WorkflowTestCase(Base):
     """Database model for workflow test cases."""
 

@@ -16,9 +16,11 @@
     --color-node-shadow: rgba(15, 23, 42, 0.05);
     --color-node-shadow-hover: rgba(15, 23, 42, 0.12);
 
-    /* Primary Accent (OAK emerald) */
-    --color-primary: #059669;
-    --color-primary-hover: #047857;
+    /* Primary Accent (OAK blue — premium indigo-blue ramp) */
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4ed8;
+    --color-primary-soft: rgba(37, 99, 235, 0.1);
+    --color-primary-ring: rgba(37, 99, 235, 0.35);
 
     /* UI Colors */
     --color-ui-border: rgba(226, 232, 240, 0.75);
@@ -40,9 +42,11 @@
     --color-node-bg: rgba(15, 23, 42, 0.75);
     --color-node-border: rgba(51, 65, 85, 0.6);
     --color-node-shadow: rgba(0, 0, 0, 0.6);
-    --color-node-shadow-hover: rgba(16, 185, 129, 0.25);
-    --color-primary: #10b981;
-    --color-primary-hover: #34d399;
+    --color-node-shadow-hover: rgba(59, 130, 246, 0.25);
+    --color-primary: #3b82f6;
+    --color-primary-hover: #60a5fa;
+    --color-primary-soft: rgba(59, 130, 246, 0.14);
+    --color-primary-ring: rgba(96, 165, 250, 0.4);
     --color-ui-border: rgba(30, 41, 59, 0.8);
     --color-ui-bg: rgba(9, 13, 22, 0.85);
     --color-ui-bg-subtle: rgba(15, 23, 42, 0.65);
@@ -73,8 +77,8 @@ body {
 
 .dark body {
     background:
-        radial-gradient(circle at 10% 10%, rgba(16, 185, 129, 0.12), transparent 40%),
-        radial-gradient(circle at 90% 90%, rgba(45, 212, 191, 0.10), transparent 40%),
+        radial-gradient(circle at 10% 10%, rgba(59, 130, 246, 0.10), transparent 40%),
+        radial-gradient(circle at 90% 90%, rgba(99, 102, 241, 0.08), transparent 40%),
         linear-gradient(180deg, #020617 0%, #030712 50%, #050811 100%);
     color: var(--color-text-secondary);
     background-attachment: fixed;
@@ -119,7 +123,7 @@ body {
 
 /* Stunning gradient text animations */
 .text-gradient-primary {
-    background: linear-gradient(135deg, #34d399 0%, #10b981 50%, #2dd4bf 100%);
+    background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #818cf8 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

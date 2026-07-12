@@ -208,6 +208,23 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
         headers: '',
         body_template: '',
         response_path: '',
+        // mcp
+        transport: 'stdio',
+        command: '',
+        args: '',
+        url: '',
+        auth_env_var: '',
+        tool_filter: '',
+        // database
+        db_source: 'env',
+        db_uri: '',
+        db_uri_env_var: '',
+        tables: '',
+        allow_dml: false,
+        // gmail
+        account_email: '',
+        capabilities: 'send, search, read',
+        max_results: '10',
     });
 
     // Agent Config State (Enhanced to match PropertiesPanel.tsx)
@@ -248,7 +265,12 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
 
     const resetForm = () => {
         setFormData({ name: '', description: '', type: 'function', config: {} });
-        setToolConfig({ entrypoint: '', api_url: '', http_method: 'GET', auth_type: 'none', headers: '', body_template: '', response_path: '' });
+        setToolConfig({
+            entrypoint: '', api_url: '', http_method: 'GET', auth_type: 'none', headers: '', body_template: '', response_path: '',
+            transport: 'stdio', command: '', args: '', url: '', auth_env_var: '', tool_filter: '',
+            db_source: 'env', db_uri: '', db_uri_env_var: '', tables: '', allow_dml: false,
+            account_email: '', capabilities: 'send, search, read', max_results: '10',
+        });
         setAgentConfig({
             agentType: 'LlmAgent', instruction: '', model: 'gpt-4o', provider: 'openai', temperature: 0.7,
             base_url: '', max_tokens: 2048, output_key: '', is_selector: false, human_input_mode: 'NEVER', max_loops: 5, tools: []
@@ -274,6 +296,20 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                 headers: item.config?.headers || '',
                 body_template: item.config?.body_template || '',
                 response_path: item.config?.response_path || '',
+                transport: item.config?.transport || 'stdio',
+                command: item.config?.command || '',
+                args: Array.isArray(item.config?.args) ? item.config.args.join(' ') : '',
+                url: item.config?.url || '',
+                auth_env_var: item.config?.auth_env_var || '',
+                tool_filter: Array.isArray(item.config?.tool_filter) ? item.config.tool_filter.join(', ') : '',
+                db_source: item.config?.db_uri_env_var ? 'env' : 'inline',
+                db_uri: item.config?.db_uri || '',
+                db_uri_env_var: item.config?.db_uri_env_var || '',
+                tables: Array.isArray(item.config?.tables) ? item.config.tables.join(', ') : '',
+                allow_dml: Boolean(item.config?.allow_dml),
+                account_email: item.config?.account_email || '',
+                capabilities: Array.isArray(item.config?.capabilities) ? item.config.capabilities.join(', ') : 'send, search, read',
+                max_results: String(item.config?.max_results ?? 10),
             });
         } else {
             const config = item.config || {};
@@ -317,16 +353,48 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
         let type = formData.type;
 
         if (activeTab === 'tools') {
-            config = {
-                type: formData.type,
-                entrypoint: toolConfig.entrypoint,
-                api_url: toolConfig.api_url,
-                http_method: toolConfig.http_method,
-                auth_type: toolConfig.auth_type,
-                headers: toolConfig.headers,
-                body_template: toolConfig.body_template,
-                response_path: toolConfig.response_path,
-            };
+            const splitList = (value: string, sep: RegExp) => value.split(sep).map((s) => s.trim()).filter(Boolean);
+            if (formData.type === 'mcp') {
+                config = {
+                    type: 'mcp',
+                    transport: toolConfig.transport,
+                    ...(toolConfig.transport === 'stdio'
+                        ? { command: toolConfig.command, args: splitList(toolConfig.args, /\s+/) }
+                        : {
+                            url: toolConfig.url,
+                            auth_type: toolConfig.auth_env_var ? 'bearer' : 'none',
+                            ...(toolConfig.auth_env_var ? { auth_env_var: toolConfig.auth_env_var } : {}),
+                        }),
+                    tool_filter: splitList(toolConfig.tool_filter, /,/),
+                };
+            } else if (formData.type === 'database') {
+                config = {
+                    type: 'database',
+                    ...(toolConfig.db_source === 'env'
+                        ? { db_uri_env_var: toolConfig.db_uri_env_var }
+                        : { db_uri: toolConfig.db_uri }),
+                    tables: splitList(toolConfig.tables, /,/),
+                    allow_dml: toolConfig.allow_dml,
+                };
+            } else if (formData.type === 'gmail') {
+                config = {
+                    type: 'gmail',
+                    account_email: toolConfig.account_email,
+                    capabilities: splitList(toolConfig.capabilities, /,/),
+                    max_results: parseInt(toolConfig.max_results) || 10,
+                };
+            } else {
+                config = {
+                    type: formData.type,
+                    entrypoint: toolConfig.entrypoint,
+                    api_url: toolConfig.api_url,
+                    http_method: toolConfig.http_method,
+                    auth_type: toolConfig.auth_type,
+                    headers: toolConfig.headers,
+                    body_template: toolConfig.body_template,
+                    response_path: toolConfig.response_path,
+                };
+            }
         } else {
             type = agentConfig.agentType;
             config = {
@@ -714,8 +782,11 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                                             value={formData.type}
                                                             onChange={(v) => setFormData({ ...formData, type: v })}
                                                             options={[
-                                                                { value: 'function', label: 'Local Injected Stack (Python)' },
-                                                                { value: 'api', label: 'External Remote Network Hook' }
+                                                                { value: 'function', label: 'Python Function' },
+                                                                { value: 'api', label: 'REST API' },
+                                                                { value: 'mcp', label: 'MCP Server' },
+                                                                { value: 'database', label: 'Database (NL2SQL)' },
+                                                                { value: 'gmail', label: 'Gmail' }
                                                             ]}
                                                             icon={Zap}
                                                         />
@@ -798,6 +869,137 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                                                 onChange={(v) => setToolConfig({ ...toolConfig, response_path: v })}
                                                                 mono
                                                                 helpText="Pulls highly specific payload arrays out of nested API responses automatically."
+                                                            />
+                                                        </>
+                                                    )}
+
+                                                    {formData.type === 'mcp' && (
+                                                        <>
+                                                            <FormSelect
+                                                                label="Transport"
+                                                                value={toolConfig.transport}
+                                                                onChange={(v) => setToolConfig({ ...toolConfig, transport: v })}
+                                                                options={[
+                                                                    { value: 'stdio', label: 'stdio (local command)' },
+                                                                    { value: 'sse', label: 'SSE (remote URL)' },
+                                                                    { value: 'streamable-http', label: 'Streamable HTTP (remote URL)' }
+                                                                ]}
+                                                            />
+                                                            {toolConfig.transport === 'stdio' ? (
+                                                                <>
+                                                                    <FormInput
+                                                                        label="Command"
+                                                                        placeholder="npx"
+                                                                        value={toolConfig.command}
+                                                                        onChange={(v) => setToolConfig({ ...toolConfig, command: v })}
+                                                                        mono
+                                                                    />
+                                                                    <FormInput
+                                                                        label="Arguments (space-separated)"
+                                                                        placeholder="-y @modelcontextprotocol/server-filesystem /tmp"
+                                                                        value={toolConfig.args}
+                                                                        onChange={(v) => setToolConfig({ ...toolConfig, args: v })}
+                                                                        mono
+                                                                    />
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <FormInput
+                                                                        label="Server URL"
+                                                                        placeholder="https://mcp.example.com/sse"
+                                                                        value={toolConfig.url}
+                                                                        onChange={(v) => setToolConfig({ ...toolConfig, url: v })}
+                                                                        mono
+                                                                    />
+                                                                    <FormInput
+                                                                        label="Bearer token env var (optional)"
+                                                                        placeholder="MY_MCP_TOKEN"
+                                                                        value={toolConfig.auth_env_var}
+                                                                        onChange={(v) => setToolConfig({ ...toolConfig, auth_env_var: v })}
+                                                                        mono
+                                                                        helpText="Name of the backend env var holding the token — never the token itself."
+                                                                    />
+                                                                </>
+                                                            )}
+                                                            <FormInput
+                                                                label="Tool filter (comma-separated, empty = all)"
+                                                                placeholder="read_file, list_directory"
+                                                                value={toolConfig.tool_filter}
+                                                                onChange={(v) => setToolConfig({ ...toolConfig, tool_filter: v })}
+                                                                mono
+                                                            />
+                                                        </>
+                                                    )}
+
+                                                    {formData.type === 'database' && (
+                                                        <>
+                                                            <FormSelect
+                                                                label="Connection source"
+                                                                value={toolConfig.db_source}
+                                                                onChange={(v) => setToolConfig({ ...toolConfig, db_source: v })}
+                                                                options={[
+                                                                    { value: 'env', label: 'Environment variable (URIs with credentials)' },
+                                                                    { value: 'inline', label: 'Inline URI (credential-free, e.g. SQLite)' }
+                                                                ]}
+                                                            />
+                                                            {toolConfig.db_source === 'env' ? (
+                                                                <FormInput
+                                                                    label="Env var holding the SQLAlchemy URI"
+                                                                    placeholder="SALES_DB_URI"
+                                                                    value={toolConfig.db_uri_env_var}
+                                                                    onChange={(v) => setToolConfig({ ...toolConfig, db_uri_env_var: v })}
+                                                                    mono
+                                                                    helpText="e.g. SALES_DB_URI=postgresql://user:pass@host:5432/sales in the backend .env"
+                                                                />
+                                                            ) : (
+                                                                <FormInput
+                                                                    label="Database URI (no embedded credentials)"
+                                                                    placeholder="sqlite:///./data/demo.db"
+                                                                    value={toolConfig.db_uri}
+                                                                    onChange={(v) => setToolConfig({ ...toolConfig, db_uri: v })}
+                                                                    mono
+                                                                />
+                                                            )}
+                                                            <FormInput
+                                                                label="Table allowlist (comma-separated, empty = all)"
+                                                                placeholder="orders, customers"
+                                                                value={toolConfig.tables}
+                                                                onChange={(v) => setToolConfig({ ...toolConfig, tables: v })}
+                                                                mono
+                                                            />
+                                                            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={toolConfig.allow_dml}
+                                                                    onChange={(e) => setToolConfig({ ...toolConfig, allow_dml: e.target.checked })}
+                                                                    className="accent-blue-600 h-4 w-4 rounded"
+                                                                />
+                                                                Allow write operations (DML) — off means read-only queries
+                                                            </label>
+                                                        </>
+                                                    )}
+
+                                                    {formData.type === 'gmail' && (
+                                                        <>
+                                                            <FormInput
+                                                                label="Connected account email"
+                                                                placeholder="support@yourdomain.com"
+                                                                value={toolConfig.account_email}
+                                                                onChange={(v) => setToolConfig({ ...toolConfig, account_email: v })}
+                                                                mono
+                                                                helpText="Connect the account first from a Gmail tool node's inspector (Connect Gmail)."
+                                                            />
+                                                            <FormInput
+                                                                label="Capabilities (send, search, read)"
+                                                                placeholder="send, search, read"
+                                                                value={toolConfig.capabilities}
+                                                                onChange={(v) => setToolConfig({ ...toolConfig, capabilities: v })}
+                                                            />
+                                                            <FormInput
+                                                                label="Max search results"
+                                                                placeholder="10"
+                                                                value={toolConfig.max_results}
+                                                                onChange={(v) => setToolConfig({ ...toolConfig, max_results: v })}
                                                             />
                                                         </>
                                                     )}

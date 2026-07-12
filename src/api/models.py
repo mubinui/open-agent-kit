@@ -236,45 +236,41 @@ class AgentConfigUpdateRequest(BaseModel):
 # Tool Models
 class ToolRegisterRequest(BaseModel):
     """Request to register a tool.
-    
-    For function tools: entrypoint is required (e.g., src.tools.calculator:calculate)
-    For API tools: settings.type='api' and settings.api_url are required
+
+    Supported settings['type'] values: function (default, requires entrypoint),
+    api (requires settings.api_url), mcp (requires transport + command/url),
+    database (requires db_uri or db_uri_env_var), gmail (requires account_email).
     """
 
     id: str = Field(pattern=r"^[a-z0-9_]+$", description="Unique tool identifier (lowercase alphanumeric and underscores only)")
     name: str = Field(description="Tool name")
     description: str = Field(description="Tool description")
-    entrypoint: Optional[str] = Field(default=None, description="Python entrypoint (module.path:function). Required for function tools, optional for API tools.")
+    entrypoint: Optional[str] = Field(default=None, description="Python entrypoint (module.path:function). Required for function tools only.")
     enabled: bool = Field(default=True)
-    settings: dict[str, Any] = Field(default_factory=dict, description="Tool settings. For API tools, must include 'type': 'api' and 'api_url'.")
-    
+    settings: dict[str, Any] = Field(default_factory=dict, description="Tool settings; see ToolConfig for per-type requirements.")
+
     def model_post_init(self, __context: Any) -> None:
-        """Validate tool configuration based on type."""
-        tool_type = self.settings.get('type', 'function')
-        
-        if tool_type == 'api':
-            # API tool validation
-            api_url = self.settings.get('api_url')
-            if not api_url:
-                raise ValueError(
-                    "API tools require 'api_url' in settings. "
-                    "Example: settings={'type': 'api', 'api_url': 'https://api.example.com/endpoint', 'http_method': 'GET'}"
-                )
-            # Set default entrypoint for API tools
-            if not self.entrypoint:
-                self.entrypoint = "src.tools.api_tool_executor:execute_api_tool"
-        else:
-            # Function tool validation
-            if not self.entrypoint:
-                raise ValueError(
-                    "Function tools require 'entrypoint' field. "
-                    "Example: entrypoint='src.tools.calculator:calculate'"
-                )
-            if ':' not in self.entrypoint:
-                raise ValueError(
-                    f"Invalid entrypoint format: '{self.entrypoint}'. "
-                    "Expected format: 'module.path:function_name' (e.g., 'src.tools.calculator:calculate')"
-                )
+        """Validate by delegating to ToolConfig — the single source of truth for tool schemas."""
+        from src.config.tool_models import ToolConfig
+
+        validated = ToolConfig(
+            id=self.id,
+            name=self.name,
+            description=self.description,
+            entrypoint=self.entrypoint,
+            enabled=self.enabled,
+            settings=self.settings,
+        )
+        # ToolConfig may normalize fields (e.g. default entrypoint for api tools,
+        # default gmail capabilities) — propagate those back.
+        self.entrypoint = validated.entrypoint
+        self.settings = validated.settings
+
+        if self.entrypoint and ':' not in self.entrypoint:
+            raise ValueError(
+                f"Invalid entrypoint format: '{self.entrypoint}'. "
+                "Expected format: 'module.path:function_name' (e.g., 'src.tools.calculator:calculate')"
+            )
 
 
 class ToolResponse(BaseModel):

@@ -239,7 +239,7 @@ export const ChatPanel = () => {
                             {hasLoadedWorkflow ? workflowName : 'Test Workflow'}
                         </span>
                         {hasLoadedWorkflow && (
-                            <span className="text-[10px] text-emerald-100 block truncate">
+                            <span className="text-[10px] text-blue-100 block truncate">
                                 ID: {currentWorkflowId}
                             </span>
                         )}

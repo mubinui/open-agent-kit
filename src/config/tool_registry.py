@@ -37,6 +37,7 @@ class ToolDefinition:
         name: Optional[str] = None,
         description: Optional[str] = None,
         is_async: Optional[bool] = None,
+        factory: Optional[Any] = None,
     ) -> None:
         """
         Initialize a tool definition.
@@ -47,6 +48,9 @@ class ToolDefinition:
             name: Optional name for the tool (defaults to function name)
             description: Optional description (extracted from docstring if not provided)
             is_async: Whether function is async (auto-detected if None)
+            factory: Optional RuntimeToolFactory for tool types that build native
+                CrewAI BaseTool instances per run (mcp/database/gmail). When set,
+                `function` is only the sandbox-tester callable.
         """
         self.tool_id = tool_id
         self.function = function
@@ -54,6 +58,7 @@ class ToolDefinition:
         self.description = description or self._extract_description(function)
         # Auto-detect async if not specified
         self.is_async = is_async if is_async is not None else inspect.iscoroutinefunction(function)
+        self.factory = factory
 
     def _extract_description(self, func: Callable) -> str:
         """
@@ -238,7 +243,36 @@ class ToolRegistry:
                 description=description,
             )
             return
-            
+
+        # Factory-backed tool types (mcp/database/gmail): registration stays inert —
+        # no connections are opened here. The runtime calls factory.build() per run,
+        # and the stored function is only the sandbox-tester callable.
+        tool_type = (settings or {}).get("type", "function")
+        if tool_type in {"mcp", "database", "gmail"}:
+            from src.tools.runtime_tool_factories import create_runtime_factory
+
+            factory = create_runtime_factory(
+                tool_type=tool_type,
+                tool_id=tool_id,
+                name=name or tool_id,
+                description=description or f"{tool_type} tool: {tool_id}",
+                settings=settings or {},
+            )
+            self._tools[tool_id] = ToolDefinition(
+                tool_id=tool_id,
+                function=factory.sandbox_function(),
+                name=name or tool_id,
+                description=description,
+                factory=factory,
+            )
+            _get_logger().info(
+                "Registered factory tool",
+                tool_id=tool_id,
+                tool_type=tool_type,
+            )
+            return
+
+
         try:
             # Parse entrypoint
             if ":" not in entrypoint:

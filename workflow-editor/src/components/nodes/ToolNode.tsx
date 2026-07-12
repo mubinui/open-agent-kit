@@ -1,13 +1,31 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
-import { KeyRound, Link2, Wrench } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Brain, Database, FileSearch, KeyRound, Link2, Mail, Server, Wrench } from 'lucide-react';
 import type { WorkflowNodeData } from '../../types/workflow';
 import { StatusBadge } from '../studio/StatusBadge';
 import { getToolSummary } from '../../utils/studioDerivedState';
 import { NODE_TONE } from '../../utils/nodeTheme';
 
 const tone = NODE_TONE.tool;
+
+const TOOL_TYPE_ICON: Record<string, LucideIcon> = {
+    mcp: Server,
+    database: Database,
+    gmail: Mail,
+    memory: Brain,
+    knowledge: FileSearch,
+};
+
+const TOOL_TYPE_CAPTION: Record<string, string> = {
+    mcp: 'MCP server',
+    database: 'NL2SQL database',
+    gmail: 'Gmail account',
+    memory: 'Memory store',
+    knowledge: 'Knowledge source',
+    function: 'Function',
+};
 
 export const ToolNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeData>>) => {
     const summary = getToolSummary(data.config);
@@ -21,7 +39,7 @@ export const ToolNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeDat
                     : '';
     return (
         <div
-            className={`group relative flex min-w-[170px] max-w-[230px] items-center gap-2.5 rounded-xl border px-3 py-2.5 ag-surface-raised shadow-sm transition-all duration-200
+            className={`group relative flex min-w-[150px] max-w-[210px] items-center gap-2 rounded-xl border px-2.5 py-2 ag-surface-raised shadow-sm transition-all duration-200
             ${liveClass || (selected
                     ? `border-orange-500 dark:border-orange-400 ${tone.ring}`
                     : `${tone.border} ${tone.borderHover} hover:shadow-md`
@@ -34,21 +52,32 @@ export const ToolNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeDat
                 className={`!w-2.5 !h-2.5 !-left-1.5 !bg-gray-400 dark:!bg-slate-600 !border-2 !border-[var(--color-surface-raised)] ${tone.handleHover} transition-colors`}
             />
 
-            {/* Icon */}
-            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${tone.iconBorder} ${tone.iconBg} ${tone.iconText}`}>
-                <Wrench size={15} strokeWidth={2.5} />
-            </div>
+            {/* Icon — reflects the tool's integration type */}
+            {(() => {
+                const Icon = TOOL_TYPE_ICON[summary.type] ?? Wrench;
+                return (
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${tone.iconBorder} ${tone.iconBg} ${tone.iconText}`}>
+                        <Icon size={15} strokeWidth={2.5} />
+                    </div>
+                );
+            })()}
 
             {/* Label */}
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="min-w-0">
                     <span className="block truncate text-sm font-bold ag-text">{data.label}</span>
-                    <span className="block truncate text-[10px] ag-muted">{summary.type === 'api' ? summary.method : 'Function'} action</span>
+                    <span className="block truncate text-[10px] ag-muted">
+                        {summary.type === 'api' ? `${summary.method} action` : (TOOL_TYPE_CAPTION[summary.type] ?? 'Function action')}
+                    </span>
                 </div>
                 <div className="flex flex-wrap gap-1">
                     <StatusBadge tone={summary.health} label={summary.health === 'ready' ? summary.type : 'Setup'} compact />
                     {summary.type === 'api' && <StatusBadge tone="muted" label={summary.method} icon={Link2} compact />}
-                    <StatusBadge tone={summary.auth === 'none' ? 'muted' : 'warning'} label={summary.auth === 'none' ? 'No auth' : summary.auth} icon={KeyRound} compact />
+                    {summary.type === 'mcp' && summary.transport && <StatusBadge tone="muted" label={summary.transport} icon={Server} compact />}
+                    {summary.type === 'gmail' && summary.accountEmail && <StatusBadge tone="muted" label={summary.accountEmail} icon={Mail} compact />}
+                    {(summary.type === 'api' || summary.type === 'function') && (
+                        <StatusBadge tone={summary.auth === 'none' ? 'muted' : 'warning'} label={summary.auth === 'none' ? 'No auth' : summary.auth} icon={KeyRound} compact />
+                    )}
                 </div>
             </div>
 

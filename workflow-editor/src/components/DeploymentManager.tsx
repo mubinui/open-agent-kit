@@ -61,7 +61,7 @@ curl -X POST ${origin}/api/v1/sessions/<session_id>/messages \\
 
     const tabClass = (tab: typeof activeTab) =>
         `px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${activeTab === tab
-            ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
+            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
             : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
         }`;
 
@@ -70,7 +70,7 @@ curl -X POST ${origin}/api/v1/sessions/<session_id>/messages \\
             {/* Top Toolbar Strip */}
             <div className="h-14 bg-white dark:bg-[#0b111b] border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-6 shrink-0 shadow-sm">
                 <div className="flex items-center gap-2">
-                    <Rocket className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <Rocket className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     <span className="font-bold text-xs text-gray-900 dark:text-white uppercase tracking-wider">
                         Deployments
                     </span>
@@ -100,7 +100,7 @@ curl -X POST ${origin}/api/v1/sessions/<session_id>/messages \\
                     </div>
                     <button
                         onClick={refresh}
-                        className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/10 transition-all flex items-center gap-2 shrink-0"
+                        className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-600/10 transition-all flex items-center gap-2 shrink-0"
                     >
                         <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
                         Refresh
@@ -155,7 +155,7 @@ curl -X POST ${origin}/api/v1/sessions/<session_id>/messages \\
                                         href={deployment.url}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="text-xs text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1 mt-2 font-medium"
+                                        className="text-xs text-blue-600 dark:text-blue-400 inline-flex items-center gap-1 mt-2 font-medium"
                                     >
                                         {origin}
                                         {deployment.url} <ExternalLink size={11} />
@@ -201,7 +201,7 @@ curl -X POST ${origin}/api/v1/sessions/<session_id>/messages \\
                         <span className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
                             Talk to your workflow programmatically. Create a session, then post messages to it.
                             Full API reference is at{' '}
-                            <a href="/docs" target="_blank" rel="noreferrer" className="text-emerald-600 dark:text-emerald-400 underline">
+                            <a href="/docs" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline">
                                 {origin}/docs
                             </a>
                             .

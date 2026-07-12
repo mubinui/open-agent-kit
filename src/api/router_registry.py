@@ -16,6 +16,7 @@ def register_routers(app: FastAPI) -> None:
         deployments,
         functions,
         health,
+        integrations,
         library,
         prompts,
         sessions,
@@ -33,6 +34,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(studio.router)
     app.include_router(agents.router)
     app.include_router(tools.router)
+    app.include_router(integrations.router)
     app.include_router(workflows.router)
     app.include_router(topologies.router)
     app.include_router(prompts.router)

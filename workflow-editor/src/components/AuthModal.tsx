@@ -131,7 +131,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800/80 flex items-center justify-between bg-gray-50/50 dark:bg-slate-900/30">
                     <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         <span className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
                             Account & API Keys
                         </span>
@@ -148,7 +148,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`flex-1 py-2.5 font-semibold text-center border-b-2 transition-all ${activeTab === tab
-                                ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900/40'
+                                ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900/40'
                                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
                                 }`}
                         >
@@ -206,7 +206,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                         onChange={(e) => setUsername(e.target.value)}
                                         required
                                         autoComplete="username"
-                                        className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                                     />
                                 </div>
                                 <div>
@@ -217,13 +217,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
                                         autoComplete="current-password"
-                                        className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                                        className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                                     />
                                 </div>
                                 <button
                                     type="submit"
                                     disabled={busy}
-                                    className="mt-2 w-full py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-md shadow-emerald-600/10 transition-all disabled:opacity-50"
+                                    className="mt-2 w-full py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md shadow-blue-600/10 transition-all disabled:opacity-50"
                                 >
                                     {busy ? 'Signing in…' : 'Sign In'}
                                 </button>
@@ -291,12 +291,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                 value={newKeyName}
                                 onChange={(e) => setNewKeyName(e.target.value)}
                                 placeholder="Key name (e.g. ci-pipeline)"
-                                className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                                className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
                             />
                             <button
                                 onClick={() => void handleCreateKey()}
                                 disabled={busy}
-                                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
                             >
                                 {busy ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                                 Create

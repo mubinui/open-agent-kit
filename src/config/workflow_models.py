@@ -586,6 +586,19 @@ class WorkflowConfig(BaseModel):
     memory: CrewAIMemoryConfig = Field(default_factory=CrewAIMemoryConfig)
     knowledge: CrewAIKnowledgeConfig = Field(default_factory=CrewAIKnowledgeConfig)
     guardrails: CrewAIGuardrailsConfig = Field(default_factory=CrewAIGuardrailsConfig)
+    planning: bool = Field(
+        default=False,
+        description="Enable CrewAI planning: an LLM drafts a step-by-step plan before execution",
+    )
+    cache: bool = Field(
+        default=True,
+        description="Enable CrewAI tool-result caching across the crew",
+    )
+    max_rpm: int | None = Field(
+        default=None,
+        ge=1,
+        description="Crew-wide requests-per-minute cap for LLM calls",
+    )
     tracing: CrewAITracingConfig = Field(default_factory=CrewAITracingConfig)
     event_listeners: list[dict[str, Any]] = Field(default_factory=list)
     mcp_servers: list[dict[str, Any]] = Field(default_factory=list)
