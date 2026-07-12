@@ -4,7 +4,7 @@
 
 **An open-source multi-agent development kit — design, test, and deploy AI agent workflows from one place.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/mubinui/open-agent-kit/ci.yml?label=CI)](../../actions)
+[![Docker](https://img.shields.io/github/actions/workflow/status/mubinui/open-agent-kit/docker-release.yml?label=Docker%20Build)](../../actions/workflows/docker-release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![CrewAI](https://img.shields.io/badge/runtime-CrewAI-orange.svg)](https://crewai.com)
