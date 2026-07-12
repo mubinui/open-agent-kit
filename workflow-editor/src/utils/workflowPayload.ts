@@ -15,6 +15,29 @@ const agentIdForNode = (node: VisualNode) => {
     return slugify(String(config.id ?? config.agent_id ?? config.name ?? node.data?.label ?? node.id), 'agent');
 };
 
+export interface AgentBinding {
+    nodeId: string;
+    label: string;
+    /** The backend agent id this node will reference on save. */
+    agentId: string;
+}
+
+/**
+ * The backend agent id each agent node on the canvas resolves to. The backend
+ * rejects a workflow whose topology references an agent id absent from the
+ * agent registry, so callers compare these against the known agents to catch
+ * unbound placeholder nodes before saving.
+ */
+export function getAgentBindings(nodes: VisualNode[]): AgentBinding[] {
+    return nodes
+        .filter((node) => node.type === 'agent')
+        .map((node) => ({
+            nodeId: node.id,
+            label: String(node.data?.label ?? node.id),
+            agentId: agentIdForNode(node),
+        }));
+}
+
 const inferPattern = (nodes: VisualNode[], edges: VisualEdge[]) => {
     const hasRouter = nodes.some((node) => node.type === 'router' || node.data?.config?.is_selector);
     const hasLoop = nodes.some((node) => node.data?.config?.type === 'LoopAgent');

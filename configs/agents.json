@@ -84,6 +84,44 @@
         "calculate"
       ],
       "output_key": "calculation_result"
+    },
+    {
+      "id": "e2e_researcher",
+      "type": "conversable",
+      "name": "Web_Researcher",
+      "system_message": "You are a web research specialist. Use the web_search tool to find current information about the user's question, then report concise, sourced findings.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-4o-mini",
+        "temperature": 0.3,
+        "max_tokens": 800
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [
+        "web_search"
+      ],
+      "max_consecutive_auto_reply": 5,
+      "retrieve_config": null,
+      "description": "Searches the web and summarizes findings"
+    },
+    {
+      "id": "e2e_writer",
+      "type": "conversable",
+      "name": "Answer_Writer",
+      "system_message": "You write a clear, well-structured final answer for the user based on the research handed to you. Always produce a complete, non-empty answer.",
+      "llm_config": {
+        "provider_id": "openrouter",
+        "model": "openai/gpt-4o-mini",
+        "temperature": 0.5,
+        "max_tokens": 800
+      },
+      "human_input_mode": "NEVER",
+      "code_execution_config": false,
+      "tools": [],
+      "max_consecutive_auto_reply": 5,
+      "retrieve_config": null,
+      "description": "Writes the final guarded answer"
     }
   ]
 }

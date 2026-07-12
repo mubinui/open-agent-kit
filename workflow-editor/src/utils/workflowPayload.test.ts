@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VisualEdge, VisualNode } from '../types/workflow';
-import { buildWorkflowPayload } from './workflowPayload';
+import { buildWorkflowPayload, getAgentBindings } from './workflowPayload';
 
 const agent = (id: string, label: string): VisualNode => ({
     id,
@@ -28,6 +28,37 @@ const auxEdge = (source: string, target: string, handle: string): VisualEdge => 
     target,
     sourceHandle: 'attach',
     targetHandle: handle,
+});
+
+describe('getAgentBindings', () => {
+    it('resolves the backend agent id per agent node and ignores non-agents', () => {
+        const nodes: VisualNode[] = [
+            agent('n1', 'Search Assistant'),
+            tool('t1', 'MCP Tool', 'mcp'),
+            {
+                id: 'blank',
+                type: 'agent',
+                position: { x: 0, y: 0 },
+                // Blank palette agent: no id/name → resolves from the label.
+                data: { label: 'CrewAI Agent', config: { type: 'LlmAgent' } },
+            },
+        ];
+        const bindings = getAgentBindings(nodes);
+        expect(bindings).toEqual([
+            { nodeId: 'n1', label: 'Search Assistant', agentId: 'search_assistant' },
+            { nodeId: 'blank', label: 'CrewAI Agent', agentId: 'crewai_agent' },
+        ]);
+    });
+
+    it('prefers config.id over name/label', () => {
+        const node: VisualNode = {
+            id: 'x',
+            type: 'agent',
+            position: { x: 0, y: 0 },
+            data: { label: 'Some Label', config: { id: 'general_assistant', name: 'Other' } },
+        };
+        expect(getAgentBindings([node])[0].agentId).toBe('general_assistant');
+    });
 });
 
 describe('buildWorkflowPayload aux attachments', () => {

@@ -128,18 +128,35 @@ const toolToLibraryItem = (tool: ToolConfig): LibraryItem => ({
     },
 });
 
+// Backend AgentConfig.type is an autogen-style enum, distinct from the CrewAI
+// agent kinds the canvas uses ('LlmAgent', 'RecursiveAgent', …). Passing a
+// canvas kind through fails validation, so map unknown kinds to 'conversable'
+// (what every seeded agent uses).
+const VALID_BACKEND_AGENT_TYPES = new Set([
+    'conversable', 'retrieve_user_proxy', 'group_chat_manager', 'assistant', 'code_executor', 'custom',
+]);
+
 const itemToAgentCreate = (item: Partial<LibraryItem>) => {
     const config = item.config ?? {};
     const modelConfig = config.model_config ?? config.llm_config ?? {};
     const id = slugify(String(config.id ?? item.name ?? ''), 'agent');
     const name = String(item.name ?? config.name ?? id).replace(/\s+/g, '_');
 
+    const rawType = String(item.type ?? config.type ?? '');
+    const type = VALID_BACKEND_AGENT_TYPES.has(rawType) ? rawType : 'conversable';
+
+    // Backend LLMConfig requires provider_id + model; an empty object fails
+    // validation, so send null when a real model hasn't been configured. The
+    // runtime then falls back to the environment default model.
+    const hasModel = Boolean(modelConfig && modelConfig.provider_id && modelConfig.model);
+    const llm_config = hasModel ? modelConfig : null;
+
     return {
         id,
-        type: String(item.type ?? config.type ?? 'LlmAgent'),
+        type,
         name,
         system_message: String(config.instruction ?? config.system_message ?? 'You are a helpful AI assistant.'),
-        llm_config: modelConfig,
+        llm_config,
         human_input_mode: String(config.human_input_mode ?? 'NEVER'),
         code_execution_config: config.code_execution_config ?? false,
         tools: Array.isArray(config.tools) ? config.tools : [],
@@ -148,6 +165,8 @@ const itemToAgentCreate = (item: Partial<LibraryItem>) => {
         description: item.description ?? '',
     };
 };
+
+export { itemToAgentCreate };
 
 const itemToToolCreate = (item: Partial<LibraryItem>) => {
     const config = item.config ?? {};

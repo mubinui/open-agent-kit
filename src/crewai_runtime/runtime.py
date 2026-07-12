@@ -484,16 +484,21 @@ class CrewAIWorkflowRuntime:
     ) -> Any:
         func = tool_def.function
 
-        def run_tool(**kwargs: Any) -> Any:
+        def run_tool(*args: Any, **kwargs: Any) -> Any:
             started_tool = time.perf_counter()
             logger.info("crewai_tool_call_started", tool_id=tool_def.tool_id, tool_name=tool_def.name)
             if emitter is not None:
-                emitter.tool_started(tool_def.tool_id, tool_def.name, kwargs)
+                # Positional args are rare (crewai passes structured kwargs), but
+                # record them so the inspector reflects the real call.
+                recorded = dict(kwargs)
+                if args:
+                    recorded["_args"] = list(args)
+                emitter.tool_started(tool_def.tool_id, tool_def.name, recorded)
             try:
                 if inspect.iscoroutinefunction(func):
-                    res = asyncio.run(func(**kwargs))
+                    res = asyncio.run(func(*args, **kwargs))
                 else:
-                    res = func(**kwargs)
+                    res = func(*args, **kwargs)
                 duration = time.perf_counter() - started_tool
                 logger.info("crewai_tool_call_success", tool_id=tool_def.tool_id, duration_sec=round(duration, 3))
                 if emitter is not None:
@@ -512,6 +517,15 @@ class CrewAIWorkflowRuntime:
 
         run_tool.__name__ = tool_def.name
         run_tool.__doc__ = tool_def.description
+        # Expose the underlying function's real signature so crewai builds a
+        # typed argument schema (e.g. web_search's `query`). Without this the
+        # wrapper is `(**kwargs)`, the schema is empty, and the model calls the
+        # tool with no arguments — every plain-function tool silently fails.
+        try:
+            run_tool.__signature__ = inspect.signature(func)
+            run_tool.__annotations__ = dict(getattr(func, "__annotations__", {}))
+        except (ValueError, TypeError):
+            pass
         return tool_decorator(tool_def.name)(run_tool)
 
     def _resolve_process(self, process_cls: type[Any], workflow: WorkflowConfig) -> Any:

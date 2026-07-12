@@ -4,7 +4,8 @@ import { useReactFlow } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useLibraryStore } from '../stores/libraryStore';
-import { buildWorkflowPayload } from '../utils/workflowPayload';
+import { buildWorkflowPayload, getAgentBindings } from '../utils/workflowPayload';
+import { describeSaveError } from '../utils/saveErrors';
 import { getLayoutedElements } from '../utils/layout';
 import { OakLogo } from './OakLogo';
 import { useTheme } from '../hooks/useTheme';
@@ -49,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
     // getState() inside handlers so this header doesn't re-render on every node/edge
     // change (e.g. every mousemove frame while dragging a node on the canvas).
     const workflowName = useWorkflowStore((state) => state.workflowName);
-    const { setNodes, setEdges, onNodesChange, setWorkflowName, setCurrentWorkflow, loadWorkflow } = useWorkflowStore(
+    const { setNodes, setEdges, onNodesChange, setWorkflowName, setCurrentWorkflow, loadWorkflow, updateNodeData } = useWorkflowStore(
         useShallow((state) => ({
             setNodes: state.setNodes,
             setEdges: state.setEdges,
@@ -57,6 +58,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
             setWorkflowName: state.setWorkflowName,
             setCurrentWorkflow: state.setCurrentWorkflow,
             loadWorkflow: state.loadWorkflow,
+            updateNodeData: state.updateNodeData,
         })),
     );
     const { savedWorkflows, saveWorkflow, validateWorkflow, executeWorkflow, isLoading, fetchLibraryItems } = useLibraryStore();
@@ -94,10 +96,52 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
             return;
         }
 
+        // Pre-flight: the backend rejects a workflow whose topology references an
+        // agent id absent from the agent registry. A blank "CrewAI Agent" palette
+        // node resolves to an id like `crewai_agent` that was never persisted, so
+        // catch that here and offer to create the agents instead of surfacing a
+        // raw 422. Refetch first so the check runs against current backend truth.
+        try {
+            await fetchLibraryItems();
+        } catch {
+            // Non-fatal: fall through with whatever agents we already have.
+        }
+        const { savedAgents, saveItem } = useLibraryStore.getState();
+        const knownAgentIds = new Set(savedAgents.map((a) => a.id));
+        const unbound = getAgentBindings(nodes).filter((b) => !knownAgentIds.has(b.agentId));
+
+        if (unbound.length > 0) {
+            const list = unbound.map((b) => ` • ${b.label} → "${b.agentId}"`).join('\n');
+            const proceed = confirm(
+                `${unbound.length} agent node(s) aren't saved as backend agents yet:\n${list}\n\n` +
+                `Click OK to create them in your agent library and save the workflow.\n` +
+                `Click Cancel to bind them to existing agents yourself first.`,
+            );
+            if (!proceed) return;
+            try {
+                for (const binding of unbound) {
+                    const node = nodes.find((n) => n.id === binding.nodeId);
+                    // Pin config.id to the resolved id so both the created agent and
+                    // the workflow topology reference exactly the same id.
+                    const config = { ...(node?.data?.config ?? {}), id: binding.agentId };
+                    await saveItem('agent', {
+                        name: binding.label,
+                        description: String(node?.data?.description ?? ''),
+                        config,
+                    });
+                    updateNodeData(binding.nodeId, { config });
+                }
+            } catch (e) {
+                alert("Couldn't create the missing agents:\n" + describeSaveError((e as Error).message));
+                return;
+            }
+        }
+
+        // Re-read nodes: config.id may have just been written onto unbound nodes.
         const payload = buildWorkflowPayload({
             id: currentWorkflowId,
             name: workflowName,
-            nodes,
+            nodes: useWorkflowStore.getState().nodes,
             edges,
         });
 
@@ -106,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
             setCurrentWorkflow(saved.id, saved.name);
             alert("Workflow saved to backend successfully.");
         } catch (e) {
-            alert("Failed to save workflow: " + (e as Error).message);
+            alert("Failed to save workflow:\n" + describeSaveError((e as Error).message));
         }
     };
 

@@ -249,6 +249,239 @@
       },
       "persistence": "postgres",
       "workflow_type": "chatbot"
+    },
+    {
+      "id": "e2e_search_demo",
+      "name": "E2E Search Demo",
+      "description": "Trigger a web search, then write a guarded final answer.",
+      "pattern": "sequential",
+      "entry_agent_id": "e2e_researcher",
+      "recipient_agent_id": null,
+      "max_turns": 10,
+      "summary_method": "last_msg",
+      "enabled": true,
+      "metadata": {
+        "visual_canvas": {
+          "nodes": [
+            {
+              "id": "trigger_1",
+              "type": "trigger",
+              "position": {
+                "x": 40,
+                "y": 200
+              },
+              "data": {
+                "label": "Manual Trigger",
+                "config": {
+                  "trigger_type": "manual",
+                  "label": "Start"
+                }
+              }
+            },
+            {
+              "id": "researcher",
+              "type": "agent",
+              "position": {
+                "x": 320,
+                "y": 180
+              },
+              "data": {
+                "label": "Web Researcher",
+                "config": {
+                  "id": "e2e_researcher",
+                  "type": "conversable",
+                  "name": "Web_Researcher",
+                  "tools": [
+                    "web_search"
+                  ],
+                  "model_config": {
+                    "provider_id": "openrouter",
+                    "model": "openai/gpt-4o-mini",
+                    "temperature": 0.3,
+                    "max_tokens": 800
+                  }
+                }
+              }
+            },
+            {
+              "id": "web_search_tool",
+              "type": "tool",
+              "position": {
+                "x": 300,
+                "y": 400
+              },
+              "data": {
+                "label": "Web Search",
+                "config": {
+                  "id": "web_search",
+                  "type": "function",
+                  "name": "web_search"
+                }
+              }
+            },
+            {
+              "id": "writer",
+              "type": "agent",
+              "position": {
+                "x": 640,
+                "y": 180
+              },
+              "data": {
+                "label": "Answer Writer",
+                "config": {
+                  "id": "e2e_writer",
+                  "type": "conversable",
+                  "name": "Answer_Writer",
+                  "model_config": {
+                    "provider_id": "openrouter",
+                    "model": "openai/gpt-4o-mini",
+                    "temperature": 0.5,
+                    "max_tokens": 800
+                  }
+                }
+              }
+            },
+            {
+              "id": "guardrail_1",
+              "type": "router",
+              "position": {
+                "x": 940,
+                "y": 180
+              },
+              "data": {
+                "label": "Output Guardrail",
+                "config": {
+                  "type": "guardrail",
+                  "guardrails_enabled": true,
+                  "output_schema": "text"
+                }
+              }
+            },
+            {
+              "id": "output_1",
+              "type": "output",
+              "position": {
+                "x": 1200,
+                "y": 200
+              },
+              "data": {
+                "label": "Final Output",
+                "config": {
+                  "type": "output"
+                }
+              }
+            }
+          ],
+          "edges": [
+            {
+              "id": "e-trigger",
+              "source": "trigger_1",
+              "target": "researcher",
+              "type": "smoothstep"
+            },
+            {
+              "id": "e-tool",
+              "source": "web_search_tool",
+              "target": "researcher",
+              "sourceHandle": "attach",
+              "targetHandle": "tools",
+              "type": "straight",
+              "style": {
+                "strokeDasharray": "6 4",
+                "stroke": "#94a3b8",
+                "strokeWidth": 1.5
+              }
+            },
+            {
+              "id": "e-flow",
+              "source": "researcher",
+              "target": "writer",
+              "type": "smoothstep"
+            },
+            {
+              "id": "e-guard",
+              "source": "writer",
+              "target": "guardrail_1",
+              "type": "smoothstep"
+            },
+            {
+              "id": "e-out",
+              "source": "guardrail_1",
+              "target": "output_1",
+              "type": "smoothstep"
+            }
+          ],
+          "viewport": {
+            "x": 0,
+            "y": 0,
+            "zoom": 1
+          }
+        }
+      },
+      "topology": {
+        "type": "sequential",
+        "entry_node": "researcher",
+        "nodes": [
+          {
+            "id": "researcher",
+            "agent_id": "e2e_researcher",
+            "tools": [
+              "web_search"
+            ]
+          },
+          {
+            "id": "writer",
+            "agent_id": "e2e_writer"
+          }
+        ],
+        "edges": [
+          {
+            "from_node": "researcher",
+            "to_node": "writer",
+            "context_strategy": "full"
+          }
+        ]
+      },
+      "execution_strategy": "sequential",
+      "workflow_type": "sequential",
+      "persistence": "postgres",
+      "runtime": "crewai",
+      "process": "sequential",
+      "tasks": [],
+      "memory": {
+        "enabled": false,
+        "retention": "session"
+      },
+      "knowledge": {
+        "enabled": false,
+        "collections": [],
+        "top_k": 5
+      },
+      "guardrails": {
+        "enabled": true,
+        "human_review": false,
+        "output_schema": "text"
+      },
+      "tracing": {
+        "enabled": true,
+        "amp_enabled": false,
+        "event_listeners": [
+          "crew",
+          "agent",
+          "task",
+          "tool"
+        ]
+      },
+      "event_listeners": [],
+      "mcp_servers": [],
+      "output_schema": "text",
+      "deployment_auth_mode": "public",
+      "steps": null,
+      "group_chat": null,
+      "nested_chats": null,
+      "selector_config": null,
+      "nodes": null,
+      "connections": null
     }
   ]
 }

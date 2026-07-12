@@ -2,7 +2,13 @@
 
 from typing import Any
 
-from duckduckgo_search import DDGS
+# `duckduckgo_search` was renamed to `ddgs`; the old package no longer returns
+# results (DuckDuckGo rate-limits its endpoints). Prefer ddgs, fall back so the
+# import never hard-fails.
+try:
+    from ddgs import DDGS
+except ImportError:  # pragma: no cover - legacy fallback
+    from duckduckgo_search import DDGS
 
 
 class DuckDuckGoConnector:
