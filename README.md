@@ -36,7 +36,16 @@ You'll also want an LLM API key — an [OpenRouter](https://openrouter.ai/keys) 
 
 ### Option 1 — Docker (recommended)
 
-Build the image and run it:
+Pull the prebuilt image from GitHub Container Registry:
+
+```bash
+docker run -p 8000:8000 \
+  -e OPENROUTER_API_KEY=sk-or-... \
+  -v oak_data:/app/data \
+  ghcr.io/mubinui/open-agent-kit:latest
+```
+
+Or build it yourself:
 
 ```bash
 git clone https://github.com/mubinui/open-agent-kit.git
