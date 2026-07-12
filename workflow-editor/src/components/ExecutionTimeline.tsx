@@ -132,7 +132,7 @@ export const ExecutionTimeline = () => {
                             <div className="min-w-0 flex-1">
                                 <div className="text-xs font-semibold ag-text truncate">{item.label}</div>
                                 <div className="text-[10px] ag-muted">{new Date(item.timestamp).toLocaleTimeString()}</div>
-                                {(item.type.includes('tool') || item.type === 'error') && (
+                                {(item.type.includes('tool') || item.type === 'error' || item.type === 'node_input' || item.type === 'node_output') && (
                                     <pre className="mt-2 text-[10px] bg-slate-950 text-slate-100 p-2 rounded overflow-auto max-h-28">{JSON.stringify(item.payload, null, 2)}</pre>
                                 )}
                             </div>

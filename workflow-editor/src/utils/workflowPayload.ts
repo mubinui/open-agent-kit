@@ -1,4 +1,5 @@
 import type { VisualEdge, VisualNode } from '../types/workflow';
+import { isAuxHandle } from './connectionRules';
 
 const slugify = (value: string, fallback: string) => {
     const slug = value
@@ -87,7 +88,32 @@ export function buildWorkflowPayload(options: {
     }));
 
     const agentNodeIds = new Set(agentNodes.map((node) => node.id));
+
+    // Auxiliary attachments: edges landing on an agent's tools/memory/knowledge
+    // handle bind that tool node to the agent instead of joining the flow.
+    const nodeById = new Map(options.nodes.map((node) => [node.id, node]));
+    const toolAttachments = new Map<string, string[]>();
+    const memoryAttached = new Set<string>();
+    const knowledgeAttached = new Set<string>();
+    for (const edge of options.edges) {
+        if (!isAuxHandle(edge.targetHandle) || !agentNodeIds.has(edge.target)) continue;
+        const source = nodeById.get(edge.source);
+        if (!source || source.type !== 'tool') continue;
+        if (edge.targetHandle === 'memory') {
+            memoryAttached.add(edge.target);
+        } else if (edge.targetHandle === 'knowledge') {
+            knowledgeAttached.add(edge.target);
+        } else {
+            const config = source.data?.config ?? {};
+            const toolId = slugify(String(config.id ?? config.tool_id ?? config.name ?? source.data?.label ?? source.id), 'tool');
+            const bucket = toolAttachments.get(edge.target) ?? [];
+            if (!bucket.includes(toolId)) bucket.push(toolId);
+            toolAttachments.set(edge.target, bucket);
+        }
+    }
+
     const connections = options.edges
+        .filter((edge) => !isAuxHandle(edge.targetHandle))
         .filter((edge) => agentNodeIds.has(edge.source) && agentNodeIds.has(edge.target))
         .map((edge) => ({
             from_node: edge.source,
@@ -111,6 +137,9 @@ export function buildWorkflowPayload(options: {
             description: node.config?.description ?? '',
             position: node.position,
             config: node.config,
+            tools: toolAttachments.get(node.id) ?? [],
+            ...(memoryAttached.has(node.id) ? { memory: true } : {}),
+            ...(knowledgeAttached.has(node.id) ? { knowledge: true } : {}),
         })),
         edges: topologyEdges,
         entry_node: entryNode?.id ?? backendNodes[0]?.id ?? '',
@@ -118,8 +147,12 @@ export function buildWorkflowPayload(options: {
 
     const process = processForPattern(pattern);
     const tasks = agentNodes.map(taskForNode);
-    const memoryEnabled = options.nodes.some((node) => node.data?.config?.type === 'memory' || node.data?.config?.memory_enabled);
-    const knowledgeEnabled = options.nodes.some((node) => node.data?.config?.type === 'knowledge' || node.data?.config?.knowledge_enabled);
+    // Handle attachments win; the presence scan keeps legacy canvases (memory/
+    // knowledge nodes sitting in the main flow) behaving as before.
+    const memoryEnabled = memoryAttached.size > 0
+        || options.nodes.some((node) => node.data?.config?.type === 'memory' || node.data?.config?.memory_enabled);
+    const knowledgeEnabled = knowledgeAttached.size > 0
+        || options.nodes.some((node) => node.data?.config?.type === 'knowledge' || node.data?.config?.knowledge_enabled);
     const guardrailsEnabled = options.nodes.some((node) => node.data?.config?.type === 'guardrail' || node.data?.config?.guardrails_enabled);
 
     const create = {
@@ -138,7 +171,9 @@ export function buildWorkflowPayload(options: {
         process,
         tasks,
         memory: {
-            enabled: memoryEnabled || true,
+            // Was `memoryEnabled || true` (always on); enabled now actually
+            // reflects attached/present memory nodes.
+            enabled: memoryEnabled,
             retention: 'session',
         },
         knowledge: {

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { X, Trash2, Save, ChevronDown, ChevronRight, Check, Activity, FlaskConical, Gauge, Settings2, Sparkles, Wrench, Layers, Mail, Server, BookmarkPlus, ExternalLink } from 'lucide-react';
+import { X, Trash2, Save, ChevronDown, ChevronRight, Check, Activity, ArrowLeftRight, FlaskConical, Gauge, Settings2, Sparkles, Wrench, Layers, Mail, Server, BookmarkPlus, ExternalLink } from 'lucide-react';
 import { useStoreWithEqualityFn } from 'zustand/traditional';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useLibraryStore } from '../stores/libraryStore';
 import { InspectorTabs } from './studio/InspectorTabs';
 import { StatusBadge } from './studio/StatusBadge';
+import { DataPreview } from './studio/DataPreview';
 import { getAgentSummary, getToolSummary } from '../utils/studioDerivedState';
 import { api } from '../api/client';
 
@@ -1050,6 +1051,7 @@ export const PropertiesPanel = () => {
                         { id: 'model', label: 'Driver', icon: Sparkles, disabled: selectedNode.type !== 'agent' },
                         { id: 'tools', label: selectedNode.type === 'tool' ? 'Config' : 'Tools', icon: Wrench, disabled: selectedNode.type === 'trigger' },
                         { id: 'runtime', label: 'Runtime', icon: Layers },
+                        { id: 'data', label: 'Data', icon: ArrowLeftRight, disabled: selectedNode.type !== 'agent' && selectedNode.type !== 'tool' },
                         { id: 'test', label: 'Test', icon: Gauge, disabled: selectedNode.type === 'output' },
                     ]}
                 />
@@ -1093,6 +1095,39 @@ export const PropertiesPanel = () => {
                     {selectedNode.type === 'tool' && activeInspectorTab === 'tools' && renderToolConfig()}
                     {selectedNode.type === 'tool' && activeInspectorTab === 'test' && renderToolTest()}
                     {selectedNode.type === 'trigger' && activeInspectorTab === 'runtime' && renderTriggerConfig()}
+
+                    {activeInspectorTab === 'data' && (selectedNode.type === 'agent' || selectedNode.type === 'tool') && (
+                        <div className="space-y-4">
+                            <div className="space-y-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/40 p-4 shadow-2xs">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-xs font-black text-emerald-700 dark:text-emerald-400 tracking-wide uppercase">Input</div>
+                                    {selectedNode.data.lastInput && (
+                                        <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500">
+                                            {new Date(selectedNode.data.lastInput.timestamp).toLocaleTimeString()}
+                                        </span>
+                                    )}
+                                </div>
+                                <DataPreview
+                                    value={selectedNode.data.lastInput?.data}
+                                    emptyMessage="No run data yet — press Run Live in the Execution timeline to populate."
+                                />
+                            </div>
+                            <div className="space-y-2 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/40 p-4 shadow-2xs">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-xs font-black text-sky-700 dark:text-sky-400 tracking-wide uppercase">Output</div>
+                                    {selectedNode.data.lastOutput && (
+                                        <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500">
+                                            {new Date(selectedNode.data.lastOutput.timestamp).toLocaleTimeString()}
+                                        </span>
+                                    )}
+                                </div>
+                                <DataPreview
+                                    value={selectedNode.data.lastOutput?.data}
+                                    emptyMessage="No run data yet — press Run Live in the Execution timeline to populate."
+                                />
+                            </div>
+                        </div>
+                    )}
                     
                     {activeInspectorTab === 'test' && selectedNode.type === 'agent' && (
                         <div className="rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-900/40 p-4 text-xs text-slate-500 dark:text-slate-400 font-medium text-center">

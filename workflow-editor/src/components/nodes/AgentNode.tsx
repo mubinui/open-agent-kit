@@ -1,17 +1,55 @@
 
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, useConnection } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
 import { Bot, CheckCircle2, GitBranch, Hand, Play, Wrench } from 'lucide-react';
 import type { WorkflowNodeData } from '../../types/workflow';
 import { StatusBadge } from '../studio/StatusBadge';
+import { IoBadges } from '../studio/IoBadges';
 import { getAgentSummary } from '../../utils/studioDerivedState';
 import { NODE_TONE } from '../../utils/nodeTheme';
+import { auxKindForToolType } from '../../utils/connectionRules';
+
+// Auxiliary attachment handles along the bottom edge: tool/memory/knowledge
+// nodes plug in here instead of joining the main left→right flow.
+const AUX_HANDLE_STYLE: Array<{ id: 'tools' | 'memory' | 'knowledge'; left: string; label: string; className: string; glow: string }> = [
+    {
+        id: 'tools',
+        left: '25%',
+        label: 'Tools',
+        className: '!bg-orange-400 dark:!bg-orange-500 hover:!bg-orange-500 dark:hover:!bg-orange-400',
+        glow: '!shadow-[0_0_0_4px_rgba(249,115,22,0.35)]',
+    },
+    {
+        id: 'memory',
+        left: '50%',
+        label: 'Memory',
+        className: '!bg-violet-400 dark:!bg-violet-500 hover:!bg-violet-500 dark:hover:!bg-violet-400',
+        glow: '!shadow-[0_0_0_4px_rgba(168,85,247,0.35)]',
+    },
+    {
+        id: 'knowledge',
+        left: '75%',
+        label: 'Knowledge',
+        className: '!bg-teal-400 dark:!bg-teal-500 hover:!bg-teal-500 dark:hover:!bg-teal-400',
+        glow: '!shadow-[0_0_0_4px_rgba(20,184,166,0.35)]',
+    },
+];
 
 const tone = NODE_TONE.agent;
 
 export const AgentNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeData>>) => {
     const summary = getAgentSummary(data.config);
+
+    // While a connection is being dragged from a tool's attach handle, light up
+    // the one aux handle that will accept it and show the handle labels.
+    // Selector form: without it every node re-renders on every pointer move
+    // of an in-progress connection, which makes dragging feel choppy.
+    const pendingAuxKind = useConnection((conn) =>
+        conn.inProgress && conn.fromHandle?.id === 'attach' && conn.fromNode?.type === 'tool'
+            ? auxKindForToolType((conn.fromNode?.data as WorkflowNodeData | undefined)?.config?.type)
+            : null,
+    );
 
     const liveClass =
         data.status === 'running'
@@ -67,14 +105,15 @@ export const AgentNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeDa
                 </div>
 
                 {/* Footer: Config/Status (Minimal) */}
-                {(data.status || summary.issues.length > 0) && (
+                {(data.status || summary.issues.length > 0 || data.lastInput || data.lastOutput) && (
                     <div className="flex items-center gap-1.5 border-t border-[var(--color-ui-border)] pt-2">
                         {data.status === 'running' && <Play size={8} className="text-yellow-500 fill-yellow-500 animate-pulse" />}
                         {data.status === 'configured' && <CheckCircle2 size={8} className="text-green-500" />}
                         {data.status === 'error' && <span className="w-2 h-2 rounded-full bg-red-500" />}
-                        <span className="truncate text-[9px] ag-muted">
+                        <span className="min-w-0 flex-1 truncate text-[9px] ag-muted">
                             {summary.issues[0] ?? (data.status ? String(data.status) : 'Configured')}
                         </span>
+                        <IoBadges data={data} />
                     </div>
                 )}
             </div>
@@ -85,6 +124,41 @@ export const AgentNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeDa
                 position={Position.Right}
                 className={`!w-3 !h-3 !-right-1.5 !bg-gray-400 dark:!bg-slate-600 !border-2 !border-[var(--color-surface-raised)] ${tone.handleHover} transition-colors`}
             />
+
+            {/* Auxiliary attachment handles (Bottom): Tools / Memory / Knowledge */}
+            {AUX_HANDLE_STYLE.map((aux) => {
+                const isPendingTarget = pendingAuxKind === aux.id;
+                const isDimmed = pendingAuxKind !== null && !isPendingTarget;
+                return (
+                    <Handle
+                        key={aux.id}
+                        id={aux.id}
+                        type="target"
+                        position={Position.Bottom}
+                        style={{ left: aux.left }}
+                        className={`!w-3.5 !h-3.5 !-bottom-2 !border-2 !border-[var(--color-surface-raised)] ${aux.className} ${
+                            isPendingTarget ? `${aux.glow} animate-pulse` : ''
+                        } ${isDimmed ? '!opacity-30' : ''} transition-all`}
+                    />
+                );
+            })}
+            <div
+                className={`pointer-events-none absolute -bottom-6 left-0 flex w-full select-none transition-opacity duration-150 ${
+                    pendingAuxKind !== null ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
+            >
+                {AUX_HANDLE_STYLE.map((aux) => (
+                    <span
+                        key={aux.id}
+                        className={`absolute -translate-x-1/2 text-[8px] font-bold uppercase tracking-wider ${
+                            pendingAuxKind === aux.id ? 'ag-text' : 'ag-faint'
+                        } ${pendingAuxKind !== null && pendingAuxKind !== aux.id ? 'opacity-30' : ''}`}
+                        style={{ left: aux.left }}
+                    >
+                        {aux.label}
+                    </span>
+                ))}
+            </div>
         </div>
     );
 });

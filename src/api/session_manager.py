@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from datetime import datetime
 import json
@@ -15,6 +16,7 @@ from src.config.settings import get_settings
 from src.config.workflow_registry import get_workflow_registry
 from src.core.events import ResponseDelta, ResponseDeltaType, StreamEventBuilder
 from src.crewai_runtime import CrewAIWorkflowRuntime
+from src.crewai_runtime.execution_events import EventSink
 from src.memory.models import ConversationState, MessageRole
 
 logger = structlog.get_logger(__name__)
@@ -103,6 +105,7 @@ class SessionManager:
         message: str,
         max_turns: int | None = None,
         metadata: dict[str, Any] | None = None,
+        event_sink: EventSink | None = None,
     ) -> dict[str, Any]:
         """Process one message with CrewAI and return the legacy response DTO."""
         session = await self.get_session(session_id)
@@ -137,6 +140,7 @@ class SessionManager:
             session_id=str(session_id),
             user_id=session.metadata.get("user_id", "default_user"),
             metadata=run_metadata,
+            event_sink=event_sink,
         )
 
         response_text = result.response or "I could not generate a response."
@@ -161,16 +165,63 @@ class SessionManager:
         metadata: dict[str, Any] | None = None,
         correlation_id: str | None = None,
     ) -> AsyncIterator[ResponseDelta]:
-        """Stream CrewAI execution through the existing SSE event schema."""
+        """Stream CrewAI execution live through the existing SSE event schema.
+
+        Runtime events (node input/output, tool calls, planning trace) are
+        pushed from the kickoff worker thread onto an asyncio queue and
+        yielded as they happen, while the run itself progresses concurrently.
+        The frame contract is unchanged: START first, then live events, then
+        the final TOKEN and DONE (ERROR replaces them on failure).
+        """
         builder = StreamEventBuilder(str(session_id), correlation_id=correlation_id)
         yield builder.delta(
             ResponseDeltaType.START,
             {"runtime": "crewai", "message_length": len(message), "metadata": metadata or {}},
         )
+
+        queue: asyncio.Queue[tuple[str, dict[str, Any], str | None]] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def sink(event_type: str, payload: dict[str, Any], agent_id: str | None = None) -> None:
+            try:
+                loop.call_soon_threadsafe(queue.put_nowait, (event_type, payload, agent_id))
+            except RuntimeError:
+                # Event loop closed (client disconnected mid-run); the run
+                # itself keeps going, we just stop forwarding events.
+                pass
+
+        def _build_delta(event_type: str, payload: dict[str, Any], agent_id: str | None) -> ResponseDelta:
+            try:
+                delta_type = ResponseDeltaType(event_type)
+            except ValueError:
+                delta_type = ResponseDeltaType.REASONING_DELTA
+            return builder.delta(delta_type, payload, agent_id=agent_id)
+
+        run_task = asyncio.create_task(
+            self.process_message(session_id, message, max_turns=max_turns, metadata=metadata, event_sink=sink)
+        )
+        # Retrieve the exception even if the client disconnects before we await
+        # the task, so a failed run never surfaces as "exception never retrieved".
+        run_task.add_done_callback(self._log_stream_run_failure)
+
+        pending_get: asyncio.Task[tuple[str, dict[str, Any], str | None]] | None = None
         try:
-            result = await self.process_message(session_id, message, max_turns=max_turns, metadata=metadata)
-            for step in result.get("metadata", {}).get("trace_steps", []):
-                yield builder.delta(ResponseDeltaType.REASONING_DELTA, step)
+            while True:
+                pending_get = asyncio.create_task(queue.get())
+                done, _ = await asyncio.wait({pending_get, run_task}, return_when=asyncio.FIRST_COMPLETED)
+                if pending_get in done:
+                    event_type, payload, agent_id = pending_get.result()
+                    pending_get = None
+                    yield _build_delta(event_type, payload, agent_id)
+                    continue
+                pending_get.cancel()
+                pending_get = None
+                break
+            while not queue.empty():
+                event_type, payload, agent_id = queue.get_nowait()
+                yield _build_delta(event_type, payload, agent_id)
+
+            result = await run_task
             response = result.get("response", "")
             if response:
                 yield builder.delta(ResponseDeltaType.TOKEN, {"text": response})
@@ -188,6 +239,17 @@ class SessionManager:
                 ResponseDeltaType.ERROR,
                 {"error_type": type(exc).__name__, "error_message": str(exc), "runtime": "crewai"},
             )
+        finally:
+            if pending_get is not None:
+                pending_get.cancel()
+
+    @staticmethod
+    def _log_stream_run_failure(task: asyncio.Task) -> None:
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            logger.error("crewai_stream_run_failed", error=str(exc))
 
     async def get_chat_history(self, session_id: UUID) -> dict[str, Any]:
         """Return chat history in the router's response shape."""

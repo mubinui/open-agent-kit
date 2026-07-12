@@ -309,10 +309,14 @@ body {
     background: rgba(15, 23, 42, 0.85);
 }
 
-/* Remove default focus rectangle from React Flow nodes */
+/* The React Flow node wrapper is a plain rectangle — any outline/shadow on it
+   draws a box that ignores the component's rounded shape. Selection visuals
+   live on the node components themselves (thin colored border + soft ring
+   that follows the border-radius), so the wrapper stays invisible. */
 .react-flow__node:focus,
+.react-flow__node:focus-visible,
 .react-flow__node.selected {
     outline: none !important;
     border: none !important;
-    box-shadow: 0 0 0 2px var(--color-primary), 0 10px 25px -5px rgba(0, 0, 0, 0.2) !important;
+    box-shadow: none !important;
 }

@@ -24,10 +24,11 @@ export const ChatPanel = () => {
     // frame — only when the node/edge *count* actually changes.
     const nodesLength = useWorkflowStore((state) => state.nodes.length);
     const edgesLength = useWorkflowStore((state) => state.edges.length);
-    const { currentWorkflowId, workflowName } = useWorkflowStore(
+    const { currentWorkflowId, workflowName, applyNodeIo } = useWorkflowStore(
         useShallow((state) => ({
             currentWorkflowId: state.currentWorkflowId,
             workflowName: state.workflowName,
+            applyNodeIo: state.applyNodeIo,
         })),
     );
 
@@ -196,6 +197,9 @@ export const ChatPanel = () => {
                 ...prev,
                 { role: 'assistant', content: responseText },
             ]);
+
+            // Surface per-node/tool run data on the canvas (badges + Data tab).
+            applyNodeIo(result.metadata?.node_io, result.metadata?.tool_io);
 
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';

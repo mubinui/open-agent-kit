@@ -7,6 +7,16 @@ export interface InspectorTab {
     disabled?: boolean;
 }
 
+// Tailwind can't build class names dynamically — map the tab count to a literal.
+const GRID_COLS: Record<number, string> = {
+    1: 'grid-cols-1',
+    2: 'grid-cols-2',
+    3: 'grid-cols-3',
+    4: 'grid-cols-4',
+    5: 'grid-cols-5',
+    6: 'grid-cols-6',
+};
+
 export const InspectorTabs = ({
     tabs,
     activeTab,
@@ -16,7 +26,7 @@ export const InspectorTabs = ({
     activeTab: string;
     onChange: (tab: string) => void;
 }) => (
-    <div className="grid grid-cols-5 gap-1 rounded-lg border border-[var(--color-ui-border)] bg-slate-50/80 dark:bg-slate-900/60 p-1">
+    <div className={`grid ${GRID_COLS[tabs.length] ?? 'grid-cols-5'} gap-1 rounded-lg border border-[var(--color-ui-border)] bg-slate-50/80 dark:bg-slate-900/60 p-1`}>
         {tabs.map(({ id, label, icon: Icon, disabled }) => (
             <button
                 key={id}

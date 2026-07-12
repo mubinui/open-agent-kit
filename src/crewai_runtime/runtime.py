@@ -22,6 +22,7 @@ from src.config.agent_models import AgentConfig
 from src.config.loader import load_agents_config
 from src.config.tool_registry import ToolDefinition, get_tool_registry
 from src.config.workflow_models import WorkflowConfig
+from src.crewai_runtime.execution_events import EventSink, ExecutionEventEmitter, TaskMeta
 
 logger = structlog.get_logger(__name__)
 
@@ -68,6 +69,7 @@ class CrewAIWorkflowRuntime:
         session_id: str,
         user_id: str,
         metadata: dict[str, Any] | None = None,
+        event_sink: EventSink | None = None,
     ) -> CrewAIRuntimeResult:
         """Run one user message through a CrewAI crew or Flow in a worker thread."""
 
@@ -79,6 +81,7 @@ class CrewAIWorkflowRuntime:
             session_id,
             user_id,
             metadata or {},
+            event_sink,
         )
         result.metadata.setdefault("latency_ms", round((time.perf_counter() - started) * 1000))
         return result
@@ -90,12 +93,13 @@ class CrewAIWorkflowRuntime:
         session_id: str,
         user_id: str,
         metadata: dict[str, Any],
+        event_sink: EventSink | None = None,
     ) -> CrewAIRuntimeResult:
         # The ExitStack owns the lifecycle of per-run tool resources (notably MCP
         # server connections/subprocesses): they are closed when this method
         # returns or raises, no matter where the failure happens.
         with contextlib.ExitStack() as stack:
-            return self._run_message_inner(workflow, message, session_id, user_id, metadata, stack)
+            return self._run_message_inner(workflow, message, session_id, user_id, metadata, stack, event_sink)
 
     def _run_message_inner(
         self,
@@ -105,6 +109,7 @@ class CrewAIWorkflowRuntime:
         user_id: str,
         metadata: dict[str, Any],
         stack: contextlib.ExitStack,
+        event_sink: EventSink | None = None,
     ) -> CrewAIRuntimeResult:
         try:
             from crewai import Agent, Crew, Process, Task
@@ -121,6 +126,18 @@ class CrewAIWorkflowRuntime:
         if not workflow_agent_ids:
             raise ValueError(f"Workflow {workflow.id} has no agents to execute")
 
+        # The emitter records per-node I/O for every run (surfaced in result
+        # metadata); with an event_sink it additionally streams events live.
+        emitter = ExecutionEventEmitter(event_sink, message)
+
+        # Canvas attachments (Tools/Memory/Knowledge handles) fold into the
+        # agent behind each node. The same agent used by several nodes gets
+        # the union of their attachments.
+        extra_tools, wants_memory, wants_knowledge = self._node_attachments(ordered_nodes)
+        attached_knowledge_sources = (
+            self._resolve_knowledge_sources(workflow, force=True) if wants_knowledge else []
+        )
+
         crew_agents: list[Any] = []
         crew_agent_by_id: dict[str, Any] = {}
         # One factory build per tool id per run: agents sharing an MCP tool share
@@ -131,14 +148,23 @@ class CrewAIWorkflowRuntime:
             if config is None:
                 logger.warning("crewai_agent_config_missing", workflow_id=workflow.id, agent_id=agent_id)
                 continue
-            crew_agent = self._create_agent(Agent, config, stack, run_tool_cache)
+            crew_agent = self._create_agent(
+                Agent,
+                config,
+                stack,
+                run_tool_cache,
+                emitter=emitter,
+                extra_tool_ids=extra_tools.get(agent_id, []),
+                memory_attached=agent_id in wants_memory,
+                knowledge_sources=attached_knowledge_sources if agent_id in wants_knowledge else None,
+            )
             crew_agents.append(crew_agent)
             crew_agent_by_id[agent_id] = crew_agent
 
         if not crew_agents:
             raise ValueError(f"Workflow {workflow.id} has no valid CrewAI agents")
 
-        tasks = self._create_tasks(
+        tasks, task_metas = self._create_tasks(
             task_cls=Task,
             workflow=workflow,
             ordered_nodes=ordered_nodes,
@@ -151,18 +177,23 @@ class CrewAIWorkflowRuntime:
         )
 
         process = self._resolve_process(Process, workflow)
-        
+        process_name = process.value if hasattr(process, "value") else str(process)
+        emitter.register_tasks(task_metas, sequential=not process_name.lower().endswith("hierarchical"))
+
         # Resolve Knowledge sources natively if available
         knowledge_sources = self._resolve_knowledge_sources(workflow)
-        
+
         trace_steps = self._planning_trace(
             workflow=workflow,
-            ordered_nodes=ordered_nodes,
+            task_metas=task_metas,
             tasks=tasks,
             process=process,
             crew_agents=crew_agents,
         )
-        
+        if event_sink is not None:
+            for step in trace_steps:
+                emitter.emit_trace(step)
+
         memory_active = workflow.memory.enabled if hasattr(workflow, "memory") else self.memory_enabled
         
         crew_kwargs: dict[str, Any] = {
@@ -172,6 +203,7 @@ class CrewAIWorkflowRuntime:
             "memory": memory_active,
             "verbose": False,
             "cache": bool(getattr(workflow, "cache", True)),
+            "task_callback": emitter.task_callback,
         }
 
         if knowledge_sources:
@@ -200,6 +232,7 @@ class CrewAIWorkflowRuntime:
         
         started_execution = time.time()
         try:
+            emitter.on_kickoff_start()
             kickoff_result = crew.kickoff(inputs=inputs_dict)
             response = getattr(kickoff_result, "raw", None) or str(kickoff_result)
             token_usage = getattr(kickoff_result, "token_usage", {})
@@ -253,15 +286,42 @@ class CrewAIWorkflowRuntime:
                 "memory_enabled": memory_active,
                 "knowledge_enabled": bool(knowledge_sources),
                 "knowledge_sources_count": len(knowledge_sources) if knowledge_sources else 0,
-                "process": process.value if hasattr(process, "value") else str(process),
+                "process": process_name,
                 "usage": token_usage if isinstance(token_usage, dict) else {},
                 "cost_usd": round(approx_cost, 6),
+                "node_io": emitter.node_io(),
+                "tool_io": emitter.tool_io(),
             },
         )
 
-    def _resolve_knowledge_sources(self, workflow: WorkflowConfig) -> list[Any]:
-        """Dynamically build CrewAI Knowledge source instances if configured."""
-        if not hasattr(workflow, "knowledge") or not getattr(workflow.knowledge, "enabled", False):
+    @staticmethod
+    def _node_attachments(
+        ordered_nodes: list[Any],
+    ) -> tuple[dict[str, list[str]], set[str], set[str]]:
+        """Fold canvas handle attachments (tools/memory/knowledge) per agent id."""
+        extra_tools: dict[str, list[str]] = {}
+        wants_memory: set[str] = set()
+        wants_knowledge: set[str] = set()
+        for node in ordered_nodes:
+            agent_id = node.agent_id
+            for tool_id in getattr(node, "tools", None) or []:
+                bucket = extra_tools.setdefault(agent_id, [])
+                if tool_id not in bucket:
+                    bucket.append(tool_id)
+            if getattr(node, "memory", None):
+                wants_memory.add(agent_id)
+            if getattr(node, "knowledge", None):
+                wants_knowledge.add(agent_id)
+        return extra_tools, wants_memory, wants_knowledge
+
+    def _resolve_knowledge_sources(self, workflow: WorkflowConfig, force: bool = False) -> list[Any]:
+        """Dynamically build CrewAI Knowledge source instances if configured.
+
+        `force=True` builds sources even when the workflow-level toggle is off,
+        for agents with a Knowledge node attached directly on the canvas.
+        """
+        enabled = hasattr(workflow, "knowledge") and getattr(workflow.knowledge, "enabled", False)
+        if not enabled and not force:
             return []
             
         sources = []
@@ -282,15 +342,43 @@ class CrewAIWorkflowRuntime:
             
         return sources
 
+    def _effective_model_config(self, config: AgentConfig) -> dict[str, Any]:
+        """Merge every place the studio/API can express an agent's model settings.
+
+        Studio-created agents persist `llm_config` (v0.2), older configs use
+        `model_config`/`model_config_override`, and v0.4 uses model_client_config.
+        The runtime previously read only model_config_override, silently dropping
+        the provider/model/temperature users picked in the studio.
+        Priority: model_config_override > llm_config/model_client_config.
+        """
+        merged: dict[str, Any] = {}
+        try:
+            effective = config.get_effective_model_config()
+        except Exception:
+            effective = None
+        if effective is not None:
+            merged.update({k: v for k, v in effective.model_dump().items() if v is not None})
+        override = config.model_config_override or {}
+        merged.update({k: v for k, v in override.items() if v is not None})
+        return merged
+
     def _create_agent(
         self,
         agent_cls: type[Any],
         config: AgentConfig,
         stack: contextlib.ExitStack | None = None,
         run_tool_cache: dict[str, list[Any]] | None = None,
+        emitter: ExecutionEventEmitter | None = None,
+        extra_tool_ids: list[str] | None = None,
+        memory_attached: bool = False,
+        knowledge_sources: list[Any] | None = None,
     ) -> Any:
-        model_config = config.model_config_override or {}
-        tools = self._get_crewai_tools(config.tools, stack, run_tool_cache)
+        model_config = self._effective_model_config(config)
+        tool_ids = list(config.tools)
+        for tool_id in extra_tool_ids or []:
+            if tool_id not in tool_ids:
+                tool_ids.append(tool_id)
+        tools = self._get_crewai_tools(tool_ids, stack, run_tool_cache, emitter=emitter)
 
         agent_kwargs: dict[str, Any] = {
             "role": config.name,
@@ -302,6 +390,10 @@ class CrewAIWorkflowRuntime:
             "max_iter": int(model_config.get("max_iter") or 20),
             "verbose": False,
         }
+        if memory_attached:
+            agent_kwargs["memory"] = True
+        if knowledge_sources:
+            agent_kwargs["knowledge_sources"] = knowledge_sources
         if model_config.get("max_rpm"):
             agent_kwargs["max_rpm"] = int(model_config["max_rpm"])
         if model_config.get("max_execution_time"):
@@ -349,6 +441,7 @@ class CrewAIWorkflowRuntime:
         tool_ids: list[str],
         stack: contextlib.ExitStack | None = None,
         run_tool_cache: dict[str, list[Any]] | None = None,
+        emitter: ExecutionEventEmitter | None = None,
     ) -> list[Any]:
         if not tool_ids:
             return []
@@ -380,15 +473,22 @@ class CrewAIWorkflowRuntime:
                 crew_tools.extend(cache[tool_id])
                 continue
 
-            crew_tools.append(self._wrap_tool(tool, tool_def))
+            crew_tools.append(self._wrap_tool(tool, tool_def, emitter=emitter))
         return crew_tools
 
-    def _wrap_tool(self, tool_decorator: Callable[..., Any], tool_def: ToolDefinition) -> Any:
+    def _wrap_tool(
+        self,
+        tool_decorator: Callable[..., Any],
+        tool_def: ToolDefinition,
+        emitter: ExecutionEventEmitter | None = None,
+    ) -> Any:
         func = tool_def.function
 
         def run_tool(**kwargs: Any) -> Any:
             started_tool = time.perf_counter()
             logger.info("crewai_tool_call_started", tool_id=tool_def.tool_id, tool_name=tool_def.name)
+            if emitter is not None:
+                emitter.tool_started(tool_def.tool_id, tool_def.name, kwargs)
             try:
                 if inspect.iscoroutinefunction(func):
                     res = asyncio.run(func(**kwargs))
@@ -396,10 +496,18 @@ class CrewAIWorkflowRuntime:
                     res = func(**kwargs)
                 duration = time.perf_counter() - started_tool
                 logger.info("crewai_tool_call_success", tool_id=tool_def.tool_id, duration_sec=round(duration, 3))
+                if emitter is not None:
+                    emitter.tool_finished(
+                        tool_def.tool_id, tool_def.name, result=res, duration_ms=round(duration * 1000)
+                    )
                 return res
             except Exception as e:
                 duration = time.perf_counter() - started_tool
                 logger.error("crewai_tool_call_failed", tool_id=tool_def.tool_id, error=str(e), duration_sec=round(duration, 3))
+                if emitter is not None:
+                    emitter.tool_finished(
+                        tool_def.tool_id, tool_def.name, error=str(e), duration_ms=round(duration * 1000)
+                    )
                 return f"Tool execution error: {str(e)}"
 
         run_tool.__name__ = tool_def.name
@@ -457,7 +565,10 @@ class CrewAIWorkflowRuntime:
     def _make_output_guardrail(output_schema: str) -> Callable[[Any], tuple[bool, Any]]:
         """Simple final-output validator used when workflow.guardrails.enabled."""
 
-        def guardrail(task_output: Any) -> tuple[bool, Any]:
+        # No return annotation on purpose: `from __future__ import annotations`
+        # stringifies it, and crewai's Task validator inspects the raw signature
+        # (get_origin on a string fails → "must be Tuple[bool, Any]" error).
+        def guardrail(task_output):  # type: (Any) -> tuple[bool, Any]
             raw = str(getattr(task_output, "raw", task_output) or "").strip()
             if not raw:
                 return False, "The output was empty. Produce a complete answer."
@@ -489,7 +600,14 @@ class CrewAIWorkflowRuntime:
         user_id: str,
         metadata: dict[str, Any],
         agent_configs: dict[str, Any] | None = None,
-    ) -> list[Any]:
+    ) -> tuple[list[Any], list[TaskMeta]]:
+        """Build CrewAI tasks plus aligned per-node metadata.
+
+        Tasks are named after their topology node id so ``TaskOutput.name``
+        identifies the node in ``task_callback``. The returned ``TaskMeta``
+        list is index-aligned with the task list (nodes whose agent is missing
+        are skipped from both).
+        """
         agent_configs = agent_configs or {}
         guardrails_enabled = bool(getattr(getattr(workflow, "guardrails", None), "enabled", False))
         guardrail_schema = str(getattr(getattr(workflow, "guardrails", None), "output_schema", "text"))
@@ -504,22 +622,26 @@ class CrewAIWorkflowRuntime:
 
         explicit_tasks = getattr(workflow, "tasks", []) or []
         if explicit_tasks:
-            tasks = []
+            tasks: list[Any] = []
+            metas: list[TaskMeta] = []
             for index, task_config in enumerate(explicit_tasks):
                 agent = crew_agent_by_id.get(task_config.agent_id)
                 if not agent:
                     continue
+                node_id = task_config.node_id or task_config.id or f"task-{index + 1}"
+                description = self._task_description(
+                    workflow,
+                    message,
+                    session_id,
+                    user_id,
+                    metadata,
+                    step=index + 1,
+                    node_id=task_config.node_id,
+                    task_description=task_config.description,
+                )
                 task_kwargs = {
-                    "description": self._task_description(
-                        workflow,
-                        message,
-                        session_id,
-                        user_id,
-                        metadata,
-                        step=index + 1,
-                        node_id=task_config.node_id,
-                        task_description=task_config.description,
-                    ),
+                    "name": node_id,
+                    "description": description,
                     "expected_output": task_config.expected_output,
                     "agent": agent,
                 }
@@ -527,38 +649,63 @@ class CrewAIWorkflowRuntime:
                     task_kwargs["context"] = tasks[:]
                 apply_task_extras(task_kwargs, task_config.agent_id, is_final=index == len(explicit_tasks) - 1)
                 tasks.append(task_cls(**task_kwargs))
+                metas.append(
+                    TaskMeta(
+                        node_id=node_id,
+                        agent_id=task_config.agent_id,
+                        index=len(tasks) - 1,
+                        description=description,
+                        expected_output=task_config.expected_output,
+                        # Explicit tasks receive every prior task as context.
+                        upstream_node_ids=[meta.node_id for meta in metas],
+                    )
+                )
             if tasks:
-                return tasks
+                return tasks, metas
 
         tasks = []
+        metas = []
         for index, node in enumerate(ordered_nodes):
             agent = crew_agent_by_id.get(node.agent_id)
             if not agent:
                 continue
             node_goal = node.config_override.get("task") if node.config_override else None
+            description = self._task_description(
+                workflow,
+                message,
+                session_id,
+                user_id,
+                metadata,
+                step=index + 1,
+                node_id=node.id,
+                task_description=node_goal or f"Execute and analyze workflow node {node.id} natively.",
+            )
+            expected_output = (node.config_override or {}).get(
+                "expected_output",
+                "A highly detailed, production-grade output supporting complete context validation.",
+            )
             task_kwargs = {
-                "description": self._task_description(
-                    workflow,
-                    message,
-                    session_id,
-                    user_id,
-                    metadata,
-                    step=index + 1,
-                    node_id=node.id,
-                    task_description=node_goal or f"Execute and analyze workflow node {node.id} natively.",
-                ),
-                "expected_output": (node.config_override or {}).get(
-                    "expected_output",
-                    "A highly detailed, production-grade output supporting complete context validation.",
-                ),
+                "name": node.id,
+                "description": description,
+                "expected_output": expected_output,
                 "agent": agent,
             }
-            upstream_tasks = self._upstream_tasks(workflow, node.id, ordered_nodes, tasks)
-            if upstream_tasks:
-                task_kwargs["context"] = upstream_tasks
+            upstream = self._upstream_task_pairs(workflow, node.id, metas, tasks)
+            if upstream:
+                task_kwargs["context"] = [task for _, task in upstream]
             apply_task_extras(task_kwargs, node.agent_id, is_final=index == len(ordered_nodes) - 1)
             tasks.append(task_cls(**task_kwargs))
-        return tasks
+            metas.append(
+                TaskMeta(
+                    node_id=node.id,
+                    agent_id=node.agent_id,
+                    index=len(tasks) - 1,
+                    description=description,
+                    expected_output=expected_output,
+                    upstream_node_ids=[meta.node_id for meta, _ in upstream],
+                )
+            )
+        return tasks, metas
 
     def _task_description(
         self,
@@ -584,33 +731,34 @@ class CrewAIWorkflowRuntime:
             "Deliver an optimal, exhaustive answer utilizing any applicable configured tools automatically."
         )
 
-    def _upstream_tasks(
+    def _upstream_task_pairs(
         self,
         workflow: WorkflowConfig,
         node_id: str,
-        ordered_nodes: list[Any],
+        created_metas: list[TaskMeta],
         created_tasks: list[Any],
-    ) -> list[Any]:
-        """Return CrewAI task context for upstream topology nodes."""
-        if not workflow.topology.edges:
-            return created_tasks[-1:] if created_tasks else []
+    ) -> list[tuple[TaskMeta, Any]]:
+        """Return (meta, task) context pairs for upstream topology nodes.
 
-        node_position = {node.id: index for index, node in enumerate(ordered_nodes)}
+        Pairing created metas with created tasks (always index-aligned) instead
+        of ordered_nodes avoids misattributing context when a node is skipped
+        because its agent config is missing.
+        """
+        pairs = list(zip(created_metas, created_tasks))
+        if not workflow.topology.edges:
+            return pairs[-1:]
+
         upstream_ids = {
             edge.from_node
             for edge in workflow.topology.edges
-            if edge.to_node == node_id and edge.from_node in node_position
+            if edge.to_node == node_id
         }
-        return [
-            task
-            for node, task in zip(ordered_nodes, created_tasks)
-            if node.id in upstream_ids
-        ]
+        return [(meta, task) for meta, task in pairs if meta.node_id in upstream_ids]
 
     def _planning_trace(
         self,
         workflow: WorkflowConfig,
-        ordered_nodes: list[Any],
+        task_metas: list[TaskMeta],
         tasks: list[Any],
         process: Any,
         crew_agents: list[Any],
@@ -645,15 +793,15 @@ class CrewAIWorkflowRuntime:
                 "details": workflow.knowledge.model_dump(mode="json") if hasattr(workflow, "knowledge") else {"enabled": True, "sources_resolved": True},
             },
         ]
-        for index, (node, task) in enumerate(zip(ordered_nodes, tasks), start=1):
+        for index, (meta, task) in enumerate(zip(task_metas, tasks), start=1):
             trace_steps.append(
                 {
                     "type": "task_planned",
-                    "agent": node.agent_id,
-                    "description": f"Orchestrated Task {index} mapped to state node {node.id}",
+                    "agent": meta.agent_id,
+                    "description": f"Orchestrated Task {index} mapped to state node {meta.node_id}",
                     "timestamp": now,
                     "details": {
-                        "node_id": node.id,
+                        "node_id": meta.node_id,
                         "task_preview": getattr(task, "description", "")[:240],
                         "expected_output": getattr(task, "expected_output", None),
                     },

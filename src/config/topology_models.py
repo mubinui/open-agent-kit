@@ -70,7 +70,19 @@ class AgentNode(BaseModel):
         gt=0,
         description="Node-specific timeout in seconds"
     )
-    
+    tools: list[str] = Field(
+        default_factory=list,
+        description="Extra tool ids attached to this node via the canvas Tools handle"
+    )
+    memory: Optional[bool] = Field(
+        default=None,
+        description="Per-node memory attachment; None inherits the workflow-level setting"
+    )
+    knowledge: Optional[bool] = Field(
+        default=None,
+        description="Per-node knowledge attachment; None inherits the workflow-level setting"
+    )
+
     @field_validator('id', 'agent_id')
     @classmethod
     def validate_ids(cls, v: str) -> str:

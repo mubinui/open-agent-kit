@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useLibraryStore } from '../stores/libraryStore';
 import { getLayoutedElements, positionsAreDegenerate } from '../utils/layout';
+import { isValidConnection as isValidConnectionRule } from '../utils/connectionRules';
 import type { NodeType } from '../types/workflow';
 
 import { AgentNode } from './nodes/AgentNode';
@@ -402,6 +403,14 @@ const WorkflowCanvasContent = () => {
         [screenToFlowPosition, fitView, addNode, savedAgents, savedTools]
     );
 
+    // Typed aux handles: only matching tool kinds may land on an agent's
+    // tools/memory/knowledge handle; flow connections stay unrestricted.
+    const isValidConnection = useCallback(
+        (connection: Parameters<typeof isValidConnectionRule>[0]) =>
+            isValidConnectionRule(connection, useWorkflowStore.getState().nodes),
+        [],
+    );
+
     return (
         <div className="flex-grow h-full bg-[var(--color-canvas-bg)]" ref={reactFlowWrapper}>
             <ReactFlow
@@ -410,6 +419,7 @@ const WorkflowCanvasContent = () => {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
+                isValidConnection={isValidConnection}
                 onDragOver={onDragOver}
                 onDrop={onDrop}
                 onNodeDragStart={() => setNodeDragging(true)}

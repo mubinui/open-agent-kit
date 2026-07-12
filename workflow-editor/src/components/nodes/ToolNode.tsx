@@ -1,12 +1,14 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, useConnection } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
 import type { LucideIcon } from 'lucide-react';
 import { Brain, Database, FileSearch, KeyRound, Link2, Mail, Server, Wrench } from 'lucide-react';
 import type { WorkflowNodeData } from '../../types/workflow';
 import { StatusBadge } from '../studio/StatusBadge';
+import { IoBadges } from '../studio/IoBadges';
 import { getToolSummary } from '../../utils/studioDerivedState';
 import { NODE_TONE } from '../../utils/nodeTheme';
+import { auxKindForToolType, isAuxHandle } from '../../utils/connectionRules';
 
 const tone = NODE_TONE.tool;
 
@@ -29,6 +31,17 @@ const TOOL_TYPE_CAPTION: Record<string, string> = {
 
 export const ToolNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeData>>) => {
     const summary = getToolSummary(data.config);
+
+    // Highlight this tool's attach handle when an agent aux handle of the
+    // matching kind is being dragged toward it. Selector form avoids
+    // re-rendering on every pointer move of an in-progress connection.
+    const attachWanted = useConnection(
+        (conn) =>
+            conn.inProgress &&
+            conn.fromNode?.type === 'agent' &&
+            isAuxHandle(conn.fromHandle?.id) &&
+            conn.fromHandle?.id === auxKindForToolType(summary.type),
+    );
     const liveClass =
         data.status === 'running'
             ? 'border-blue-500 dark:border-sky-400 shadow-[0_0_0_4px_rgba(37,99,235,0.18)] dark:shadow-[0_0_0_4px_rgba(56,189,248,0.28)] animate-pulse'
@@ -50,6 +63,16 @@ export const ToolNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeDat
                 type="target"
                 position={Position.Left}
                 className={`!w-2.5 !h-2.5 !-left-1.5 !bg-gray-400 dark:!bg-slate-600 !border-2 !border-[var(--color-surface-raised)] ${tone.handleHover} transition-colors`}
+            />
+
+            {/* Attach Handle (Top) — connects this tool to an agent's Tools/Memory/Knowledge handle */}
+            <Handle
+                id="attach"
+                type="source"
+                position={Position.Top}
+                className={`!w-3 !h-3 !-top-2 !bg-gray-400 dark:!bg-slate-600 !border-2 !border-[var(--color-surface-raised)] ${tone.handleHover} ${
+                    attachWanted ? '!bg-orange-400 dark:!bg-orange-500 !shadow-[0_0_0_4px_rgba(249,115,22,0.35)] animate-pulse' : ''
+                } transition-all`}
             />
 
             {/* Icon — reflects the tool's integration type */}
@@ -78,6 +101,7 @@ export const ToolNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeDat
                     {(summary.type === 'api' || summary.type === 'function') && (
                         <StatusBadge tone={summary.auth === 'none' ? 'muted' : 'warning'} label={summary.auth === 'none' ? 'No auth' : summary.auth} icon={KeyRound} compact />
                     )}
+                    <IoBadges data={data} />
                 </div>
             </div>
 
