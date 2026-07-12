@@ -1,17 +1,26 @@
 """Pydantic models for tool configuration validation."""
 
+import re
 from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+VALID_TOOL_TYPES = {"function", "api", "mcp", "database", "gmail"}
+MCP_TRANSPORTS = {"stdio", "sse", "streamable-http"}
+GMAIL_CAPABILITIES = {"send", "search", "read"}
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
 
 class ToolConfig(BaseModel):
     """Configuration for a tool.
-    
-    Supports two tool types:
+
+    Supported tool types (settings['type']):
     - function: Python function tools (requires entrypoint)
     - api: HTTP API tools (requires settings.api_url)
+    - mcp: MCP server tools (requires settings.transport + command/url)
+    - database: NL2SQL database tools (requires settings.db_uri or db_uri_env_var)
+    - gmail: Gmail tools via connected Google OAuth account (requires settings.account_email)
     """
 
     id: str = Field(
@@ -56,7 +65,13 @@ class ToolConfig(BaseModel):
     def validate_tool_type(self) -> 'ToolConfig':
         """Validate tool configuration based on type."""
         tool_type = self.settings.get('type', 'function')
-        
+
+        if tool_type not in VALID_TOOL_TYPES:
+            raise ValueError(
+                f"Tool '{self.id}': unknown tool type '{tool_type}'. "
+                f"Supported types: {sorted(VALID_TOOL_TYPES)}"
+            )
+
         if tool_type == 'api':
             # API tool validation
             api_url = self.settings.get('api_url')
@@ -68,6 +83,12 @@ class ToolConfig(BaseModel):
             # Set default entrypoint for API tools if not provided
             if not self.entrypoint:
                 self.entrypoint = "src.tools.api_tool_executor:execute_api_tool"
+        elif tool_type == 'mcp':
+            self._validate_mcp_settings()
+        elif tool_type == 'database':
+            self._validate_database_settings()
+        elif tool_type == 'gmail':
+            self._validate_gmail_settings()
         else:
             # Function tool validation
             if not self.entrypoint:
@@ -75,8 +96,86 @@ class ToolConfig(BaseModel):
                     f"Tool '{self.id}': Function tools require 'entrypoint' field. "
                     "Example: entrypoint='src.tools.calculator:calculate'"
                 )
-        
+
         return self
+
+    def _validate_mcp_settings(self) -> None:
+        transport = self.settings.get('transport')
+        if transport not in MCP_TRANSPORTS:
+            raise ValueError(
+                f"Tool '{self.id}': MCP tools require 'transport' in settings, "
+                f"one of {sorted(MCP_TRANSPORTS)}"
+            )
+        if transport == 'stdio':
+            if not self.settings.get('command'):
+                raise ValueError(
+                    f"Tool '{self.id}': stdio MCP tools require 'command' in settings "
+                    "(e.g. 'npx' or 'uvx')"
+                )
+            if self.settings.get('url'):
+                raise ValueError(f"Tool '{self.id}': stdio MCP tools must not set 'url'")
+            args = self.settings.get('args')
+            if args is not None and not (isinstance(args, list) and all(isinstance(a, str) for a in args)):
+                raise ValueError(f"Tool '{self.id}': MCP 'args' must be a list of strings")
+        else:
+            url = self.settings.get('url')
+            if not url or not str(url).startswith(('http://', 'https://')):
+                raise ValueError(
+                    f"Tool '{self.id}': {transport} MCP tools require an http(s) 'url' in settings"
+                )
+            if self.settings.get('command'):
+                raise ValueError(f"Tool '{self.id}': {transport} MCP tools must not set 'command'")
+            auth_type = self.settings.get('auth_type', 'none')
+            if auth_type not in {'none', 'bearer'}:
+                raise ValueError(f"Tool '{self.id}': MCP 'auth_type' must be 'none' or 'bearer'")
+            if auth_type == 'bearer' and not self.settings.get('auth_env_var'):
+                raise ValueError(
+                    f"Tool '{self.id}': bearer-authenticated MCP tools require 'auth_env_var' "
+                    "(the NAME of the env var holding the token — never the token itself)"
+                )
+        tool_filter = self.settings.get('tool_filter')
+        if tool_filter is not None and not (
+            isinstance(tool_filter, list) and all(isinstance(t, str) for t in tool_filter)
+        ):
+            raise ValueError(f"Tool '{self.id}': MCP 'tool_filter' must be a list of tool names")
+        timeout = self.settings.get('connect_timeout')
+        if timeout is not None and not (isinstance(timeout, (int, float)) and 1 <= timeout <= 300):
+            raise ValueError(f"Tool '{self.id}': MCP 'connect_timeout' must be between 1 and 300 seconds")
+
+    def _validate_database_settings(self) -> None:
+        db_uri = self.settings.get('db_uri')
+        db_uri_env_var = self.settings.get('db_uri_env_var')
+        if bool(db_uri) == bool(db_uri_env_var):
+            raise ValueError(
+                f"Tool '{self.id}': database tools require exactly one of 'db_uri' "
+                "or 'db_uri_env_var' in settings"
+            )
+        if db_uri and '@' in str(db_uri):
+            raise ValueError(
+                f"Tool '{self.id}': inline 'db_uri' values must not embed credentials. "
+                "Use 'db_uri_env_var' (the NAME of an env var holding the full URI) instead."
+            )
+        tables = self.settings.get('tables')
+        if tables is not None and not (isinstance(tables, list) and all(isinstance(t, str) for t in tables)):
+            raise ValueError(f"Tool '{self.id}': database 'tables' must be a list of table names")
+
+    def _validate_gmail_settings(self) -> None:
+        account_email = self.settings.get('account_email')
+        if not account_email or not _EMAIL_RE.match(str(account_email)):
+            raise ValueError(
+                f"Tool '{self.id}': gmail tools require a valid 'account_email' in settings"
+            )
+        capabilities = self.settings.get('capabilities', sorted(GMAIL_CAPABILITIES))
+        if not (
+            isinstance(capabilities, list)
+            and capabilities
+            and set(capabilities) <= GMAIL_CAPABILITIES
+        ):
+            raise ValueError(
+                f"Tool '{self.id}': gmail 'capabilities' must be a non-empty subset "
+                f"of {sorted(GMAIL_CAPABILITIES)}"
+            )
+        self.settings['capabilities'] = capabilities
 
     def validate_entrypoint(self) -> None:
         """Validate entrypoint format."""

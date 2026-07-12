@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Play, X, Send, Loader2, AlertCircle, RefreshCw, PlusCircle } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkflowStore } from '../stores/workflowStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,8 +19,17 @@ export const ChatPanel = () => {
     const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Get current workflow from canvas store (n8n-style)
-    const { nodes, edges, currentWorkflowId, workflowName } = useWorkflowStore();
+    // Get current workflow from canvas store (n8n-style). Select primitive counts
+    // (not the arrays themselves) so this panel doesn't re-render on every node-drag
+    // frame — only when the node/edge *count* actually changes.
+    const nodesLength = useWorkflowStore((state) => state.nodes.length);
+    const edgesLength = useWorkflowStore((state) => state.edges.length);
+    const { currentWorkflowId, workflowName } = useWorkflowStore(
+        useShallow((state) => ({
+            currentWorkflowId: state.currentWorkflowId,
+            workflowName: state.workflowName,
+        })),
+    );
 
     // Optional JWT for authenticated workflows
     const [jwtToken, setJwtToken] = useState('');
@@ -41,7 +51,7 @@ export const ChatPanel = () => {
     }, [currentWorkflowId]);
 
     // Check if canvas has a workflow
-    const hasWorkflow = nodes.length > 0;
+    const hasWorkflow = nodesLength > 0;
     const hasLoadedWorkflow = currentWorkflowId && hasWorkflow;
 
     const createSession = async () => {
@@ -112,12 +122,12 @@ export const ChatPanel = () => {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="absolute bottom-6 right-6 z-50 w-12 h-12 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all group"
+                className="absolute bottom-6 right-6 z-50 w-12 h-12 flex items-center justify-center bg-[var(--color-primary)] text-white rounded-full shadow-lg hover:bg-[var(--color-primary-hover)] hover:scale-105 transition-all group"
                 title="Test Workflow"
             >
                 <Play size={20} fill="currentColor" />
                 {/* Tooltip */}
-                <span className="absolute right-full mr-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                <span className="absolute right-full mr-2 px-2 py-1 bg-gray-800 dark:bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                     Test Workflow
                 </span>
             </button>
@@ -219,9 +229,9 @@ export const ChatPanel = () => {
     };
 
     return (
-        <div className="absolute bottom-6 right-6 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-200 h-[550px]">
+        <div className="absolute bottom-6 right-6 w-96 bg-white dark:bg-[#0b111b] rounded-xl shadow-2xl border border-gray-200 dark:border-slate-800 z-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-200 h-[550px]">
             {/* Header - Shows current workflow name */}
-            <div className={`p-4 ${hasLoadedWorkflow ? 'bg-blue-600' : 'bg-gray-700'} text-white flex items-center justify-between shrink-0 transition-colors duration-300`}>
+            <div className={`p-4 ${hasLoadedWorkflow ? 'bg-[var(--color-primary)]' : 'bg-gray-700 dark:bg-slate-800'} text-white flex items-center justify-between shrink-0 transition-colors duration-300`}>
                 <div className="flex items-center gap-2 overflow-hidden">
                     <MessageSquare size={18} className="shrink-0" />
                     <div className="min-w-0">
@@ -229,7 +239,7 @@ export const ChatPanel = () => {
                             {hasLoadedWorkflow ? workflowName : 'Test Workflow'}
                         </span>
                         {hasLoadedWorkflow && (
-                            <span className="text-[10px] text-blue-200 block truncate">
+                            <span className="text-[10px] text-emerald-100 block truncate">
                                 ID: {currentWorkflowId}
                             </span>
                         )}
@@ -262,23 +272,23 @@ export const ChatPanel = () => {
             </div>
 
             {/* Workflow Status & JWT Config */}
-            <div className="p-3 bg-gray-50 border-b border-gray-200 space-y-2 shrink-0">
+            <div className="p-3 bg-gray-50 dark:bg-slate-900/60 border-b border-gray-200 dark:border-slate-800 space-y-2 shrink-0">
                 {/* Workflow Status */}
                 <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500">Canvas Status:</span>
+                    <span className="text-gray-500 dark:text-slate-400">Canvas Status:</span>
                     {hasLoadedWorkflow ? (
-                        <span className="text-green-600 font-medium flex items-center gap-1">
-                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                            {nodes.length} nodes, {edges.length} edges
+                        <span className="text-green-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                            <span className="w-2 h-2 bg-green-500 dark:bg-emerald-400 rounded-full"></span>
+                            {nodesLength} nodes, {edgesLength} edges
                         </span>
                     ) : hasWorkflow ? (
-                        <span className="text-yellow-600 font-medium flex items-center gap-1">
-                            <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                        <span className="text-yellow-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                            <span className="w-2 h-2 bg-yellow-500 dark:bg-amber-400 rounded-full"></span>
                             Canvas has nodes (drop workflow to test)
                         </span>
                     ) : (
-                        <span className="text-gray-400 font-medium flex items-center gap-1">
-                            <span className="w-2 h-2 bg-gray-300 rounded-full"></span>
+                        <span className="text-gray-400 dark:text-slate-500 font-medium flex items-center gap-1">
+                            <span className="w-2 h-2 bg-gray-300 dark:bg-slate-600 rounded-full"></span>
                             Empty canvas
                         </span>
                     )}
@@ -287,10 +297,10 @@ export const ChatPanel = () => {
                 {/* JWT Token Input */}
                 <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-gray-500">Authentication</label>
+                        <label className="text-xs font-semibold text-gray-500 dark:text-slate-400">Authentication</label>
                         <button
                             onClick={() => setShowJwtInput(!showJwtInput)}
-                            className="text-xs text-blue-600 hover:text-blue-700"
+                            className="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]"
                         >
                             {showJwtInput ? 'Hide' : 'Add JWT Token'}
                         </button>
@@ -301,14 +311,14 @@ export const ChatPanel = () => {
                             value={jwtToken}
                             onChange={(e) => setJwtToken(e.target.value)}
                             placeholder="Bearer token (optional)"
-                            className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded text-xs font-mono"
+                            className="w-full px-2 py-1.5 bg-white dark:bg-slate-950 border border-gray-300 dark:border-slate-700 text-gray-900 dark:text-slate-200 rounded text-xs font-mono"
                         />
                     )}
                 </div>
 
                 {/* Error Display */}
                 {error && (
-                    <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                    <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded text-xs text-red-700 dark:text-red-400">
                         <AlertCircle size={14} className="shrink-0" />
                         <span>{error}</span>
                     </div>
@@ -316,9 +326,9 @@ export const ChatPanel = () => {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 min-h-0">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-slate-950/40 min-h-0">
                 {messages.length === 0 && (
-                    <div className="text-center text-gray-400 text-sm mt-8">
+                    <div className="text-center text-gray-400 dark:text-slate-500 text-sm mt-8">
                         <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
                         {hasLoadedWorkflow ? (
                             <p>Send a message to test your workflow!</p>
@@ -328,14 +338,14 @@ export const ChatPanel = () => {
                                 <p className="text-xs mt-1">Drag a workflow from the sidebar to get started</p>
                             </div>
                         )}
-                        {isLoading && <div className="mt-4"><Loader2 size={24} className="animate-spin text-blue-500 mx-auto" /></div>}
+                        {isLoading && <div className="mt-4"><Loader2 size={24} className="animate-spin text-[var(--color-primary)] mx-auto" /></div>}
                     </div>
                 )}
                 {messages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm ${msg.role === 'user'
-                            ? 'bg-blue-600 text-white rounded-br-none'
-                            : 'bg-white border border-gray-200 text-gray-700 rounded-bl-none shadow-sm'
+                            ? 'bg-[var(--color-primary)] text-white rounded-br-none'
+                            : 'bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-300 rounded-bl-none shadow-sm'
                             }`}>
                             {msg.role === 'user' ? (
                                 msg.content
@@ -346,18 +356,18 @@ export const ChatPanel = () => {
                                         // Code blocks
                                         code: ({ inline, className, children, ...props }: any) => {
                                             return inline ? (
-                                                <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                                <code className="bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 px-1 py-0.5 rounded text-xs font-mono" {...props}>
                                                     {children}
                                                 </code>
                                             ) : (
-                                                <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto my-2 text-xs">
+                                                <pre className="bg-gray-900 dark:bg-slate-950 text-gray-100 dark:text-slate-200 p-3 rounded-lg overflow-x-auto my-2 text-xs">
                                                     <code className={className} {...props}>{children}</code>
                                                 </pre>
                                             );
                                         },
                                         // Links
                                         a: ({ children, ...props }: any) => (
-                                            <a className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props}>
+                                            <a className="text-[var(--color-primary)] hover:underline" target="_blank" rel="noopener noreferrer" {...props}>
                                                 {children}
                                             </a>
                                         ),
@@ -374,18 +384,18 @@ export const ChatPanel = () => {
                                         h3: ({ children }: any) => <h3 className="text-sm font-bold mt-2 mb-1">{children}</h3>,
                                         // Blockquote
                                         blockquote: ({ children }: any) => (
-                                            <blockquote className="border-l-2 border-gray-300 pl-3 my-2 text-gray-600 italic">
+                                            <blockquote className="border-l-2 border-gray-300 dark:border-slate-700 pl-3 my-2 text-gray-600 dark:text-slate-400 italic">
                                                 {children}
                                             </blockquote>
                                         ),
                                         // Table
                                         table: ({ children }: any) => (
                                             <div className="overflow-x-auto my-2">
-                                                <table className="min-w-full text-xs border border-gray-200">{children}</table>
+                                                <table className="min-w-full text-xs border border-gray-200 dark:border-slate-800">{children}</table>
                                             </div>
                                         ),
-                                        th: ({ children }: any) => <th className="bg-gray-100 px-2 py-1 border-b font-semibold text-left">{children}</th>,
-                                        td: ({ children }: any) => <td className="px-2 py-1 border-b">{children}</td>,
+                                        th: ({ children }: any) => <th className="bg-gray-100 dark:bg-slate-800 px-2 py-1 border-b border-gray-200 dark:border-slate-700 font-semibold text-left">{children}</th>,
+                                        td: ({ children }: any) => <td className="px-2 py-1 border-b border-gray-200 dark:border-slate-800">{children}</td>,
                                     }}
                                 >
                                     {msg.content}
@@ -396,7 +406,7 @@ export const ChatPanel = () => {
                 ))}
                 {isLoading && messages.length > 0 && (
                     <div className="flex justify-start">
-                        <div className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-2xl rounded-bl-none shadow-sm text-sm text-gray-500">
+                        <div className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl rounded-bl-none shadow-sm text-sm text-gray-500 dark:text-slate-400">
                             <Loader2 size={14} className="animate-spin" />
                             <span>Executing workflow...</span>
                         </div>
@@ -406,7 +416,7 @@ export const ChatPanel = () => {
             </div>
 
             {/* Input */}
-            <div className="p-3 border-t border-gray-100 bg-white shrink-0">
+            <div className="p-3 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-[#0b111b] shrink-0">
                 <div className="relative">
                     <input
                         type="text"
@@ -414,13 +424,13 @@ export const ChatPanel = () => {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend()}
                         disabled={isLoading || !hasLoadedWorkflow}
-                        className="w-full pl-4 pr-10 py-2.5 bg-gray-100 border-none rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-800 placeholder-gray-400 disabled:opacity-50"
+                        className="w-full pl-4 pr-10 py-2.5 bg-gray-100 dark:bg-slate-900 border-none rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 text-gray-800 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 disabled:opacity-50"
                         placeholder={hasLoadedWorkflow ? "Type a message..." : "Load a workflow to start testing..."}
                     />
                     <button
                         onClick={handleSend}
                         disabled={isLoading || !hasLoadedWorkflow || !input.trim()}
-                        className="absolute right-1.5 top-1.5 p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="absolute right-1.5 top-1.5 p-1.5 bg-[var(--color-primary)] text-white rounded-full hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Send size={14} />
                     </button>

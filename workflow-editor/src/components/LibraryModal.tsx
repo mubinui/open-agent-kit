@@ -41,19 +41,19 @@ type ResourceTab = 'tools' | 'agents' | 'functions' | 'prompts' | 'providers' | 
 const Section = ({ title, icon: Icon, children, defaultOpen = true, className = "" }: { title: string; icon: any; children: React.ReactNode; defaultOpen?: boolean; className?: string }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     return (
-        <div className={`border border-slate-200/80 rounded-xl overflow-hidden bg-white shadow-sm transition-all ${className}`}>
+        <div className={`border border-slate-200/80 dark:border-slate-800/80 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm transition-all ${className}`}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 type="button"
-                className="w-full flex items-center justify-between px-4 py-3.5 bg-gradient-to-r from-slate-50 to-white hover:from-slate-100/70 hover:to-slate-50 transition-all text-left border-b border-slate-100"
+                className="w-full flex items-center justify-between px-4 py-3.5 bg-gradient-to-r from-slate-50 to-white hover:from-slate-100/70 hover:to-slate-50 dark:from-slate-900 dark:to-slate-900 dark:hover:from-slate-800/70 dark:hover:to-slate-800/70 transition-all text-left border-b border-slate-100 dark:border-slate-800"
             >
                 <div className="flex items-center gap-3">
-                    <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                    <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
                         <Icon size={15} />
                     </div>
-                    <span className="font-bold text-slate-800 text-xs tracking-wide uppercase">{title}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-100 text-xs tracking-wide uppercase">{title}</span>
                 </div>
-                {isOpen ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
+                {isOpen ? <ChevronDown size={14} className="text-slate-400 dark:text-slate-500" /> : <ChevronRight size={14} className="text-slate-400 dark:text-slate-500" />}
             </button>
             {isOpen && (
                 <div className="p-5 space-y-5">
@@ -69,7 +69,7 @@ const FormInput = ({ label, placeholder, value, onChange, type = 'text', icon: I
     label: string; placeholder?: string; value: string; onChange: (v: string) => void; type?: string; icon?: any; mono?: boolean; rows?: number; disabled?: boolean; helpText?: string;
 }) => (
     <div className="space-y-1.5 w-full">
-        <label className="text-xs font-bold text-slate-600 tracking-wide uppercase flex items-center gap-2">
+        <label className="text-xs font-bold text-slate-600 dark:text-slate-300 tracking-wide uppercase flex items-center gap-2">
             {Icon && <Icon size={13} className="text-blue-500" />}
             {label}
         </label>
@@ -79,10 +79,10 @@ const FormInput = ({ label, placeholder, value, onChange, type = 'text', icon: I
                 onChange={(e) => onChange(e.target.value)}
                 rows={rows}
                 disabled={disabled}
-                className={`w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg text-xs text-slate-800
-                    focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 focus:bg-white
-                    transition-all resize-y disabled:bg-slate-100 disabled:text-slate-400
-                    placeholder:text-slate-400 leading-relaxed
+                className={`w-full px-3.5 py-2.5 bg-slate-50/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200
+                    focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900
+                    transition-all resize-y disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500
+                    placeholder:text-slate-400 dark:placeholder:text-slate-500 leading-relaxed
                     ${mono ? 'font-mono text-xs' : ''}`}
                 placeholder={placeholder}
             />
@@ -93,16 +93,16 @@ const FormInput = ({ label, placeholder, value, onChange, type = 'text', icon: I
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     disabled={disabled}
-                    className={`w-full px-3.5 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-xs text-slate-800
-                        focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 focus:bg-white
-                        transition-all disabled:bg-slate-100 disabled:text-slate-400 font-medium
-                        placeholder:text-slate-400 h-9
+                    className={`w-full px-3.5 py-2 bg-slate-50/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200
+                        focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900
+                        transition-all disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 font-medium
+                        placeholder:text-slate-400 dark:placeholder:text-slate-500 h-9
                         ${mono ? 'font-mono text-xs' : ''}`}
                     placeholder={placeholder}
                 />
             </div>
         )}
-        {helpText && <p className="text-[10px] text-slate-400 font-medium">{helpText}</p>}
+        {helpText && <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{helpText}</p>}
     </div>
 );
 
@@ -111,7 +111,7 @@ const FormSelect = ({ label, value, onChange, options, icon: Icon, helpText }: {
     label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; icon?: any; helpText?: string;
 }) => (
     <div className="space-y-1.5 w-full">
-        <label className="text-xs font-bold text-slate-600 tracking-wide uppercase flex items-center gap-2">
+        <label className="text-xs font-bold text-slate-600 dark:text-slate-300 tracking-wide uppercase flex items-center gap-2">
             {Icon && <Icon size={13} className="text-blue-500" />}
             {label}
         </label>
@@ -119,17 +119,17 @@ const FormSelect = ({ label, value, onChange, options, icon: Icon, helpText }: {
             <select
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className="w-full pl-3.5 pr-8 py-2 bg-slate-50/50 border border-slate-200 rounded-lg text-xs text-slate-800
-                    focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 focus:bg-white
+                className="w-full pl-3.5 pr-8 py-2 bg-slate-50/50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200
+                    focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900
                     transition-all appearance-none cursor-pointer font-medium h-9"
             >
                 {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
             </select>
-            <div className="absolute right-3 pointer-events-none text-slate-400">
+            <div className="absolute right-3 pointer-events-none text-slate-400 dark:text-slate-500">
                 <ChevronDown size={14} />
             </div>
         </div>
-        {helpText && <p className="text-[10px] text-slate-400 font-medium">{helpText}</p>}
+        {helpText && <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{helpText}</p>}
     </div>
 );
 
@@ -439,20 +439,20 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
     return (
         <>
             <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md flex items-center justify-center z-[100] animate-in fade-in duration-200 p-4">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[88vh] flex flex-col overflow-hidden ring-1 ring-slate-900/10 antialiased">
-                    
+                <div className="bg-white dark:bg-[#0b111b] rounded-2xl shadow-2xl w-full max-w-6xl h-[88vh] flex flex-col overflow-hidden ring-1 ring-slate-900/10 dark:ring-white/10 antialiased">
+
                     {/* --- Elite Bespoke Workspace Banner --- */}
-                    <div className="h-16 px-6 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/50 shrink-0 z-20 relative">
+                    <div className="h-16 px-6 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/40 shrink-0 z-20 relative">
                         <div className="flex items-center gap-6">
                             <div className="flex items-center gap-2">
                                 <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-sm">
                                     <Sparkles size={16} />
                                 </div>
-                                <h2 className="text-sm font-black text-slate-800 tracking-tight uppercase">Library Vault</h2>
+                                <h2 className="text-sm font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Library Vault</h2>
                             </div>
-                            
+
                             {/* Seamless Tab Controller Strip */}
-                            <div className="flex bg-slate-200/60 p-1 rounded-xl gap-0.5">
+                            <div className="flex bg-slate-200/60 dark:bg-slate-800/60 p-1 rounded-xl gap-0.5">
                                 {resourceTabs.map((tab) => (
                                     <button
                                         key={tab.id}
@@ -460,13 +460,13 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                         type="button"
                                         className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all
                                             ${activeTab === tab.id
-                                                ? 'bg-white text-blue-600 shadow-sm'
-                                                : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+                                                ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm'
+                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'
                                             }`}
                                     >
                                         {tab.label}
                                         {typeof tab.count === 'number' && (
-                                            <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono ${activeTab === tab.id ? 'bg-blue-50 text-blue-600 font-extrabold' : 'bg-slate-300/60 text-slate-500'}`}>
+                                            <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[9px] font-mono ${activeTab === tab.id ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-extrabold' : 'bg-slate-300/60 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400'}`}>
                                                 {tab.count}
                                             </span>
                                         )}
@@ -475,7 +475,7 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                             </div>
                         </div>
 
-                        <button onClick={onClose} type="button" className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-xl transition-all">
+                        <button onClick={onClose} type="button" className="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-xl transition-all">
                             <X size={18} />
                         </button>
                     </div>
@@ -484,8 +484,8 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                     <div className="flex flex-1 overflow-hidden min-h-0">
 
                         {/* --- Active Resource Index Sidebar --- */}
-                        <div className="w-80 border-r border-slate-200/80 flex flex-col bg-slate-50/30">
-                            <div className="p-4 border-b border-slate-100 shrink-0 space-y-3">
+                        <div className="w-80 border-r border-slate-200/80 dark:border-slate-800/80 flex flex-col bg-slate-50/30 dark:bg-slate-900/40">
+                            <div className="p-4 border-b border-slate-100 dark:border-slate-800 shrink-0 space-y-3">
                                 <button
                                     onClick={resetForm}
                                     type="button"
@@ -494,26 +494,26 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                     <Plus size={15} />
                                     New {activeTab === 'tools' ? 'Specialist Tool' : 'Execution Agent'}
                                 </button>
-                                
+
                                 {activeTab === 'tools' && (
                                     <button
                                         onClick={() => setIsSwaggerModalOpen(true)}
                                         type="button"
-                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-all border border-slate-200 shadow-sm"
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all border border-slate-200 dark:border-slate-700 shadow-sm"
                                     >
                                         <Download size={13} className="text-blue-500" />
                                         Import OpenAPI / Swagger
                                     </button>
                                 )}
-                                
+
                                 <div className="relative flex items-center">
-                                    <Search size={13} className="absolute left-3 text-slate-400" />
+                                    <Search size={13} className="absolute left-3 text-slate-400 dark:text-slate-500" />
                                     <input
                                         type="text"
                                         placeholder="Quick filter registry..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 transition-all font-medium h-9"
+                                        className="w-full pl-8 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-600 transition-all font-medium h-9"
                                     />
                                 </div>
                             </div>
@@ -521,11 +521,11 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                             <div className="flex-1 overflow-y-auto p-3 space-y-2">
                                 {filteredItems.length === 0 ? (
                                     <div className="text-center py-12 px-4">
-                                        <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-2 border border-slate-200">
-                                            <Search size={16} className="text-slate-400" />
+                                        <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center mx-auto mb-2 border border-slate-200 dark:border-slate-700">
+                                            <Search size={16} className="text-slate-400 dark:text-slate-500" />
                                         </div>
-                                        <p className="text-xs font-bold text-slate-600">Vault Registry Empty</p>
-                                        <p className="text-[11px] text-slate-400 mt-0.5">Initialize a blueprint instance to record setup context.</p>
+                                        <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Vault Registry Empty</p>
+                                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Initialize a blueprint instance to record setup context.</p>
                                     </div>
                                 ) : (
                                     filteredItems.map(item => (
@@ -534,17 +534,17 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                             onClick={() => handleEdit(item)}
                                             className={`p-3 rounded-xl cursor-pointer group transition-all border
                                                 ${editingItem?.id === item.id
-                                                    ? 'bg-blue-50/50 border-blue-500/30 shadow-sm ring-1 ring-blue-500/10'
-                                                    : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-xs'}`}
+                                                    ? 'bg-blue-50/50 dark:bg-blue-950/30 border-blue-500/30 shadow-sm ring-1 ring-blue-500/10'
+                                                    : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 hover:shadow-xs'}`}
                                         >
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="min-w-0 flex-grow">
-                                                    <div className={`font-bold text-xs truncate ${editingItem?.id === item.id ? 'text-blue-600' : 'text-slate-800'}`}>
+                                                    <div className={`font-bold text-xs truncate ${editingItem?.id === item.id ? 'text-blue-600' : 'text-slate-800 dark:text-slate-100'}`}>
                                                         {item.name}
                                                     </div>
                                                     <div className="flex items-center gap-1.5 mt-1">
-                                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
-                                                        <span className="text-[10px] font-semibold text-slate-500 truncate font-mono tracking-wide uppercase">
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+                                                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate font-mono tracking-wide uppercase">
                                                             {item.type}
                                                         </span>
                                                     </div>
@@ -552,7 +552,7 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleDelete(item); }}
                                                     type="button"
-                                                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-all"
                                                 >
                                                     <Trash2 size={13} />
                                                 </button>
@@ -564,7 +564,7 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                         </div>
 
                         {/* --- Configurator Right Workspace Detail Panel --- */}
-                        <div className="flex-1 flex flex-col bg-white relative overflow-hidden min-w-0">
+                        <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 relative overflow-hidden min-w-0">
                             {activeTab === 'functions' ? (
                                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                                     <Section title="Generated Python Function Tools" icon={FunctionSquare}>
@@ -581,14 +581,14 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                     <Section title="Active Python Native Functions" icon={Code}>
                                         <div className="space-y-2">
                                             {functions.map((fn) => (
-                                                <div key={fn.id} className="flex items-center justify-between bg-slate-50/50 border border-slate-200/80 rounded-xl p-3">
+                                                <div key={fn.id} className="flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3">
                                                     <div>
-                                                        <div className="text-xs font-bold text-slate-800">{fn.name}</div>
-                                                        <div className="text-[11px] font-mono text-slate-500 mt-0.5">{fn.entrypoint}</div>
+                                                        <div className="text-xs font-bold text-slate-800 dark:text-slate-100">{fn.name}</div>
+                                                        <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">{fn.entrypoint}</div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <button onClick={() => handleViewFunctionSource(fn.id)} type="button" className="px-3 py-1 text-xs font-semibold bg-white border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all">Source</button>
-                                                        <button onClick={() => deleteFunctionTool(fn.id)} type="button" className="px-3 py-1 text-xs font-semibold bg-red-50 text-red-600 border border-red-100 hover:border-red-200 rounded-lg transition-all">Revoke</button>
+                                                        <button onClick={() => handleViewFunctionSource(fn.id)} type="button" className="px-3 py-1 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 rounded-lg shadow-2xs transition-all">Source</button>
+                                                        <button onClick={() => deleteFunctionTool(fn.id)} type="button" className="px-3 py-1 text-xs font-semibold bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/50 hover:border-red-200 dark:hover:border-red-800 rounded-lg transition-all">Revoke</button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -615,12 +615,12 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                     <Section title="Committed System Contexts" icon={MessageSquareText}>
                                         <div className="space-y-2">
                                             {prompts.map((prompt) => (
-                                                <div key={prompt.id} className="flex items-center justify-between bg-slate-50/50 border border-slate-200/80 rounded-xl p-3">
+                                                <div key={prompt.id} className="flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3">
                                                     <div>
-                                                        <div className="text-xs font-bold text-slate-800">{prompt.name}</div>
-                                                        <div className="text-[11px] font-mono text-slate-500 mt-0.5">{prompt.id} · {prompt.category ?? 'Global Scope'}</div>
+                                                        <div className="text-xs font-bold text-slate-800 dark:text-slate-100">{prompt.name}</div>
+                                                        <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">{prompt.id} · {prompt.category ?? 'Global Scope'}</div>
                                                     </div>
-                                                    <button onClick={() => deletePrompt(prompt.id)} type="button" className="px-3 py-1 text-xs font-semibold bg-red-50 text-red-600 border border-red-100 hover:border-red-200 rounded-lg transition-all">Delete</button>
+                                                    <button onClick={() => deletePrompt(prompt.id)} type="button" className="px-3 py-1 text-xs font-semibold bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/50 hover:border-red-200 dark:hover:border-red-800 rounded-lg transition-all">Delete</button>
                                                 </div>
                                             ))}
                                         </div>
@@ -645,14 +645,14 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                     <Section title="Registered Gateways" icon={ServerCog}>
                                         <div className="space-y-2">
                                             {providers.map((provider) => (
-                                                <div key={provider.id} className="flex items-center justify-between bg-slate-50/50 border border-slate-200/80 rounded-xl p-3">
+                                                <div key={provider.id} className="flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3">
                                                     <div>
-                                                        <div className="text-xs font-bold text-slate-800">{provider.name}</div>
-                                                        <div className="text-[11px] font-mono text-slate-500 mt-0.5">{provider.id} · {provider.type} · {provider.enabled ? 'Live' : 'Bypassed'}</div>
+                                                        <div className="text-xs font-bold text-slate-800 dark:text-slate-100">{provider.name}</div>
+                                                        <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">{provider.id} · {provider.type} · {provider.enabled ? 'Live' : 'Bypassed'}</div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <button onClick={() => testProvider(provider.id).then((res) => alert(JSON.stringify(res, null, 2))).catch((e) => alert((e as Error).message))} type="button" className="px-3 py-1 text-xs font-semibold bg-white border border-slate-200 hover:border-slate-300 rounded-lg shadow-2xs transition-all">Verify Packet</button>
-                                                        <button onClick={() => deleteProvider(provider.id)} type="button" className="px-3 py-1 text-xs font-semibold bg-red-50 text-red-600 border border-red-100 hover:border-red-200 rounded-lg transition-all">Deregister</button>
+                                                        <button onClick={() => testProvider(provider.id).then((res) => alert(JSON.stringify(res, null, 2))).catch((e) => alert((e as Error).message))} type="button" className="px-3 py-1 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 rounded-lg shadow-2xs transition-all">Verify Packet</button>
+                                                        <button onClick={() => deleteProvider(provider.id)} type="button" className="px-3 py-1 text-xs font-semibold bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900/50 hover:border-red-200 dark:hover:border-red-800 rounded-lg transition-all">Deregister</button>
                                                     </div>
                                                 </div>
                                             ))}
@@ -672,14 +672,14 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                 <>
                                     <div className="p-6 pb-0 shrink-0">
                                         <div className="flex items-center justify-between mb-1.5">
-                                            <h1 className="text-base font-black text-slate-900 tracking-tight uppercase">
+                                            <h1 className="text-base font-black text-slate-900 dark:text-white tracking-tight uppercase">
                                                 {editingItem ? `Alter Target: ${activeTab === 'tools' ? 'Tool' : 'Agent'}` : `Initialize New ${activeTab === 'tools' ? 'Tool Blueprint' : 'Agent Unit'}`}
                                             </h1>
-                                            <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 uppercase tracking-wider">
+                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 uppercase tracking-wider">
                                                 {editingItem ? 'Update Override' : 'Fresh Stack Allocation'}
                                             </span>
                                         </div>
-                                        <p className="text-slate-500 text-xs font-medium max-w-xl">
+                                        <p className="text-slate-500 dark:text-slate-400 text-xs font-medium max-w-xl">
                                             Supply properties below. Instantiated profiles link directly to studio node topology triggers on workflow drop actions.
                                         </p>
                                     </div>
@@ -835,7 +835,7 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                                                 options={HUMAN_INPUT_MODES.map(m => ({ value: m.id, label: m.name }))}
                                                             />
 
-                                                            <div className="flex items-center gap-2 px-3.5 py-2 border border-slate-200 rounded-lg bg-slate-50/50 h-9 mb-1.5">
+                                                            <div className="flex items-center gap-2 px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/40 h-9 mb-1.5">
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={agentConfig.is_selector}
@@ -843,7 +843,7 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                                                     className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 accent-blue-600"
                                                                     id="is_selector_chk"
                                                                 />
-                                                                <label htmlFor="is_selector_chk" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                                                                <label htmlFor="is_selector_chk" className="text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                                                                     Mark As Stateful Router Specialist
                                                                 </label>
                                                             </div>
@@ -902,8 +902,8 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
 
                                                             <div className="space-y-2">
                                                                 <div className="flex justify-between items-center">
-                                                                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">Creativity Temperature Factor</label>
-                                                                    <span className="text-[11px] font-mono font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">
+                                                                    <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">Creativity Temperature Factor</label>
+                                                                    <span className="text-[11px] font-mono font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-900/50">
                                                                         {agentConfig.temperature}
                                                                     </span>
                                                                 </div>
@@ -914,9 +914,9 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                                                     step="0.05"
                                                                     value={agentConfig.temperature}
                                                                     onChange={(e) => setAgentConfig({ ...agentConfig, temperature: parseFloat(e.target.value) })}
-                                                                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                                                    className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
                                                                 />
-                                                                <div className="flex justify-between text-[10px] font-semibold text-slate-400">
+                                                                <div className="flex justify-between text-[10px] font-semibold text-slate-400 dark:text-slate-500">
                                                                     <span>Absolute Determinism (0.0)</span>
                                                                     <span>Highly Expressive (2.0)</span>
                                                                 </div>
@@ -935,9 +935,9 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                                 )}
 
                                                 <Section title="Tool Attachments Portfolio" icon={Wrench}>
-                                                    <div className="border border-slate-200/80 rounded-xl bg-slate-50/40 p-4 max-h-56 overflow-y-auto">
+                                                    <div className="border border-slate-200/80 dark:border-slate-800/80 rounded-xl bg-slate-50/40 dark:bg-slate-900/40 p-4 max-h-56 overflow-y-auto">
                                                         {savedTools.length === 0 ? (
-                                                            <div className="text-xs text-slate-400 text-center py-5 font-medium">
+                                                            <div className="text-xs text-slate-400 dark:text-slate-500 text-center py-5 font-medium">
                                                                 No accessible tools compiled. Build function blocks to bind references.
                                                             </div>
                                                         ) : (
@@ -949,10 +949,10 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                                                             key={tool.id}
                                                                             className={`flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all border text-xs select-none
                                                                                 ${isChecked
-                                                                                    ? 'bg-white border-blue-600 shadow-2xs font-bold text-blue-600'
-                                                                                    : 'bg-white/60 border-slate-200 hover:border-slate-300 text-slate-600 font-medium'}`}
+                                                                                    ? 'bg-white dark:bg-slate-900 border-blue-600 shadow-2xs font-bold text-blue-600'
+                                                                                    : 'bg-white/60 dark:bg-slate-900/60 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-600 dark:text-slate-400 font-medium'}`}
                                                                         >
-                                                                            <div className={`flex items-center justify-center w-4 h-4 rounded border shrink-0 transition-colors ${isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300'}`}>
+                                                                            <div className={`flex items-center justify-center w-4 h-4 rounded border shrink-0 transition-colors ${isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700'}`}>
                                                                                 {isChecked && <Check size={10} strokeWidth={3} />}
                                                                             </div>
                                                                             <span className="truncate flex-grow">
@@ -970,11 +970,11 @@ export const LibraryModal = ({ isOpen, onClose, initialTab = 'tools' }: LibraryM
                                     </div>
 
                                     {/* Footer save hooks */}
-                                    <div className="p-4 border-t border-slate-100 bg-slate-50/30 flex items-center justify-between shrink-0">
+                                    <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/40 flex items-center justify-between shrink-0">
                                         <button
                                             onClick={resetForm}
                                             type="button"
-                                            className="px-5 py-2 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
+                                            className="px-5 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition-all shadow-2xs"
                                         >
                                             Discard Changes
                                         </button>

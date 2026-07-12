@@ -6,39 +6,42 @@ import { Bot, CheckCircle2, GitBranch, Hand, Play, Wrench } from 'lucide-react';
 import type { WorkflowNodeData } from '../../types/workflow';
 import { StatusBadge } from '../studio/StatusBadge';
 import { getAgentSummary } from '../../utils/studioDerivedState';
+import { NODE_TONE } from '../../utils/nodeTheme';
+
+const tone = NODE_TONE.agent;
 
 export const AgentNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeData>>) => {
     const summary = getAgentSummary(data.config);
 
     const liveClass =
         data.status === 'running'
-            ? 'border-blue-500 shadow-[0_0_0_4px_rgba(37,99,235,0.18)] animate-pulse'
+            ? 'border-blue-500 dark:border-sky-400 shadow-[0_0_0_4px_rgba(37,99,235,0.18)] dark:shadow-[0_0_0_4px_rgba(56,189,248,0.28)] animate-pulse'
             : data.status === 'configured'
-                ? 'border-green-400 shadow-[0_0_0_3px_rgba(34,197,94,0.15)]'
+                ? 'border-green-400 dark:border-emerald-500 shadow-[0_0_0_3px_rgba(34,197,94,0.15)] dark:shadow-[0_0_0_3px_rgba(52,211,153,0.25)]'
                 : data.status === 'error'
-                    ? 'border-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.18)]'
+                    ? 'border-red-500 dark:border-red-400 shadow-[0_0_0_3px_rgba(239,68,68,0.18)] dark:shadow-[0_0_0_3px_rgba(248,113,113,0.28)]'
                     : '';
 
     return (
         <div
-            className={`group relative min-w-[255px] max-w-[300px] ag-surface-raised rounded-lg border transition-all duration-200 shadow-sm
+            className={`group relative min-w-[230px] max-w-[270px] ag-surface-raised rounded-xl border transition-all duration-200 shadow-sm
             ${liveClass || (selected
-                    ? 'border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.3)]'
-                    : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                    ? `border-blue-500 dark:border-sky-400 ${tone.ring}`
+                    : `${tone.border} ${tone.borderHover} hover:shadow-md`
                 )}`}
         >
             {/* Input Handle (Left) - like n8n */}
             <Handle
                 type="target"
                 position={Position.Left}
-                className="!w-3 !h-3 !-left-1.5 !bg-gray-400 !border-2 !border-[var(--color-surface-raised)] group-hover:!bg-blue-500 transition-colors"
+                className={`!w-3 !h-3 !-left-1.5 !bg-gray-400 dark:!bg-slate-600 !border-2 !border-[var(--color-surface-raised)] ${tone.handleHover} transition-colors`}
             />
 
             <div className="flex flex-col gap-2.5 p-3">
                 {/* Header: Icon + Type */}
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-2">
-                        <div className={`p-1.5 rounded-md ${selected ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'} transition-colors`}>
+                        <div className={`p-1.5 rounded-md border ${tone.iconBg} ${tone.iconText} ${tone.iconBorder} transition-colors`}>
                             <Bot size={14} strokeWidth={2.5} />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -80,7 +83,7 @@ export const AgentNode = memo(({ data, selected }: NodeProps<Node<WorkflowNodeDa
             <Handle
                 type="source"
                 position={Position.Right}
-                className="!w-3 !h-3 !-right-1.5 !bg-gray-400 !border-2 !border-[var(--color-surface-raised)] group-hover:!bg-blue-500 transition-colors"
+                className={`!w-3 !h-3 !-right-1.5 !bg-gray-400 dark:!bg-slate-600 !border-2 !border-[var(--color-surface-raised)] ${tone.handleHover} transition-colors`}
             />
         </div>
     );

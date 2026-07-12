@@ -38,6 +38,9 @@ interface WorkflowState {
     liveRunActive: boolean;
     liveResponse: string;
     executionTimeline: ExecutionTimelineItem[];
+    // True while a node (or selection) is being dragged on the canvas — used to keep
+    // the inspector out of the way until the drag finishes.
+    isNodeDragging: boolean;
 
     onNodesChange: OnNodesChange<VisualNode>;
     onEdgesChange: OnEdgesChange;
@@ -56,6 +59,7 @@ interface WorkflowState {
     setExecutingTrigger: (id: string | null, result?: 'success' | 'error' | null) => void;
     resetExecution: () => void;
     applyExecutionEvent: (event: Record<string, any>) => void;
+    setNodeDragging: (dragging: boolean) => void;
 }
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
@@ -68,6 +72,11 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     liveRunActive: false,
     liveResponse: '',
     executionTimeline: [],
+    isNodeDragging: false,
+
+    setNodeDragging: (dragging: boolean) => {
+        set({ isNodeDragging: dragging });
+    },
 
     onNodesChange: (changes: NodeChange<VisualNode>[]) => {
         set({

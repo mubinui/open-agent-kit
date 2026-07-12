@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { ChevronRight, GripVertical } from 'lucide-react';
+import { useState } from 'react';
 import type { DragEvent } from 'react';
 import type { NodeType } from '../../types/workflow';
 import { StatusBadge } from './StatusBadge';
@@ -51,25 +52,38 @@ export const ResourceCard = ({
     onClick?: () => void;
     compact?: boolean;
 }) => {
+    const [isDragging, setIsDragging] = useState(false);
+
     const dragStart = (event: DragEvent) => {
         event.dataTransfer.setData('application/reactflow', type);
         event.dataTransfer.setData('application/reactflow-label', label);
         if (config) event.dataTransfer.setData('application/reactflow-config', JSON.stringify(config));
         event.dataTransfer.effectAllowed = 'move';
+        // Defer so the browser captures the drag image before we dim the source card.
+        requestAnimationFrame(() => setIsDragging(true));
     };
+
+    const dragEnd = () => setIsDragging(false);
 
     const toneStyles = toneClass[tone];
 
     if (collapsed) {
+        // Rail tile: a compact, tone-colored "2D logo" with its name underneath.
         return (
             <button
                 draggable
                 onDragStart={dragStart}
+                onDragEnd={dragEnd}
                 onClick={onClick}
-                className={`group flex h-10 w-10 items-center justify-center rounded-lg border border-transparent ag-surface hover:shadow-md ${toneStyles.border}`}
+                className={`flex w-16 shrink-0 cursor-grab active:cursor-grabbing flex-col items-center gap-1 rounded-lg py-1.5 transition-all duration-150 hover:bg-gray-50 dark:hover:bg-slate-900 ${isDragging ? 'opacity-40 scale-95' : ''}`}
                 title={label}
             >
-                <Icon size={17} />
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-150 hover:shadow-md ${toneStyles.icon}`}>
+                    <Icon size={15} strokeWidth={2.2} />
+                </span>
+                <span className="w-full px-0.5 text-center text-[9px] font-medium leading-[1.15] text-gray-500 dark:text-slate-400 line-clamp-2">
+                    {label}
+                </span>
             </button>
         );
     }
@@ -78,8 +92,9 @@ export const ResourceCard = ({
         <div
             draggable
             onDragStart={dragStart}
+            onDragEnd={dragEnd}
             onClick={onClick}
-            className={`group relative mb-1 cursor-grab rounded-lg border border-[var(--color-ui-border)] ag-surface-raised ${compact ? 'p-1.5' : 'p-2'} transition-all duration-200 hover:shadow-md ${toneStyles.border}`}
+            className={`group relative mb-1.5 cursor-grab active:cursor-grabbing rounded-xl border border-[var(--color-ui-border)] ag-surface-raised ${compact ? 'p-2' : 'p-2.5'} transition-all duration-150 hover:shadow-md hover:-translate-y-px ${toneStyles.border} ${isDragging ? 'opacity-40 scale-[0.98] shadow-none' : ''}`}
             style={{ marginLeft: `${level * 12}px` }}
             title={description}
         >

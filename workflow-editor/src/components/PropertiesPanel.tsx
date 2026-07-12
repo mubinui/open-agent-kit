@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Trash2, Save, ChevronDown, ChevronRight, Check, Activity, FlaskConical, Gauge, Settings2, Sparkles, Wrench, Layers } from 'lucide-react';
+import { useStoreWithEqualityFn } from 'zustand/traditional';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useLibraryStore } from '../stores/libraryStore';
 import { InspectorTabs } from './studio/InspectorTabs';
@@ -32,9 +34,24 @@ const HUMAN_INPUT_MODES = [
 ];
 
 export const PropertiesPanel = () => {
-    const { nodes, updateNodeData, onNodesChange } = useWorkflowStore();
+    // Custom equality (not just useShallow) because a node being *dragged* gets a new
+    // object reference every frame via applyNodeChanges (position updates), even while
+    // its `data`/`type`/`id` stay referentially the same. Comparing on those three only
+    // means this panel — and its many form fields — no longer re-renders on every
+    // mousemove while the currently-selected node is being moved around the canvas.
+    const selectedNode = useStoreWithEqualityFn(
+        useWorkflowStore,
+        (state) => state.nodes.find((n) => n.selected),
+        (a, b) => a?.id === b?.id && a?.type === b?.type && a?.data === b?.data,
+    );
+    const { updateNodeData, onNodesChange } = useWorkflowStore(
+        useShallow((state) => ({
+            updateNodeData: state.updateNodeData,
+            onNodesChange: state.onNodesChange,
+        })),
+    );
+    const isNodeDragging = useWorkflowStore((state) => state.isNodeDragging);
     const { savedTools, executeTool } = useLibraryStore();
-    const selectedNode = nodes.find((n) => n.selected);
 
     // Core State
     const [label, setLabel] = useState('');
@@ -63,7 +80,9 @@ export const PropertiesPanel = () => {
         }
     }, [selectedNode?.id]);
 
-    if (!selectedNode) return null;
+    // Stay out of the way while a node is mid-drag: the inspector only appears once the
+    // drag is released, so moving a component never opens or resizes UI around it.
+    if (!selectedNode || isNodeDragging) return null;
 
     const handleSave = () => {
         if (selectedNode) {
@@ -625,9 +644,9 @@ export const PropertiesPanel = () => {
     );
 
     return (
-        <div className="absolute top-4 right-4 w-[440px] bg-white/90 dark:bg-[#0b111b]/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800/80 z-50 animate-in slide-in-from-right-4 duration-200 flex flex-col max-h-[86vh] ring-1 ring-slate-900/5 antialiased">
-            {/* Elite Floating Header Wrapper */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50/60 to-white dark:from-[#0f1723]/80 dark:to-[#0b111b] rounded-t-2xl shrink-0">
+        <div className="w-[400px] shrink-0 h-full bg-white dark:bg-[#0b111b] border-l border-[var(--color-ui-border)] shadow-xl flex flex-col antialiased animate-in slide-in-from-right duration-200">
+            {/* Docked Inspector Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50/60 to-white dark:from-[#0f1723]/80 dark:to-[#0b111b] shrink-0">
                 <div className="flex items-center gap-2.5">
                     <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-2xs">
                         <Settings2 size={15} />
@@ -727,7 +746,7 @@ export const PropertiesPanel = () => {
             </div>
 
             {/* Bottom Actions Controls */}
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/30 rounded-b-2xl flex gap-3 shrink-0">
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/30 flex gap-3 shrink-0">
                 <button
                     onClick={handleDelete}
                     type="button"

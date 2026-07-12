@@ -7,6 +7,7 @@ import {
     MiniMap,
     useReactFlow,
     ConnectionMode,
+    ConnectionLineType,
     BackgroundVariant,
     MarkerType,
 } from '@xyflow/react';
@@ -15,6 +16,7 @@ import '@xyflow/react/dist/style.css';
 
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useLibraryStore } from '../stores/libraryStore';
+import { getLayoutedElements, positionsAreDegenerate } from '../utils/layout';
 import type { NodeType } from '../types/workflow';
 
 import { AgentNode } from './nodes/AgentNode';
@@ -36,9 +38,9 @@ const nodeTypes = {
 
 const WorkflowCanvasContent = () => {
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
-    const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, addNodes, addEdges, setCurrentWorkflow } = useWorkflowStore();
+    const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, addNodes, addEdges, setCurrentWorkflow, setNodeDragging } = useWorkflowStore();
     const { savedAgents, savedTools } = useLibraryStore();
-    const { screenToFlowPosition } = useReactFlow();
+    const { screenToFlowPosition, fitView } = useReactFlow();
     const { isDark } = useTheme();
 
     // --- SMART MERGE: Preserves non-empty values from base when override has empty/null/undefined ---
@@ -313,14 +315,35 @@ const WorkflowCanvasContent = () => {
                     target: idMap.get(e.target) || e.target,
                 }));
 
-                console.log("Mapped Workflow:", { newNodes, newEdges });
+                // Workflows stored as bare topology often carry no positions, which
+                // used to drop every node onto one stacked point until the user hit
+                // Format. Auto-layout those, re-centered on the drop point.
+                let placedNodes = newNodes;
+                if (positionsAreDegenerate(workflowNodes.map((n: any) => n.position))) {
+                    const { nodes: layouted } = getLayoutedElements(newNodes, newEdges);
+                    const lxs = layouted.map((n) => n.position.x);
+                    const lys = layouted.map((n) => n.position.y);
+                    const layoutCenterX = (Math.min(...lxs) + Math.max(...lxs)) / 2;
+                    const layoutCenterY = (Math.min(...lys) + Math.max(...lys)) / 2;
+                    placedNodes = layouted.map((n) => ({
+                        ...n,
+                        position: {
+                            x: n.position.x - layoutCenterX + mousePos.x,
+                            y: n.position.y - layoutCenterY + mousePos.y,
+                        },
+                    }));
+                }
 
                 // Bulk add nodes and edges
-                addNodes(newNodes);
+                addNodes(placedNodes);
 
                 if (newEdges.length > 0) {
                     setTimeout(() => addEdges(newEdges), 50);
                 }
+
+                // Frame the dropped workflow at a sane zoom instead of leaving
+                // oversized nodes filling the viewport.
+                setTimeout(() => fitView({ padding: 0.25, duration: 300 }), 120);
 
                 // Set current workflow ID for testing (n8n-style)
                 // Try to extract workflow ID from dropped config
@@ -376,7 +399,7 @@ const WorkflowCanvasContent = () => {
 
             addNode(newNode as any);
         },
-        [screenToFlowPosition, addNode, savedAgents, savedTools]
+        [screenToFlowPosition, fitView, addNode, savedAgents, savedTools]
     );
 
     return (
@@ -389,18 +412,30 @@ const WorkflowCanvasContent = () => {
                 onConnect={onConnect}
                 onDragOver={onDragOver}
                 onDrop={onDrop}
+                onNodeDragStart={() => setNodeDragging(true)}
+                onNodeDragStop={() => setNodeDragging(false)}
+                onSelectionDragStart={() => setNodeDragging(true)}
+                onSelectionDragStop={() => setNodeDragging(false)}
                 nodeTypes={nodeTypes as any}
                 fitView
                 fitViewOptions={{ padding: 0.2 }}
+                // animated:false — permanently marching dashes on every edge repaint the
+                // canvas nonstop; edges animate only during live execution (set by the store).
                 defaultEdgeOptions={{
                     type: 'smoothstep',
-                    animated: true,
+                    animated: false,
                     style: { strokeWidth: 2, stroke: isDark ? '#64748b' : '#b1b1b7' },
                     markerEnd: { type: MarkerType.ArrowClosed, color: isDark ? '#64748b' : '#b1b1b7' },
                 }}
-                connectionMode={ConnectionMode.Loose}
-                snapToGrid={true}
-                snapGrid={[15, 15]}
+                // Strict: the drag preview only snaps to valid target handles, so the
+                // edge always lands exactly where the preview showed it.
+                connectionMode={ConnectionMode.Strict}
+                connectionLineType={ConnectionLineType.SmoothStep}
+                // Generous magnet radius so a dropped connection snaps to a nearby handle
+                // instead of demanding a pixel-perfect hit on a 10px dot.
+                connectionRadius={36}
+                // Dragging is free-form (no 15px snap jumps); use the Format button for tidy layout.
+                selectNodesOnDrag={false}
                 proOptions={{ hideAttribution: true }}
             >
                 <Background
@@ -409,12 +444,18 @@ const WorkflowCanvasContent = () => {
                     size={2}
                     variant={BackgroundVariant.Dots}
                 />
-                <Controls showInteractive={false} className="!bg-[var(--color-ui-bg)] !border-[var(--color-ui-border)] !shadow-lg" />
-                <MiniMap
-                    nodeColor={() => isDark ? '#334155' : '#e2e8f0'}
-                    maskColor={isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(240, 242, 245, 0.7)'}
-                    className="!bg-[var(--color-ui-bg)] !border-[var(--color-ui-border)] !shadow-lg"
-                />
+                <Controls showInteractive={false} position="bottom-left" className="!bg-[var(--color-ui-bg)] !border-[var(--color-ui-border)] !shadow-lg" />
+                {/* Top-right keeps it clear of the chat button (bottom-right) and the
+                    controls/timeline (bottom-left); hidden entirely on an empty canvas
+                    where it would just render as a blank rectangle. */}
+                {nodes.length > 0 && (
+                    <MiniMap
+                        position="top-right"
+                        nodeColor={() => isDark ? '#334155' : '#e2e8f0'}
+                        maskColor={isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(240, 242, 245, 0.7)'}
+                        className="!bg-[var(--color-ui-bg)] !border-[var(--color-ui-border)] !shadow-lg"
+                    />
+                )}
             </ReactFlow>
         </div>
     );

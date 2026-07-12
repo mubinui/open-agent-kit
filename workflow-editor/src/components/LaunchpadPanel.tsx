@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bot, Cable, ChevronLeft, ChevronRight, Code2, ExternalLink, PlayCircle, Rocket, Send, Trash2, Wand2, Wrench } from 'lucide-react';
+import { Bot, Cable, Code2, ExternalLink, PlayCircle, Rocket, Send, Trash2, Wand2, Wrench, X } from 'lucide-react';
 import { applyBuilderPlan, generateBuilderConfig, generateFrontend, listBuilderModels, normalizeApi, planChatbot, streamBuilderChat } from '../api/builderApi';
 import type { BuilderType, ChatMessage, ModelInfo } from '../api/builderApi';
+import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../stores/libraryStore';
 import { useWorkflowStore } from '../stores/workflowStore';
 
@@ -26,8 +27,7 @@ const GeneratingBubble = () => (
     </div>
 );
 
-export const LaunchpadPanel = () => {
-    const [collapsed, setCollapsed] = useState(false);
+export const LaunchpadPanel = ({ onClose }: { onClose?: () => void }) => {
     const [tab, setTab] = useState<Tab>('build');
     const [buildKind, setBuildKind] = useState<BuildKind>('chatbot');
     const [buildMessages, setBuildMessages] = useState<ChatMessage[]>([]);
@@ -45,7 +45,13 @@ export const LaunchpadPanel = () => {
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState('');
 
-    const { currentWorkflowId, workflowName } = useWorkflowStore();
+    // Selector-scoped so this panel doesn't re-render on every node/edge change on the canvas.
+    const { currentWorkflowId, workflowName } = useWorkflowStore(
+        useShallow((state) => ({
+            currentWorkflowId: state.currentWorkflowId,
+            workflowName: state.workflowName,
+        })),
+    );
     const {
         triggers,
         deployments,
@@ -388,42 +394,20 @@ export const LaunchpadPanel = () => {
         { id: 'deploy' as const, label: 'Deploy', icon: Rocket },
     ];
 
-    if (collapsed) {
-        return (
-            <aside className="w-14 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b111b] flex flex-col items-center py-3 gap-2 shrink-0">
-                <button onClick={() => setCollapsed(false)} className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400" title="Open AI Launchpad">
-                    <ChevronRight size={18} />
-                </button>
-                {tabs.map(({ id, label, icon: Icon }) => (
-                    <button
-                        key={id}
-                        onClick={() => {
-                            setTab(id);
-                            setCollapsed(false);
-                        }}
-                        className={`p-2 rounded-md ${tab === id ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                        title={label}
-                    >
-                        <Icon size={17} />
-                    </button>
-                ))}
-            </aside>
-        );
-    }
-
     return (
-        <aside className="w-[340px] border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b111b] flex flex-col shrink-0">
-            <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+        // Floating window over the canvas — toggled from the Builder button in the header.
+        <aside className="absolute top-4 right-4 bottom-24 z-40 w-[380px] rounded-2xl border border-[var(--color-ui-border)] bg-white dark:bg-[#0b111b] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right-4 fade-in duration-200">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 shrink-0">
                 <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                         <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold">
-                            <Bot size={18} className="text-blue-600" />
-                            AI Launchpad
+                            <Bot size={18} className="text-[var(--color-primary)]" />
+                            AI Builder
                         </div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{workflowId ? `Target: ${workflowId}` : 'No saved workflow selected'}</div>
                     </div>
-                    <button onClick={() => setCollapsed(true)} className="p-2 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400" title="Collapse">
-                        <ChevronLeft size={17} />
+                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors" title="Close Builder">
+                        <X size={16} />
                     </button>
                 </div>
             </div>
@@ -434,7 +418,7 @@ export const LaunchpadPanel = () => {
                         key={id}
                         onClick={() => setTab(id)}
                         className={`h-12 rounded-md text-[11px] font-semibold flex flex-col items-center justify-center gap-1 ${
-                            tab === id ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            tab === id ? 'bg-[var(--color-primary)] text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                         }`}
                     >
                         <Icon size={16} />
@@ -446,22 +430,26 @@ export const LaunchpadPanel = () => {
             <div className="p-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
                 <select
                     value={providerId}
+                    disabled={models.length === 0}
                     onChange={(event) => {
                         setProviderId(event.target.value);
                         const first = models.find((model) => model.provider_id === event.target.value);
                         if (first) setModelId(first.model_id);
                     }}
-                    className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200"
+                    className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 disabled:opacity-60"
                 >
+                    {models.length === 0 && <option value="">No providers — backend offline</option>}
                     {[...new Set(models.map((model) => model.provider_id))].map((provider) => (
                         <option key={provider} value={provider}>{provider}</option>
                     ))}
                 </select>
                 <select
                     value={modelId}
+                    disabled={providerModels.length === 0}
                     onChange={(event) => setModelId(event.target.value)}
-                    className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200"
+                    className="w-full border border-slate-300 dark:border-slate-700 rounded-md px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 disabled:opacity-60"
                 >
+                    {providerModels.length === 0 && <option value="">No models available</option>}
                     {providerModels.map((model) => (
                         <option key={`${model.provider_id}:${model.model_id}`} value={model.model_id}>{model.model_id}</option>
                     ))}
@@ -495,7 +483,7 @@ export const LaunchpadPanel = () => {
                                     key={`${chatMessage.role}-${index}`}
                                     className={`text-sm rounded-md p-3 whitespace-pre-wrap ${
                                         chatMessage.role === 'user'
-                                            ? 'bg-blue-600 text-white ml-5'
+                                            ? 'bg-[var(--color-primary)] text-white ml-5'
                                             : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 mr-5'
                                     }`}
                                 >
@@ -510,7 +498,7 @@ export const LaunchpadPanel = () => {
                             placeholder="Describe what you want to build..."
                         />
                         <div className="grid grid-cols-3 gap-2">
-                            <button onClick={runChatBuilder} disabled={busy} className="col-span-2 bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+                            <button onClick={runChatBuilder} disabled={busy} className="col-span-2 bg-[var(--color-primary)] text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
                                 <Send size={15} /> Send
                             </button>
                             <button onClick={finalizeChatBuilder} disabled={busy || buildMessages.length === 0} className="bg-slate-900 dark:bg-slate-700 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
@@ -531,7 +519,7 @@ export const LaunchpadPanel = () => {
                     <>
                         <textarea value={specification} onChange={(event) => setSpecification(event.target.value)} className="w-full min-h-20 border border-slate-300 dark:border-slate-700 rounded-md p-3 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200" />
                         <textarea value={rawApi} onChange={(event) => setRawApi(event.target.value)} className="w-full min-h-44 border border-slate-300 dark:border-slate-700 rounded-md p-3 text-sm font-mono bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200" />
-                        <button onClick={runNormalizeApi} disabled={busy} className="w-full bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
+                        <button onClick={runNormalizeApi} disabled={busy} className="w-full bg-[var(--color-primary)] text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
                             Normalize API
                         </button>
                         {normalizedTool && <pre className="text-xs bg-slate-950 text-slate-100 p-3 rounded-md overflow-auto max-h-96">{compactJson(normalizedTool)}</pre>}
@@ -541,7 +529,7 @@ export const LaunchpadPanel = () => {
                 {tab === 'triggers' && (
                     <>
                         <div className="grid grid-cols-2 gap-2">
-                            <button onClick={createChatTrigger} disabled={busy} className="bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">Chat Trigger</button>
+                            <button onClick={createChatTrigger} disabled={busy} className="bg-[var(--color-primary)] text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">Chat Trigger</button>
                             <button onClick={createWebhookTrigger} disabled={busy} className="bg-slate-900 dark:bg-slate-700 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">Webhook</button>
                         </div>
                         {triggers.map((trigger) => (
@@ -575,7 +563,7 @@ export const LaunchpadPanel = () => {
                                     key={`${chatMessage.role}-${index}`}
                                     className={`text-sm rounded-md p-3 whitespace-pre-wrap ${
                                         chatMessage.role === 'user'
-                                            ? 'bg-blue-600 text-white ml-6'
+                                            ? 'bg-[var(--color-primary)] text-white ml-6'
                                             : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 mr-6'
                                     }`}
                                 >
@@ -590,7 +578,7 @@ export const LaunchpadPanel = () => {
                             placeholder="Ask Gemini to build or revise the chatbot frontend..."
                         />
                         <div className="grid grid-cols-2 gap-2">
-                            <button onClick={runFrontendGenerate} disabled={busy} className="bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
+                            <button onClick={runFrontendGenerate} disabled={busy} className="bg-[var(--color-primary)] text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
                                 Generate UI
                             </button>
                             <button onClick={runGeneratedFlashDeploy} disabled={busy || !frontendHtml} className="bg-slate-900 dark:bg-slate-700 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50">
@@ -609,7 +597,7 @@ export const LaunchpadPanel = () => {
                                             href={`data:text/html;charset=utf-8,${encodeURIComponent(frontendHtml)}`}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600"
+                                            className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)]"
                                         >
                                             Open Preview <ExternalLink size={12} />
                                         </a>
@@ -638,7 +626,7 @@ export const LaunchpadPanel = () => {
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                             Deployments are served by this app at <span className="font-mono">/d/&lt;name&gt;/</span> — same origin, no extra ports.
                         </p>
-                        <button onClick={runFlashDeploy} disabled={busy} className="w-full bg-blue-600 text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+                        <button onClick={runFlashDeploy} disabled={busy} className="w-full bg-[var(--color-primary)] text-white rounded-md py-2 text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
                             <PlayCircle size={16} /> Flash Deploy
                         </button>
                         {deployments.map((deployment) => (
@@ -647,7 +635,7 @@ export const LaunchpadPanel = () => {
                                     <div>
                                         <div className="text-sm font-semibold text-slate-900 dark:text-white">{deployment.title}</div>
                                         <div className="text-xs text-slate-500 dark:text-slate-400">{deployment.status} · {deployment.workflow_id}</div>
-                                        <a href={deployment.url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 inline-flex items-center gap-1 mt-1">
+                                        <a href={deployment.url} target="_blank" rel="noreferrer" className="text-xs text-[var(--color-primary)] inline-flex items-center gap-1 mt-1">
                                             {deployment.url}<ExternalLink size={11} />
                                         </a>
                                     </div>

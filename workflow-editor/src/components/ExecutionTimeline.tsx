@@ -1,4 +1,6 @@
-import { Activity, AlertTriangle, CheckCircle2, Circle, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+import { Activity, AlertTriangle, CheckCircle2, Circle, RotateCcw, X } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { API_BASE_URL } from '../api/client';
 import { useWorkflowStore } from '../stores/workflowStore';
 
@@ -28,6 +30,7 @@ const readSse = async (
 };
 
 export const ExecutionTimeline = () => {
+    const [isOpen, setIsOpen] = useState(false);
     const {
         currentWorkflowId,
         executionTimeline,
@@ -35,7 +38,16 @@ export const ExecutionTimeline = () => {
         liveResponse,
         resetExecution,
         applyExecutionEvent,
-    } = useWorkflowStore();
+    } = useWorkflowStore(
+        useShallow((state) => ({
+            currentWorkflowId: state.currentWorkflowId,
+            executionTimeline: state.executionTimeline,
+            liveRunActive: state.liveRunActive,
+            liveResponse: state.liveResponse,
+            resetExecution: state.resetExecution,
+            applyExecutionEvent: state.applyExecutionEvent,
+        })),
+    );
 
     const runLive = async () => {
         if (!currentWorkflowId) {
@@ -63,34 +75,59 @@ export const ExecutionTimeline = () => {
     };
 
     const iconFor = (status: string) => {
-        if (status === 'running') return <Activity size={14} className="text-blue-600 animate-pulse" />;
-        if (status === 'success') return <CheckCircle2 size={14} className="text-green-600" />;
-        if (status === 'error') return <AlertTriangle size={14} className="text-red-600" />;
-        return <Circle size={14} className="text-slate-400" />;
+        if (status === 'running') return <Activity size={14} className="text-blue-500 animate-pulse" />;
+        if (status === 'success') return <CheckCircle2 size={14} className="text-emerald-500" />;
+        if (status === 'error') return <AlertTriangle size={14} className="text-red-500" />;
+        return <Circle size={14} className="ag-faint" />;
     };
 
+    if (!isOpen) {
+        return (
+            <button
+                onClick={() => setIsOpen(true)}
+                className="group absolute left-16 bottom-5 z-40 flex items-center gap-2 h-11 px-4 ag-surface-raised border rounded-full shadow-lg hover:shadow-xl transition-all"
+                title="Execution timeline"
+            >
+                <Activity size={16} className={liveRunActive ? 'text-blue-500 animate-pulse' : 'ag-muted'} />
+                <span className="text-xs font-semibold ag-text-secondary">Timeline</span>
+                {executionTimeline.length > 0 && (
+                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-[9px] font-bold text-white">
+                        {executionTimeline.length}
+                    </span>
+                )}
+            </button>
+        );
+    }
+
     return (
-        <div className="absolute left-4 bottom-4 z-40 w-[360px] max-h-[46vh] ag-surface-raised border rounded-lg shadow-2xl overflow-hidden">
-            <div className="px-4 py-3 ag-surface-subtle border-b flex items-center justify-between">
-                <div>
+        <div className="absolute left-16 bottom-5 z-40 w-[360px] max-h-[46vh] ag-surface-raised border rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-150">
+            <div className="px-4 py-3 ag-surface-subtle border-b border-[var(--color-ui-border)] flex items-center justify-between shrink-0">
+                <div className="min-w-0">
                     <div className="text-sm font-bold ag-text">Live Execution</div>
-                    <div className="text-xs ag-muted">{liveRunActive ? 'Running workflow...' : 'Agent and tool sequence'}</div>
+                    <div className="text-xs ag-muted truncate">{liveRunActive ? 'Running workflow…' : 'Agent and tool sequence'}</div>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={resetExecution} className="p-2 text-slate-500 hover:bg-slate-200 rounded-md" title="Reset">
+                <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={resetExecution} className="p-2 ag-muted hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors" title="Reset">
                         <RotateCcw size={14} />
                     </button>
-                    <button onClick={runLive} disabled={liveRunActive} className="px-3 py-2 bg-blue-600 text-white rounded-md text-xs font-semibold disabled:opacity-50">
+                    <button
+                        onClick={runLive}
+                        disabled={liveRunActive}
+                        className="px-3 py-1.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors"
+                    >
                         Run Live
+                    </button>
+                    <button onClick={() => setIsOpen(false)} className="p-2 ag-muted hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors" title="Close">
+                        <X size={14} />
                     </button>
                 </div>
             </div>
-            <div className="max-h-72 overflow-y-auto p-3 space-y-2">
+            <div className="overflow-y-auto p-3 space-y-2 min-h-0">
                 {executionTimeline.length === 0 ? (
-                    <div className="text-xs ag-muted p-3 ag-surface-subtle rounded-md">Run a workflow to see every agent transfer and tool call in order.</div>
+                    <div className="text-xs ag-muted p-3 ag-surface-subtle rounded-lg">Run a workflow to see every agent transfer and tool call in order.</div>
                 ) : (
                     executionTimeline.map((item) => (
-                        <div key={item.id} className="flex gap-2 p-2 rounded-md border ag-surface">
+                        <div key={item.id} className="flex gap-2 p-2 rounded-lg border ag-surface">
                             <div className="pt-0.5">{iconFor(item.status)}</div>
                             <div className="min-w-0 flex-1">
                                 <div className="text-xs font-semibold ag-text truncate">{item.label}</div>
@@ -104,7 +141,7 @@ export const ExecutionTimeline = () => {
                 )}
             </div>
             {liveResponse && (
-                <div className="border-t border-[var(--color-ui-border)] p-3 ag-surface-subtle">
+                <div className="border-t border-[var(--color-ui-border)] p-3 ag-surface-subtle shrink-0">
                     <div className="text-[10px] font-bold uppercase ag-faint mb-1">Response</div>
                     <div className="text-xs ag-text-secondary max-h-24 overflow-y-auto whitespace-pre-wrap">{liveResponse}</div>
                 </div>

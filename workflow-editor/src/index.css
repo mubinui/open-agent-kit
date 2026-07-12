@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Tailwind v4 defaults `dark:` to the OS `prefers-color-scheme` media query, and it
+   ignores the legacy tailwind.config.js `darkMode` option. Without this line every
+   dark: utility in the app tracks the OS theme instead of the in-app toggle (which
+   sets a .dark class on <html>) — the exact "colors stay bright after switching to
+   dark theme" bug. This re-binds dark: to the class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
     /* Rich, vibrant curated color palette */
     --color-canvas-bg: #f3f5f8;
@@ -233,6 +240,21 @@ body {
 }
 
 /* ReactFlow Customizations */
+
+/* Canvas nodes must NOT use backdrop-filter: every blurred node forces the browser to
+   re-composite the layer behind it on each frame of a drag or pan, which is the main
+   source of choppy node movement. Nodes sit on a flat dotted canvas, so a solid,
+   opaque surface looks identical and is dramatically cheaper to move. */
+.react-flow__node .ag-surface-raised {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: #ffffff !important;
+}
+
+.dark .react-flow__node .ag-surface-raised {
+    background-color: #0f172a !important;
+}
+
 .react-flow__edge-path {
     stroke: #94a3b8;
     stroke-width: 2;

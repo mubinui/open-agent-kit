@@ -1,59 +1,36 @@
 import { memo, useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
+import type { LucideIcon } from 'lucide-react';
 import { Play, MessageSquare, Link, Loader2, Check, X } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import type { WorkflowNodeData } from '../../types/workflow';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { api } from '../../api/client';
+import { NODE_TONE, triggerToneForType } from '../../utils/nodeTheme';
 
-const getTriggerStyle = (type?: string) => {
-    switch (type) {
-        case 'chat':
-            return {
-                icon: MessageSquare,
-                bg: 'bg-blue-50',
-                text: 'text-blue-600',
-                border: 'border-blue-100',
-                borderSelected: 'border-blue-500',
-                shadowSelected: 'shadow-[0_0_0_4px_rgba(37,99,235,0.2)]',
-                hover: 'hover:border-blue-400',
-                handleColor: 'bg-blue-500',
-                runBg: 'bg-blue-600 hover:bg-blue-700'
-            };
-        case 'webhook':
-            return {
-                icon: Link,
-                bg: 'bg-pink-50',
-                text: 'text-pink-600',
-                border: 'border-pink-100',
-                borderSelected: 'border-pink-500',
-                shadowSelected: 'shadow-[0_0_0_4px_rgba(219,39,119,0.2)]',
-                hover: 'hover:border-pink-400',
-                handleColor: 'bg-pink-500',
-                runBg: 'bg-pink-600 hover:bg-pink-700'
-            };
-        case 'manual':
-        default:
-            return {
-                icon: Play,
-                bg: 'bg-green-50',
-                text: 'text-green-600',
-                border: 'border-green-100',
-                borderSelected: 'border-green-500',
-                shadowSelected: 'shadow-[0_0_0_4px_rgba(34,197,94,0.2)]',
-                hover: 'hover:border-green-400',
-                handleColor: 'bg-green-500',
-                runBg: 'bg-green-600 hover:bg-green-700'
-            };
-    }
+const ICON_FOR_TRIGGER_TYPE: Record<string, LucideIcon> = {
+    chat: MessageSquare,
+    webhook: Link,
+    manual: Play,
 };
 
 export const TriggerNode = memo(({ id, data, selected }: NodeProps<Node<WorkflowNodeData>>) => {
     const config = data.config as any;
-    const style = getTriggerStyle(config?.trigger_type);
-    const Icon = style.icon;
+    const triggerType = config?.trigger_type || 'manual';
+    const tone = NODE_TONE[triggerToneForType(triggerType)];
+    const Icon = ICON_FOR_TRIGGER_TYPE[triggerType] ?? Play;
 
-    const { currentWorkflowId, setExecutingTrigger, executingTriggerId, triggerResult } = useWorkflowStore();
+    // Selector-scoped: this node only re-renders when these specific fields change,
+    // not on every node/edge update elsewhere on the canvas.
+    const { currentWorkflowId, setExecutingTrigger, executingTriggerId, triggerResult } = useWorkflowStore(
+        useShallow((state) => ({
+            currentWorkflowId: state.currentWorkflowId,
+            setExecutingTrigger: state.setExecutingTrigger,
+            executingTriggerId: state.executingTriggerId,
+            triggerResult: state.triggerResult,
+        })),
+    );
     const [localStatus, setLocalStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
 
     const isExecuting = executingTriggerId === id || localStatus === 'running';
@@ -122,24 +99,26 @@ export const TriggerNode = memo(({ id, data, selected }: NodeProps<Node<Workflow
     };
 
     return (
-        <div className="relative flex flex-col items-center justify-center">
+        // `group` lives on the outer wrapper (not the inner circle) so the run button —
+        // a sibling of the circle, not a descendant — actually receives group-hover.
+        <div className="group relative flex flex-col items-center justify-center">
             <div
-                className={`group flex items-center justify-center w-14 h-14 ag-surface-raised rounded-full border-2 shadow-sm transition-all duration-200
+                className={`flex items-center justify-center w-14 h-14 ag-surface-raised rounded-full border-2 shadow-sm transition-all duration-200
                 ${selected
-                        ? `${style.borderSelected} ${style.shadowSelected}`
-                        : `${style.border} ${style.hover} hover:shadow-md`
+                        ? `${tone.handleBorder} ${tone.ring}`
+                        : `${tone.border} ${tone.borderHover} hover:shadow-md`
                     }
-                ${showSuccess ? 'ring-4 ring-green-400/50' : ''}
-                ${showError ? 'ring-4 ring-red-400/50' : ''}
+                ${showSuccess ? 'ring-4 ring-emerald-400/50 dark:ring-emerald-400/40' : ''}
+                ${showError ? 'ring-4 ring-red-400/50 dark:ring-red-400/40' : ''}
                 `}
             >
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${style.bg} ${style.text} transition-transform group-hover:scale-110`}>
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full ${tone.iconBg} ${tone.iconText} transition-transform group-hover:scale-110`}>
                     {isExecuting ? (
                         <Loader2 size={20} className="animate-spin" />
                     ) : showSuccess ? (
-                        <Check size={20} className="text-green-600" />
+                        <Check size={20} className="text-emerald-600 dark:text-emerald-400" />
                     ) : showError ? (
-                        <X size={20} className="text-red-600" />
+                        <X size={20} className="text-red-600 dark:text-red-400" />
                     ) : (
                         <Icon size={20} fill="currentColor" className="ml-0.5" />
                     )}
@@ -149,8 +128,7 @@ export const TriggerNode = memo(({ id, data, selected }: NodeProps<Node<Workflow
                 <Handle
                     type="source"
                     position={Position.Right}
-                    className={`!w-3 !h-3 !-right-[7px] !bg-[var(--color-surface-raised)] !border-[3px] !border-${style.handleColor.replace('bg-', '')} group-hover:!${style.handleColor} transition-colors z-10`}
-                    style={{ borderColor: 'currentColor' }}
+                    className={`!w-3 !h-3 !-right-[7px] !bg-[var(--color-surface-raised)] !border-[3px] ${tone.handleBorder} ${tone.handleHover} transition-colors z-10`}
                 />
             </div>
 
@@ -158,7 +136,7 @@ export const TriggerNode = memo(({ id, data, selected }: NodeProps<Node<Workflow
             <button
                 onClick={handleRun}
                 disabled={isExecuting}
-                className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${style.runBg} text-white shadow-lg 
+                className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${tone.actionBg} text-white shadow-lg
                     flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200
                     hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed z-20
                     ${isExecuting || showSuccess || showError ? 'opacity-100' : ''}`}

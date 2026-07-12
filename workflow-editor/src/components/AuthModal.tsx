@@ -266,7 +266,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                 <div key={key.id} className="p-3 flex items-center justify-between bg-gray-50/50 dark:bg-slate-900/20 text-[11px]">
                                     <div>
                                         <span className="font-bold text-gray-900 dark:text-white block">{key.name}</span>
-                                        <span className="text-gray-400">
+                                        <span className="text-gray-400 dark:text-slate-500">
                                             {key.role} · created {new Date(key.created_at).toLocaleDateString()}
                                         </span>
                                     </div>

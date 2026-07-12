@@ -1,44 +1,13 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Plus, Layout, Save, Download, Upload, Copy, Check, ShieldCheck, Play, Moon, Sun, Home, Zap, Rocket } from 'lucide-react';
+import { Plus, Layout, Save, Download, Upload, Copy, Check, ShieldCheck, Play, Moon, Sun, Home, Zap, Rocket, Sparkles } from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
-import type { Node, Edge } from '@xyflow/react';
-import dagre from 'dagre';
+import { useShallow } from 'zustand/react/shallow';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useLibraryStore } from '../stores/libraryStore';
 import { buildWorkflowPayload } from '../utils/workflowPayload';
+import { getLayoutedElements } from '../utils/layout';
 import { OakLogo } from './OakLogo';
 import { useTheme } from '../hooks/useTheme';
-
-// --- DAGRE LAYOUT LOGIC ---
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-    dagreGraph.setGraph({ rankdir: 'LR' });
-
-    nodes.forEach((node) => {
-        dagreGraph.setNode(node.id, { width: 250, height: 100 });
-    });
-
-    edges.forEach((edge) => {
-        dagreGraph.setEdge(edge.source, edge.target);
-    });
-
-    dagre.layout(dagreGraph);
-
-    const layoutedNodes = nodes.map((node) => {
-        const nodeWithPosition = dagreGraph.node(node.id);
-        return {
-            ...node,
-            position: {
-                x: nodeWithPosition.x - 125,
-                y: nodeWithPosition.y - 50,
-            },
-        };
-    });
-
-    return { nodes: layoutedNodes, edges };
-};
 
 const isSelectorTopology = (topology: any) => (
     Boolean(topology?.entry_node)
@@ -71,10 +40,25 @@ interface HeaderProps {
     onOpenLanding?: () => void;
     onOpenTester?: () => void;
     onOpenDeploy?: () => void;
+    builderOpen?: boolean;
+    onToggleBuilder?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onOpenDeploy }) => {
-    const { nodes, edges, setNodes, setEdges, onNodesChange, currentWorkflowId, workflowName, setWorkflowName, setCurrentWorkflow, loadWorkflow } = useWorkflowStore();
+export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onOpenDeploy, builderOpen = false, onToggleBuilder }) => {
+    // Only `workflowName` is actually rendered here — everything else is read fresh via
+    // getState() inside handlers so this header doesn't re-render on every node/edge
+    // change (e.g. every mousemove frame while dragging a node on the canvas).
+    const workflowName = useWorkflowStore((state) => state.workflowName);
+    const { setNodes, setEdges, onNodesChange, setWorkflowName, setCurrentWorkflow, loadWorkflow } = useWorkflowStore(
+        useShallow((state) => ({
+            setNodes: state.setNodes,
+            setEdges: state.setEdges,
+            onNodesChange: state.onNodesChange,
+            setWorkflowName: state.setWorkflowName,
+            setCurrentWorkflow: state.setCurrentWorkflow,
+            loadWorkflow: state.loadWorkflow,
+        })),
+    );
     const { savedWorkflows, saveWorkflow, validateWorkflow, executeWorkflow, isLoading, fetchLibraryItems } = useLibraryStore();
     const { fitView } = useReactFlow();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +75,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
     };
 
     const handleLayout = useCallback(() => {
+        const { nodes, edges } = useWorkflowStore.getState();
         const { nodes: layoutedNodes } = getLayoutedElements(nodes, edges);
         const changes = layoutedNodes.map((node) => ({
             id: node.id,
@@ -100,9 +85,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
         // @ts-ignore
         onNodesChange(changes);
         setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 100);
-    }, [nodes, edges, onNodesChange, fitView]);
+    }, [onNodesChange, fitView]);
 
     const handleSave = async () => {
+        const { nodes, edges, currentWorkflowId } = useWorkflowStore.getState();
         if (!nodes.length) {
             alert("Cannot save an empty workflow.");
             return;
@@ -186,6 +172,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
     };
 
     const handleValidate = async () => {
+        const { currentWorkflowId } = useWorkflowStore.getState();
         if (!currentWorkflowId) {
             alert('Save or load a workflow before validating.');
             return;
@@ -199,6 +186,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
     };
 
     const handleExecute = async () => {
+        const { currentWorkflowId } = useWorkflowStore.getState();
         if (!currentWorkflowId) {
             alert('Save or load a workflow before executing.');
             return;
@@ -215,6 +203,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
 
     // --- EXPORT: Download workflow as JSON ---
     const handleExport = () => {
+        const { nodes, edges } = useWorkflowStore.getState();
         if (!nodes.length) {
             alert("Nothing to export - canvas is empty.");
             return;
@@ -276,6 +265,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
 
     // --- COPY: Copy workflow JSON to clipboard ---
     const handleCopy = async () => {
+        const { nodes, edges } = useWorkflowStore.getState();
         if (!nodes.length) {
             alert("Nothing to copy - canvas is empty.");
             return;
@@ -297,73 +287,78 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
         }
     };
 
+    // One quiet, uniform style for every secondary action — the previous header mixed
+    // blue/purple/emerald bold nav buttons with labeled and icon buttons of different
+    // sizes, which read as clutter. Icon-only actions carry a title tooltip.
+    const iconAction = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white transition-colors';
+    const navAction = 'flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white transition-colors';
+
     return (
-        <header className="h-14 bg-white dark:bg-[#0b111b] border-b border-[var(--color-ui-border)] flex items-center justify-between px-4 z-20 shadow-sm transition-colors">
-            <div className="flex items-center gap-3">
-                <OakLogo className="w-8 h-8 rounded-lg shadow-sm" />
-                <div className="flex flex-col">
-                    <div className="flex items-baseline gap-1.5">
+        <header className="h-14 shrink-0 bg-white dark:bg-[#0b111b] border-b border-[var(--color-ui-border)] flex items-center justify-between gap-3 px-4 z-20 shadow-sm transition-colors">
+            {/* Brand + workflow identity */}
+            <div className="flex min-w-0 items-center gap-3">
+                <OakLogo className="w-8 h-8 rounded-lg shadow-sm shrink-0" />
+                <div className="flex min-w-0 flex-col">
+                    <div className="flex items-baseline gap-1.5 whitespace-nowrap">
                         <span className="brand-lockup-title">Open Agent Kit</span>
-                        <span className="brand-lockup-tagline">Agent Studio</span>
+                        <span className="brand-lockup-tagline hidden xl:inline">Agent Studio</span>
                     </div>
                     <input
-                        className="text-sm font-semibold text-gray-900 dark:text-white bg-transparent border-none p-0 focus:ring-0 w-48 hover:bg-gray-50 dark:hover:bg-slate-800/50 rounded px-1 -ml-1 transition-colors"
+                        className="w-44 truncate text-sm font-semibold text-gray-900 dark:text-white bg-transparent border-none p-0 focus:ring-0 hover:bg-gray-50 dark:hover:bg-slate-800/50 rounded px-1 -ml-1 transition-colors"
                         value={workflowName}
                         onChange={(e) => setWorkflowName(e.target.value)}
+                        title="Workflow name"
                     />
                 </div>
             </div>
 
-            <div className="flex items-center gap-2">
-                {/* Navigation Views Switchers */}
-                {onOpenLanding && (
+            {/* Actions */}
+            <div className="flex shrink-0 items-center gap-1">
+                {/* AI Builder — collapses into this button; opens as a floating window */}
+                {onToggleBuilder && (
                     <button
-                        onClick={onOpenLanding}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-blue-600 dark:text-sky-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-md transition-colors"
-                        title="Return to Welcome Hub"
+                        onClick={onToggleBuilder}
+                        className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${builderOpen
+                            ? 'bg-[var(--color-primary)] text-white shadow-sm'
+                            : 'border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                            }`}
+                        title={builderOpen ? 'Close the AI Builder' : 'Open the AI Builder — generate agents, tools, and workflows'}
                     >
+                        <Sparkles size={14} />
+                        <span className="hidden md:inline">Builder</span>
+                    </button>
+                )}
+
+                <div className="mx-1.5 h-5 w-px bg-gray-200 dark:bg-slate-800" />
+
+                {/* View navigation */}
+                {onOpenLanding && (
+                    <button onClick={onOpenLanding} className={navAction} title="Return to welcome hub">
                         <Home size={14} />
-                        <span className="hidden md:inline">Hub</span>
+                        <span className="hidden lg:inline">Hub</span>
                     </button>
                 )}
                 {onOpenTester && (
-                    <button
-                        onClick={onOpenTester}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-slate-800 rounded-md transition-colors"
-                        title="Launch Live LLM Tester Sandbox"
-                    >
+                    <button onClick={onOpenTester} className={navAction} title="Open live LLM tester">
                         <Zap size={14} />
-                        <span className="hidden md:inline">Live API</span>
+                        <span className="hidden lg:inline">Live API</span>
                     </button>
                 )}
                 {onOpenDeploy && (
-                    <button
-                        onClick={onOpenDeploy}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 rounded-md transition-colors"
-                        title="Open Production Deploy Hub"
-                    >
+                    <button onClick={onOpenDeploy} className={navAction} title="Open deploy hub">
                         <Rocket size={14} />
-                        <span className="hidden md:inline">Deploy</span>
+                        <span className="hidden lg:inline">Deploy</span>
                     </button>
                 )}
 
-                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1"></div>
+                <div className="mx-1.5 h-5 w-px bg-gray-200 dark:bg-slate-800" />
 
-                {/* Export/Import/Copy */}
-                <button
-                    onClick={handleExport}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                    title="Download workflow as JSON"
-                >
-                    <Download size={14} />
+                {/* File actions */}
+                <button onClick={handleExport} className={iconAction} title="Download workflow as JSON">
+                    <Download size={15} />
                 </button>
-
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                    title="Import workflow from JSON"
-                >
-                    <Upload size={14} />
+                <button onClick={() => fileInputRef.current?.click()} className={iconAction} title="Import workflow from JSON">
+                    <Upload size={15} />
                 </button>
                 <input
                     ref={fileInputRef}
@@ -372,87 +367,51 @@ export const Header: React.FC<HeaderProps> = ({ onOpenLanding, onOpenTester, onO
                     onChange={handleImport}
                     className="hidden"
                 />
-
-                <button
-                    onClick={handleCopy}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                    title="Copy workflow to clipboard"
-                >
-                    {copied ? <Check size={14} className="text-green-600 dark:text-emerald-400" /> : <Copy size={14} />}
+                <button onClick={handleCopy} className={iconAction} title="Copy workflow to clipboard">
+                    {copied ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
+                </button>
+                <button onClick={handleLayout} className={iconAction} title="Auto-arrange layout">
+                    <Layout size={15} />
                 </button>
 
-                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1"></div>
+                <div className="mx-1.5 h-5 w-px bg-gray-200 dark:bg-slate-800" />
 
-                <button
-                    onClick={handleLayout}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                    title="Auto Format"
-                >
-                    <Layout size={14} />
-                    Format
-                </button>
-
-                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1"></div>
-
+                {/* Workflow lifecycle */}
                 <select
                     onFocus={() => fetchLibraryItems()}
                     onChange={(event) => handleLoadWorkflow(event.target.value)}
                     value=""
-                    className="max-w-44 px-2 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-md transition-colors"
+                    className="hidden md:block h-8 max-w-40 rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs font-medium text-gray-700 dark:text-gray-200 transition-colors"
                     title="Load workflow from backend"
                 >
-                    <option value="">Load workflow...</option>
+                    <option value="">Load workflow…</option>
                     {savedWorkflows.map((workflow) => (
                         <option key={workflow.id} value={workflow.id}>{workflow.name}</option>
                     ))}
                 </select>
-
-                <button
-                    onClick={handleValidate}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                    title="Validate saved workflow"
-                >
-                    <ShieldCheck size={14} />
-                    Validate
+                <button onClick={handleValidate} className={iconAction} title="Validate saved workflow">
+                    <ShieldCheck size={15} />
+                </button>
+                <button onClick={handleExecute} className={iconAction} title="Execute saved workflow">
+                    <Play size={15} />
                 </button>
 
-                <button
-                    onClick={handleExecute}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                    title="Execute saved workflow"
-                >
-                    <Play size={14} />
-                    Execute
+                <div className="mx-1.5 h-5 w-px bg-gray-200 dark:bg-slate-800" />
+
+                <button onClick={toggleTheme} className={iconAction} title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+                    {isDark ? <Sun size={15} /> : <Moon size={15} />}
                 </button>
-
-                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1"></div>
-
-                <button
-                    onClick={toggleTheme}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                    title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                >
-                    {isDark ? <Sun size={14} /> : <Moon size={14} />}
-                    {isDark ? 'Light' : 'Dark'}
-                </button>
-
-                <div className="w-px h-5 bg-gray-200 dark:bg-slate-800 mx-1"></div>
-
-                <button
-                    onClick={handleNew}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                >
+                <button onClick={handleNew} className={navAction} title="Start a new workflow">
                     <Plus size={14} />
-                    New
+                    <span className="hidden lg:inline">New</span>
                 </button>
-
                 <button
                     onClick={handleSave}
                     disabled={isLoading}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[var(--color-primary-hover)] disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                     <Save size={14} />
-                    {isLoading ? 'Saving...' : 'Save'}
+                    {isLoading ? 'Saving…' : 'Save'}
                 </button>
             </div>
         </header>

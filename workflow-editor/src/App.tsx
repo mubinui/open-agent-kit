@@ -36,36 +36,56 @@ function App() {
   // Navigation views state: 'landing' | 'canvas' | 'tester' | 'deploy'
   const [currentScreen, setCurrentScreen] = useState<'landing' | 'canvas' | 'tester' | 'deploy'>('landing');
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  // AI Builder lives behind a header button as a floating window — it no longer
+  // consumes permanent layout width next to the canvas.
+  const [builderOpen, setBuilderOpen] = useState(false);
 
   const openLibraryModal = (tab: 'tools' | 'agents' | 'functions' | 'prompts' | 'providers' | 'ops' = 'tools') => {
     setLibraryModalTab(tab);
     setLibraryModalOpen(true);
   };
 
+  // The studio workspace (canvas, panels, palettes) only makes sense on the 'canvas'
+  // screen. Landing/tester/deploy are full-screen overlays (each `absolute inset-0 z-30`);
+  // mounting the studio underneath them let its higher z-index panels (chat, inspector,
+  // execution timeline) visually punch through. Unmounting it entirely when inactive
+  // fixes that at the source instead of chasing z-index values.
+  const isStudioActive = currentScreen === 'canvas';
+
   return (
     <LibraryModalContext.Provider value={{ openLibraryModal }}>
       <ReactFlowProvider>
         <div className="flex h-screen w-screen bg-[var(--color-canvas-bg)] overflow-hidden flex-col relative">
-          {/* Main Global Topbar Header */}
-          <Header
-            onOpenLanding={() => setCurrentScreen('landing')}
-            onOpenTester={() => setCurrentScreen('tester')}
-            onOpenDeploy={() => setCurrentScreen('deploy')}
-          />
+          {/* Studio toolbar — only meaningful on the canvas screen. Landing, tester, and
+              deploy are full-screen views with their own chrome (nav / close buttons),
+              so the workflow toolbar must not bleed into them. */}
+          {isStudioActive && (
+            <Header
+              onOpenLanding={() => setCurrentScreen('landing')}
+              onOpenTester={() => setCurrentScreen('tester')}
+              onOpenDeploy={() => setCurrentScreen('deploy')}
+              builderOpen={builderOpen}
+              onToggleBuilder={() => setBuilderOpen((open) => !open)}
+            />
+          )}
 
           {/* Active Workspaces Wrapper */}
           <div className="flex flex-grow h-full overflow-hidden relative">
             {/* Standard Canvas/Studio layout */}
-            <Sidebar />
-            <main className="flex-grow h-full relative flex min-w-0">
-              <LaunchpadPanel />
-              <div className="flex-1 relative min-w-0">
-                <WorkflowCanvas />
-                <PropertiesPanel />
-                <ChatPanel />
-                <ExecutionTimeline />
-              </div>
-            </main>
+            {isStudioActive && (
+              <>
+                <Sidebar />
+                <main className="flex-grow h-full relative flex min-w-0">
+                  <div className="flex-1 relative min-w-0">
+                    <WorkflowCanvas />
+                    {builderOpen && <LaunchpadPanel onClose={() => setBuilderOpen(false)} />}
+                    <ChatPanel />
+                    <ExecutionTimeline />
+                  </div>
+                  <PropertiesPanel />
+                </main>
+              </>
+            )}
 
             {/* View Overlay 1: Welcome Premium Landing Page */}
             {currentScreen === 'landing' && (
